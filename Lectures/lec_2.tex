@@ -1,2 +1,275 @@
-\lecture{2}{}{Derivatives as Linear Operators}
+% Lectures/lec_2.tex
+\lecture{2}{}{Equilibria, Stability, and Simulation}
 
+\begin{prev}
+	In our last lecture, we introduced the state-space representation for continuous-time dynamical systems, \(\dot{\vec{x}} = f(\vec{x}, \vec{u})\). We examined the structure of control-affine systems and general manipulator dynamics derived from Euler-Lagrange principles. We concluded by defining linear systems and showing how they arise from the linearization of nonlinear systems.
+\end{prev}
+
+\subsection{Equilibrium Points}
+
+A fundamental concept in analyzing dynamical systems is the notion of an equilibrium point, a state where the system can remain indefinitely if undisturbed.
+
+\begin{definition}[Equilibrium Point]
+	An equilibrium point (or fixed point) \(\vec{x}^*\) of a continuous-time system \(\dot{\vec{x}} = f(\vec{x}, \vec{u})\) for a constant control input \(\vec{u}^*\) is a state that satisfies:
+	\begin{equation}
+		f(\vec{x}^*, \vec{u}^*) = \vec{0}
+	\end{equation}
+	This means that if the system starts at \(\vec{x}^*\) with control \(\vec{u}^*\), its state derivative is zero, and it will not move.
+\end{definition}
+
+\begin{eg}[Pendulum Equilibria]
+	Consider the unforced pendulum (\(u=0\)). Its dynamics are:
+	\[
+		\dot{\vec{x}} = \begin{bmatrix} \dot{\theta} \\ -\frac{g}{l}\sin(\theta) \end{bmatrix} = \begin{bmatrix} 0 \\ 0 \end{bmatrix}
+	\]
+	This system of equations requires \(\dot{\theta} = 0\) and \(\sin(\theta) = 0\). This occurs when \(\theta = k\pi\) for any integer \(k\). The two distinct physical equilibria are:
+	\begin{itemize}
+		\item \(\vec{x}^*_1 = [0, 0]^{\top}\): The pendulum is hanging straight down, at rest.
+		\item \(\vec{x}^*_2 = [\pi, 0]^{\top}\): The pendulum is balanced perfectly upright, at rest.
+	\end{itemize}
+\end{eg}
+
+A basic control problem is to create a new equilibrium point. For instance, can we make the pendulum hang at \(\theta = \pi/2\)? We need to find a constant control \(u^*\) such that \(f([\pi/2, 0]^{\top}, u^*) = \vec{0}\).
+\[
+	\dot{\vec{x}} = \begin{bmatrix} 0 \\ \frac{1}{ml^2}(u^* - mgl\sin(\pi/2)) \end{bmatrix} = \begin{bmatrix} 0 \\ 0 \end{bmatrix}
+\]
+This requires \(u^* - mgl(1) = 0\), so \(u^* = mgl\). A constant torque can indeed hold the pendulum at this new equilibrium.
+
+\subsection{Stability of Equilibria}
+
+It's not enough to know where the equilibria are; we need to know if they are stable. If the system is perturbed slightly from an equilibrium, does it return, or does it move away?
+
+\begin{intuition}[1D Systems]
+	For a 1D system \(\dot{x} = f(x)\), we can visualize stability by plotting \(\dot{x}\) vs. \(x\).
+	\begin{center}
+		\input{Figures/phase_plot1d.tex}
+	\end{center}
+	An equilibrium \(x^*\) is \textbf{locally stable} if, for points \(x\) near \(x^*\), the dynamics push the state back towards \(x^*\). This happens when the slope of \(f(x)\) at \(x^*\) is negative.
+	\begin{itemize}
+		\item If \(\pdv{f}{x}|_{x^*} < 0\), the equilibrium is stable.
+		\item If \(\pdv{f}{x}|_{x^*} > 0\), the equilibrium is unstable.
+		\item If \(\pdv{f}{x}|_{x^*} = 0\), the analysis is inconclusive (marginally stable).
+	\end{itemize}
+\end{intuition}
+
+This concept generalizes to higher dimensions. For a system \(\dot{\vec{x}} = f(\vec{x})\), we linearize the dynamics around an equilibrium \(\vec{x}^*\). Let \(\delta\vec{x} = \vec{x} - \vec{x}^*\).
+\[
+	\delta\dot{\vec{x}} \approx \left.\pdv{f}{\vec{x}}\right|_{\vec{x}^*} \delta\vec{x} = \mat{A} \delta\vec{x}
+\]
+The stability of the nonlinear system near \(\vec{x}^*\) is determined by the stability of this linear system.
+
+\begin{theorem}[Stability by Linearization]
+	An equilibrium point \(\vec{x}^*\) of \(\dot{\vec{x}} = f(\vec{x})\) is:
+	\begin{itemize}
+		\item \textbf{Asymptotically Stable} if all eigenvalues of the Jacobian \(\mat{A} = \pdv{f}{\vec{x}}|_{\vec{x}^*}\) have strictly negative real parts (\(\text{Re}(\lambda_i) < 0\)).
+		\item \textbf{Unstable} if at least one eigenvalue of \(\mat{A}\) has a strictly positive real part (\(\text{Re}(\lambda_i) > 0\)).
+		\item \textbf{Marginally Stable} if all eigenvalues have non-positive real parts (\(\text{Re}(\lambda_i) \leq 0\)) and at least one has a zero real part.
+	\end{itemize}
+\end{theorem}
+
+\begin{eg}[Pendulum Stability Analysis]
+	The Jacobian of the unforced pendulum dynamics is:
+	\[
+		\mat{A} = \pdv{f}{\vec{x}} = \begin{bmatrix} 0 & 1 \\ -\frac{g}{l}\cos(\theta) & 0 \end{bmatrix}
+	\]
+	\begin{enumerate}
+		\item \textbf{At \(\vec{x}^*_1 = [0, 0]^{\top}\) (hanging down)}:
+		      \[
+			      \mat{A}|_{\theta=0} = \begin{bmatrix} 0 & 1 \\ -\frac{g}{l} & 0 \end{bmatrix}
+		      \]
+		      The eigenvalues are \(\lambda = \pm i\sqrt{g/l}\). Since the real parts are zero, this equilibrium is \textbf{marginally stable}. A small push will cause it to oscillate forever (in this frictionless model). If we added any damping (e.g., \(u = -K_d \dot{\theta}\)), the eigenvalues would move into the left-half plane, making it asymptotically stable.
+
+		\item \textbf{At \(\vec{x}^*_2 = [\pi, 0]^{\top}\) (upright)}:
+		      \[
+			      \mat{A}|_{\theta=\pi} = \begin{bmatrix} 0 & 1 \\ \frac{g}{l} & 0 \end{bmatrix}
+		      \]
+		      The eigenvalues are \(\lambda = \pm \sqrt{g/l}\). Since there is one positive real eigenvalue, this equilibrium is \textbf{unstable}. Any small perturbation will cause the pendulum to fall.
+	\end{enumerate}
+\end{eg}
+
+\subsection{Discrete-Time Dynamics and Simulation}
+
+Analytically solving nonlinear ODEs is rarely possible. We rely on numerical simulation to understand their behavior. This requires converting the continuous-time model into a discrete-time one.
+
+\begin{definition}[Discrete-Time System]
+	An explicit discrete-time system has the form:
+	\begin{equation}
+		\vec{x}_{k+1} = f_d(\vec{x}_k, \vec{u}_k)
+		\label{eq:discrete_dynamics}
+	\end{equation}
+	where \(\vec{x}_k\) is the state at time step \(k\), and \(f_d\) is the discrete-time dynamics function that maps the current state and input to the next state.
+\end{definition}
+
+The process of converting a continuous-time model \(f\) to a discrete-time model \(f_d\) is called \textbf{discretization} or \textbf{integration}.
+
+\subsubsection{The Forward Euler Method}
+
+The simplest way to discretize is to approximate the derivative \(\dot{\vec{x}}\) with a finite difference: \(\dot{\vec{x}} \approx \frac{\vec{x}_{k+1} - \vec{x}_k}{h}\), where \(h\) is the time step.
+\[
+	\frac{\vec{x}_{k+1} - \vec{x}_k}{h} = f(\vec{x}_k, \vec{u}_k) \implies \vec{x}_{k+1} = \vec{x}_k + h f(\vec{x}_k, \vec{u}_k)
+\]
+This is the \textbf{Forward Euler} integration scheme.
+
+\begin{code}[Julia Notebook: Forward Euler Simulation]
+	The provided Julia notebook first simulates the pendulum using this method. When you run this code, you will observe that the amplitude of the pendulum's oscillation grows with each swing. Eventually, it "blows up" with the angle going to infinity. This is because the Forward Euler method is not energy-preserving. At each step, it adds a small amount of energy to this conservative system, leading to catastrophic instability. This is a critical lesson: \textbf{never use Forward Euler for simulating mechanical systems}.
+\end{code}
+
+\subsubsection{Stability of Discrete-Time Systems}
+
+Stability for discrete-time systems is defined by how the system behaves under repeated application of the map \(f_d\). For a linear discrete-time system \(\vec{x}_{k+1} = \mat{A}_d \vec{x}_k\), stability requires that \(\lim_{k\to\infty} \mat{A}_d^k \vec{x}_0 = \vec{0}\). This condition is met if and only if all eigenvalues of \(\mat{A}_d\) are strictly inside the unit circle in the complex plane.
+
+\begin{theorem}[Discrete-Time Stability]
+	A discrete-time linear system \(\vec{x}_{k+1} = \mat{A}_d \vec{x}_k\) is stable if and only if \(|\lambda_i| < 1\) for all eigenvalues \(\lambda_i\) of \(\mat{A}_d\).
+\end{theorem}
+
+For the Forward Euler method, the discrete-time Jacobian is \(\mat{A}_d = \pdv{f_d}{\vec{x}} = \mat{I} + h\mat{A}\).
+
+\begin{code}[Julia Notebook: Stability of Forward Euler]
+	The notebook analyzes the stability of the Forward Euler discretization of the pendulum around its stable equilibrium (\(\theta=0\)). It computes the eigenvalues of \(\mat{A}_d = \mat{I} + h\mat{A}|_{\theta=0}\). The result shows that the magnitude of these eigenvalues is always slightly greater than 1 for any \(h > 0\). This analytically confirms why the simulation is unstable: the discretization method itself is unstable for this type of system (systems with purely imaginary eigenvalues).
+\end{code}
+
+\subsubsection{The Runge-Kutta 4 (RK4) Method}
+
+A much better explicit integrator is the 4th-order Runge-Kutta (RK4) method. Instead of taking a single step in the direction of the derivative at the start of the interval, it evaluates the derivative at several points within the interval to get a much more accurate estimate of the next state.
+
+\begin{algorithm}[H]
+	\DontPrintSemicolon
+	\caption{RK4 Step}
+	\KwIn{Current state \(\vec{x}_k\), time step \(h\)}
+	\KwOut{Next state \(\vec{x}_{k+1}\)}
+	\BlankLine
+	\(\vec{k}_1 = f(\vec{x}_k)\) \;
+	\(\vec{k}_2 = f(\vec{x}_k + \frac{h}{2}\vec{k}_1)\) \;
+	\(\vec{k}_3 = f(\vec{x}_k + \frac{h}{2}\vec{k}_2)\) \;
+	\(\vec{k}_4 = f(\vec{x}_k + h\vec{k}_3)\) \;
+	\(\vec{x}_{k+1} = \vec{x}_k + \frac{h}{6}(\vec{k}_1 + 2\vec{k}_2 + 2\vec{k}_3 + \vec{k}_4)\) \;
+\end{algorithm}
+
+\begin{code}[Julia Notebook: RK4 Simulation and Stability]
+	The notebook also simulates the pendulum with RK4. The result is a stable oscillation. The energy is much better conserved, and the amplitude remains constant. Analyzing the eigenvalues of the RK4 discrete Jacobian \(\mat{A}_d\) shows their magnitudes are extremely close to 1. This indicates that RK4 is a much more stable and accurate choice for this type of simulation. The slight deviation from 1 explains the very slow energy drift that still occurs over very long simulations.
+\end{code}
+
+\begin{note}
+	The notebook also includes a \textbf{Backward Euler} integrator. This is an \textit{implicit} method, meaning it solves an equation \(\vec{x}_{k+1} = \vec{x}_k + hf(\vec{x}_{k+1})\) at each step. Implicit methods are generally very stable, but often introduce "numerical damping," causing energy to decrease even in a conservative system. This can be useful for stiff systems or when stability is paramount, but it may not accurately reflect the physics.
+\end{note}
+
+\subsection{Key Takeaways on Simulation}
+\begin{itemize}
+	\item Choosing the right numerical integrator is crucial for obtaining meaningful simulation results.
+	\item Explicit methods like Forward Euler can be unstable and add energy to conservative systems. Avoid them.
+	\item Higher-order methods like RK4 provide a much better balance of accuracy, stability, and computational cost for many problems in robotics.
+	\item Always sanity-check your simulations by monitoring physical quantities that should be conserved, such as total energy or momentum.
+\end{itemize}
+
+\subsection{Supplementary Concepts}
+
+\subsubsection{Lyapunov Stability Theory}
+
+Consider an autonomous system \(\dot{\vec{x}} = f(\vec{x})\) with an equilibrium \(\vec{x}^*\) (i.e. \(f(\vec{x}^*)=0\)). Define the error \(\vec{e} = \vec{x} - \vec{x}^*\) and rewrite about the origin (w.l.o.g. take \(\vec{x}^* = \vec{0}\) by translation). We recall several nested stability notions.
+
+\begin{definition}[Stability Notions]
+	Let \(\dot{\vec{x}} = f(\vec{x})\) with equilibrium at \(\vec{0}\).
+	\begin{itemize}
+		\item (Lyapunov or \emph{stable in the sense of Lyapunov}): For every \(\varepsilon>0\) there exists \(\delta(\varepsilon)>0\) s.t. \(\|\vec{x}(0)\|<\delta\Rightarrow \|\vec{x}(t)\|<\varepsilon\) for all \(t\ge 0\).
+		\item (Asymptotically Stable): Stable, and \(\exists\,\delta'>0\) s.t. \(\|\vec{x}(0)\|<\delta'\Rightarrow \lim_{t\to\infty}\vec{x}(t)=\vec{0}\).
+		\item (Exponentially Stable): \(\exists\,c>0,\alpha>0,\delta''>0\) s.t. \(\|\vec{x}(0)\|<\delta''\Rightarrow \|\vec{x}(t)\| \le c e^{-\alpha t}\|\vec{x}(0)\|\) for all \(t\ge 0\).
+		\item (Globally Asymptotically / Exponentially Stable): The above properties hold for all initial conditions (no radius restriction).
+	\end{itemize}
+\end{definition}
+
+\begin{definition}[Positive (Semi)Definite, Radially Unbounded]
+	A continuous scalar function \(V: \mathbb{R}^n \to \mathbb{R}\) is
+	\begin{itemize}
+		\item Positive definite if \(V(\vec{0})=0\) and \(V(\vec{x})>0\) for all \(\vec{x}\neq \vec{0}\).
+		\item Positive semidefinite if \(V(\vec{x})\ge 0\) and \(V(\vec{0})=0\).
+		\item Radially unbounded (proper) if \(\|\vec{x}\|\to\infty \Rightarrow V(\vec{x})\to\infty\).
+	\end{itemize}
+\end{definition}
+
+\begin{definition}[Lyapunov Function]
+	A continuously differentiable \(V\) is a (strict) Lyapunov function for the equilibrium if it is positive definite and its orbital derivative \(\dot{V}(\vec{x}) := \nabla V(\vec{x})^{\top} f(\vec{x})\) is negative definite (or negative semidefinite for weaker conclusions) in a neighborhood \(\mathcal{D}\) of the origin.
+\end{definition}
+
+\begin{theorem}[Lyapunov Stability Theorem]
+	If there exists a positive definite function \(V\) with \(\dot{V}(\vec{x}) \le 0\) (negative semidefinite) in a neighborhood \(\mathcal{D}\) of the origin, then the equilibrium is Lyapunov stable. If additionally \(\dot{V}(\vec{x})<0\) (negative definite) for all \(\vec{x}\in \mathcal{D}\setminus\{0\}\), the equilibrium is asymptotically stable. If \(V\) and \(-\dot{V}\) satisfy quadratic bounds \(\alpha_1\|\vec{x}\|^2 \le V(\vec{x}) \le \alpha_2\|\vec{x}\|^2\) and \(\dot{V}(\vec{x}) \le -\alpha_3\|\vec{x}\|^2\), exponential stability follows.
+\end{theorem}
+
+\begin{theorem}[LaSalle Invariance Principle]
+	Let \(\Omega \subset \mathbb{R}^n\) be compact, positively invariant, and suppose \(V: \Omega\to\mathbb{R}\) is continuous, \(C^1\) on interior, with \(\dot{V}\le 0\) on \(\Omega\). Let \(E = \{\vec{x}\in \Omega : \dot{V}(\vec{x})=0\}\) and let \(\mathcal{M}\) be the largest invariant subset of \(E\). Then every trajectory starting in \(\Omega\) approaches \(\mathcal{M}\) as \(t\to\infty\). If \(\mathcal{M}=\{0\}\), the origin is asymptotically stable. If \(\Omega=\mathbb{R}^n\) and \(V\) is proper, global asymptotic stability can be concluded.
+\end{theorem}
+
+\paragraph{Linear Systems and Lyapunov Equation.} For \(\dot{\vec{x}}=\mat{A}\vec{x}\) with \(\mat{A}\) Hurwitz (all eigenvalues with negative real parts), for any symmetric positive definite \(\mat{Q}\) there exists a unique symmetric positive definite \(\mat{P}\) solving the Lyapunov equation
+\[
+	\mat{A}^\top \mat{P} + \mat{P}\mat{A} = -\mat{Q}.
+\]
+Then \(V(\vec{x}) = \vec{x}^\top \mat{P} \vec{x}\) is a quadratic Lyapunov function certifying exponential stability.
+
+\subsubsection{Basin / Region of Attraction}
+
+\begin{definition}[Basin (Region) of Attraction]
+	For an asymptotically stable equilibrium \(\vec{x}^*\), its (open) basin of attraction \(\mathcal{B}(\vec{x}^*)\) is the set of initial conditions whose trajectories converge to \(\vec{x}^*\):
+	\[
+		\mathcal{B}(\vec{x}^*) := \{\vec{x}_0 \in \mathbb{R}^n : \lim_{t\to\infty} \phi_t(\vec{x}_0) = \vec{x}^*\},
+	\]
+	where \(\phi_t\) denotes the flow map. If \(\mathcal{B}(\vec{x}^*) = \mathbb{R}^n\), the equilibrium is globally asymptotically stable.
+\end{definition}
+
+\paragraph{Lyapunov Level-Set Inner Approximations.} Suppose \(V\) is a Lyapunov function certifying asymptotic stability on domain \(\mathcal{D}\). Any sublevel set \(\mathcal{L}_c := \{\vec{x}: V(\vec{x}) \le c\}\) contained in \(\mathcal{D}\) with \(\dot{V}<0\) for nonzero points inside provides an inner approximation of \(\mathcal{B}(\vec{0})\). One may enlarge \(c\) until tangency with \(\dot{V}=0\) occurs. For polynomial systems, sum-of-squares (SOS) optimization can automate this search.
+
+\paragraph{Nonlinear Pendulum Example.} Including viscous damping \(\dot{\theta} = \omega,\; \dot{\omega} = -\frac{g}{l}\sin\theta - k\omega\) (\(k>0\)) makes \(\theta=0\) asymptotically stable. The (mechanical) energy \(E = \tfrac{1}{2} ml^2 \omega^2 + mgl(1-\cos\theta)\) decreases monotonically (\(\dot{E} = -k ml^2 \omega^2 \le 0\)). The basin of attraction is all of \(\mathbb{R}^2\) (global) when friction prevents escape; without damping it was only (marginally) stable, not attracting.
+
+\subsubsection{Poincaré--Bendixson Theorem}
+
+In planar continuous-time autonomous systems (\(n=2\)), the long-term behaviors are heavily constrained. The Poincaré--Bendixson Theorem rules out chaos (which requires dimension \(\ge 3\)).
+
+\begin{theorem}[Poincaré--Bendixson]
+	Let \(\dot{\vec{x}} = f(\vec{x})\) with \(f\in C^1\) on an open set \(\mathcal{U}\subset \mathbb{R}^2\). Suppose a trajectory \(\phi_t(\vec{x}_0)\) remains in a compact set \(\mathcal{K}\subset\mathcal{U}\) for all \(t\ge 0\) and contains no equilibrium points. Then the \(\omega\)-limit set of \(\vec{x}_0\) is a periodic orbit (limit cycle). More generally, any nonempty compact \(\omega\)-limit set that contains only finitely many equilibria is either (i) an equilibrium, (ii) a periodic orbit, or (iii) a finite union of equilibria and connecting heteroclinic orbits.
+\end{theorem}
+
+\paragraph{Consequences.} In \(2\)D one cannot have strange attractors. For physical robot subsystems reduced to two states (e.g. simplified balancing planes), observed sustained oscillations typically imply a limit cycle certified by the theorem.
+
+\paragraph{Application Template.} To use Poincaré--Bendixson:
+\begin{enumerate}
+	\item Find a forward-invariant compact set \(\mathcal{K}\) (e.g. by trapping region, energy bounds).
+	\item Show the trajectory stays in \(\mathcal{K}\) and does not converge to an equilibrium (e.g. by Dulac's criterion or sign of divergence arguments).
+	\item Conclude existence of a periodic orbit (limit cycle).
+\end{enumerate}
+
+\paragraph{Example (Van der Pol).} \(\ddot{x} - \mu (1 - x^2) \dot{x} + x = 0\) with \(\mu>0\) can be written as a planar system possessing a unique stable limit cycle; trajectories enter a compact trapping region and cannot settle at the sole equilibrium (the origin is unstable for \(\mu>0\)).
+
+\subsubsection{Controllability and Observability}
+
+We restrict to linear time-invariant (LTI) systems \(\dot{\vec{x}} = \mat{A}\vec{x} + \mat{B}\vec{u}\), \(\vec{y} = \mat{C}\vec{x} + \mat{D}\vec{u}\), with \(\mat{A}\in\mathbb{R}^{n\times n}\), \(\mat{B}\in\mathbb{R}^{n\times m}\), \(\mat{C}\in\mathbb{R}^{p\times n}\).
+
+\begin{definition}[Reachable / Controllable]
+	The system is (state) controllable if for any \(\vec{x}_0,\vec{x}_f\) there exists a finite time \(T\) and input \(\vec{u}(t)\) steering \(\vec{x}(0)=\vec{x}_0\) to \(\vec{x}(T)=\vec{x}_f\). It is (origin) reachable if each state can be reached from the origin. For LTI systems these notions coincide.
+\end{definition}
+
+\begin{definition}[Observable]
+	The pair \((\mat{A},\mat{C})\) is observable if any two distinct initial states \(\vec{x}_1(0)\neq \vec{x}_2(0)\) produce different output trajectories on some finite interval; equivalently the initial state is uniquely determined from knowledge of \(\vec{y}(t)\) and \(\vec{u}(t)\) over a finite horizon.
+\end{definition}
+
+\paragraph{Kalman Rank Conditions.} Define the controllability matrix
+\[
+	\mathcal{C} = \begin{bmatrix} \mat{B} & \mat{A}\mat{B} & \mat{A}^2 \mat{B} & \cdots & \mat{A}^{n-1}\mat{B} \end{bmatrix} \in \mathbb{R}^{n\times nm}
+\]
+and the observability matrix
+\[
+	\mathcal{O} = \begin{bmatrix} \mat{C} \\ \mat{C}\mat{A} \\ \mat{C}\mat{A}^2 \\ \vdots \\ \mat{C}\mat{A}^{n-1} \end{bmatrix} \in \mathbb{R}^{np \times n}.
+\]
+Then \((\mat{A},\mat{B})\) is controllable iff \(\text{rank}(\mathcal{C}) = n\); \((\mat{A},\mat{C})\) is observable iff \(\text{rank}(\mathcal{O}) = n\).
+
+\paragraph{PBH (Popov--Belevitch--Hautus) Tests.} An equivalent spectral test: \((\mat{A},\mat{B})\) is controllable iff \(\text{rank}\begin{bmatrix} \lambda \mat{I} - \mat{A} & \mat{B} \end{bmatrix} = n\) for all \(\lambda \in \mathbb{C}\). Likewise \((\mat{A},\mat{C})\) is observable iff \(\text{rank}\begin{bmatrix} \lambda \mat{I}-\mat{A} \\ \mat{C} \end{bmatrix} = n\) for all \(\lambda\in\mathbb{C}\).
+
+\paragraph{Stabilizability and Detectability.} If uncontrollable modes (eigenvalues) all lie in the open left-half plane, the system is stabilizable (we can design feedback to stabilize). Dually, if unobservable modes all decay, the system is detectable (an observer can be designed with asymptotic error convergence). These relaxed properties are sufficient for many optimal control designs (e.g. LQR requires stabilizability / detectability, not full controllability / observability).
+
+\paragraph{Energy / Gramian Characterization.} Over horizon \([0,T]\), the controllability Gramian is
+\[\mat{W}_c(T) = \int_0^T e^{\mat{A}t} \mat{B} \mat{B}^\top e^{\mat{A}^\top t}\, dt.\]
+If \(\mat{W}_c(T)\) is nonsingular for some (hence all sufficiently large) \(T>0\), the system is controllable. Minimum input energy to reach \(\vec{x}_f\) from 0 in time \(T\) is \(\vec{x}_f^\top \mat{W}_c(T)^{-1} \vec{x}_f\).
+Similarly, the observability Gramian \(\mat{W}_o(T) = \int_0^T e^{\mat{A}^\top t}\mat{C}^\top \mat{C} e^{\mat{A} t}\, dt\) is nonsingular iff \((\mat{A},\mat{C})\) is observable.
+
+\paragraph{Connection to Optimal Control.} Existence of a unique positive semidefinite solution to the Algebraic Riccati Equation (ARE) for LQR hinges on stabilizability and detectability. The resulting optimal feedback \(\vec{u} = -\mat{K}\vec{x}\) ensures closed-loop Lyapunov stability via the ARE as a Lyapunov equation for the cost-to-go.
+
+
+\bigskip
+\noindent\textbf{Summary.} Lyapunov functions certify (local/global, asymptotic/exponential) stability and approximate basins via level sets; planar systems admit only equilibria and limit cycles as nontrivial recurrent sets (Poincaré--Bendixson), and linear controllability/observability (with their relaxed forms) determine if we can stabilize or reconstruct system states---all foundational for designing and analyzing optimal controllers.

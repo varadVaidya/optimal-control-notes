@@ -1,1 +1,56 @@
-{}
+{
+    // LaTeX specific settings
+    // Word wrap and line formatting
+    "editor.wrappingIndent": "indent",
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true,
+    // LaTeX file specific settings
+    "[latex]": {
+        "editor.wordWrap": "on",
+        "editor.wordWrapColumn": 80,
+        "editor.formatOnSave": true,
+        "editor.formatOnType": true,
+        "editor.tabSize": 2,
+        "editor.insertSpaces": true,
+        "editor.detectIndentation": false,
+        "editor.wrappingStrategy": "advanced",
+        "editor.wrappingIndent": "indent"
+    },
+    // TeX file specific settings (for .tex files)
+    "[tex]": {
+        "editor.wordWrap": "on",
+        "editor.wordWrapColumn": 80,
+        "editor.formatOnSave": true,
+        "editor.formatOnType": true,
+        "editor.tabSize": 2,
+        "editor.insertSpaces": true,
+        "editor.detectIndentation": false,
+        "editor.wrappingStrategy": "advanced",
+        "editor.wrappingIndent": "indent"
+    },
+    // BibTeX file settings
+    "[bibtex]": {
+        "editor.wordWrap": "on",
+        "editor.formatOnSave": true,
+        "editor.tabSize": 2,
+        "editor.insertSpaces": true
+    },
+    // General editor improvements
+    "editor.autoIndent": "full",
+    "editor.bracketPairColorization.enabled": true,
+    "editor.guides.bracketPairs": true,
+    "editor.suggest.insertMode": "replace",
+    "editor.acceptSuggestionOnEnter": "on",
+    // File associations
+    "files.associations": {
+        "*.tex": "latex",
+        "*.bib": "bibtex"
+    },
+    // Whitespace and trimming
+    "files.trimTrailingWhitespace": true,
+    "files.trimFinalNewlines": true,
+    "files.insertFinalNewline": true,
+    // LaTeX Workshop specific formatting
+    "latex-workshop.formatting.latex": "latexindent",
+    "latex-workshop.formatting.bibtex": "bibtex-tidy"
+}

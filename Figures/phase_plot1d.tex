@@ -1,0 +1,41 @@
+% Figures/phase_plot_1d.tex
+\begin{tikzpicture}[
+        font=\sansmath\sffamily,
+        axis/.style={-Latex, thick},
+        every pin edge/.style={Latex-, thin},
+        every pin/.style={font=\sansmath\sffamily\small, pin distance=0.5cm}
+    ]
+    % Axes
+    \draw[axis] (-4.5,0) -- (4.5,0) node[below left] {$x$};
+    \draw[axis] (0,-2) -- (0,2) node[below left] {$\dot{x}$};
+
+    % Function f(x)
+    \draw[thick, NavyBlue, domain=-4.2:4.2, samples=100] plot (\x, {0.1*(\x-3.5)*(\x-0.5)*(\x+3)});
+
+    % Equilibria points
+    \node[circle, fill=black, inner sep=1.5pt] (e1) at (-3,0) {};
+    \node[circle, fill=black, inner sep=1.5pt] (e2) at (0.5,0) {};
+    \node[circle, fill=black, inner sep=1.5pt] (e3) at (3.5,0) {};
+
+    % Stability arrows and labels
+    % Unstable at x = -3
+    \draw[->, very thick, Red] (e1) ++(-0.8,0) -- ++(0.5,0);
+    \draw[->, very thick, Red] (e1) ++(0.3,0) -- ++(0.5,0);
+    \node[above=0.2cm of e1, Red, font=\small] {Unstable};
+    \draw[Red, dashed] (e1) ++(0,-2) -- ++(0,4);
+
+
+    % Stable at x = 0.5
+    \draw[->, very thick, ForestGreen] (e2) ++(-0.8,0) -- ++(0.5,0);
+    \draw[<-, very thick, ForestGreen] (e2) ++(0.3,0) -- ++(0.8,0);
+    \node[above=0.2cm of e2, ForestGreen, font=\small] {Stable};
+    \draw[ForestGreen, dashed] (e2) ++(0,-2) -- ++(0,4);
+
+
+    % Unstable at x = 3.5
+    \draw[<-, very thick, Red] (e3) ++(-0.8,0) -- ++(-0.5,0);
+    \draw[->, very thick, Red] (e3) ++(0.3,0) -- ++(0.5,0);
+    \node[above=0.2cm of e3, Red, font=\small] {Unstable};
+    \draw[Red, dashed] (e3) ++(0,-2) -- ++(0,4);
+
+\end{tikzpicture}
