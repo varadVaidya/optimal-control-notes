@@ -1,0 +1,116 @@
+% Lectures/lec_6.tex
+\lecture{6}{}{Duality, Regularization, and Merit Functions}
+\subsection{A Dual Perspective on Constraints}
+
+Let's revisit the core idea of constrained optimization. For an equality constrained problem of the form:
+\begin{align*}
+    \min_{\vec{x} \in \mathbb{R}^n} & \quad f(\vec{x}) \\
+    \text{subject to} & \quad \vec{c}(\vec{x}) = \vec{0}
+\end{align*}
+We can recast this problem into an unconstrained form by using an \textbf{indicator function}, which assigns an infinite penalty to any point that is not feasible.
+\[
+	\min_{\vec{x}} f(\vec{x}) + \mathcal{P}_{\infty}(\vec{c}(\vec{x}))
+	\quad \text{where} \quad
+	\mathcal{P}_{\infty}(\vec{v}) =
+	\begin{cases}
+		0, & \text{if } \vec{v} = \vec{0} \\
+		+\infty, & \text{if } \vec{v} \neq \vec{0}
+	\end{cases}
+\]
+While this formulation is mathematically equivalent, it is computationally intractable due to the discontinuous nature of the indicator function. A more practical approach is to achieve the same effect through duality. The indicator function can be expressed as a maximum over a new set of variables, the Lagrange multipliers \(\vec{\lambda}\):
+\[
+	\mathcal{P}_{\infty}(\vec{c}(\vec{x})) = \max_{\vec{\lambda} \in \mathbb{R}^m} \vec{\lambda}^{\top}\vec{c}(\vec{x})
+\]
+Substituting this into our minimization problem gives us the primal-dual formulation, where we seek a saddle point of the Lagrangian:
+\[
+	\min_{\vec{x}} \max_{\vec{\lambda}} \mathcal{L}(\vec{x}, \vec{\lambda}) = \min_{\vec{x}} \max_{\vec{\lambda}} \left( f(\vec{x}) + \vec{\lambda}^{\top}\vec{c}(\vec{x}) \right)
+\]
+Whenever the constraint \(\vec{c}(\vec{x}) \neq \vec{0}\), the inner maximization problem with respect to \(\vec{\lambda}\) will blow up, effectively enforcing the constraint.
+
+This concept can also be applied to inequality constraints. For an inequality constrained problem:
+\begin{align*}
+    \min_{\vec{x} \in \mathbb{R}^n} & \quad f(\vec{x}) \\
+    \text{subject to} & \quad \vec{c}(\vec{x}) \geq \vec{0}
+\end{align*}
+We can recast this problem into an unconstrained form by using an \textbf{indicator function} for the inequality constraint, which assigns an infinite penalty to any point that violates feasibility.
+\[
+	\min_{\vec{x}} f(\vec{x}) + \mathcal{P}_{\infty}^{-}(\vec{c}(\vec{x}))
+	\quad \text{where} \quad
+	\mathcal{P}_{\infty}^{-}(\vec{v}) =
+	\begin{cases}
+		0, & \text{if } \vec{v} \geq \vec{0} \\
+		+\infty, & \text{if } \vec{v} \not\geq \vec{0}
+	\end{cases}
+\]
+While this formulation is mathematically equivalent, it is computationally intractable due to the discontinuous nature of the indicator function. A more practical approach is to achieve the same effect through duality. The indicator function for inequality constraints can be expressed as a maximum over a restricted set of Lagrange multipliers \(\vec{\lambda} \geq \vec{0}\):
+\[
+	\mathcal{P}_{\infty}^{-}(\vec{c}(\vec{x})) = \max_{\vec{\lambda} \geq \vec{0}} -\vec{\lambda}^{\top}\vec{c}(\vec{x})
+\]
+To see why this holds, note that if \(\vec{c}(\vec{x}) \geq \vec{0}\) (feasible), then \(-\vec{\lambda}^{\top}\vec{c}(\vec{x}) \leq 0\) for all \(\vec{\lambda} \geq \vec{0}\), and the maximum is zero (achieved by setting \(\vec{\lambda} = \vec{0}\)). Conversely, if any component \(c_i(\vec{x}) < 0\) (infeasible), we can take the corresponding \(\lambda_i \to +\infty\), which drives \(-\lambda_i c_i(\vec{x}) \to +\infty\), making the maximum infinite.
+
+Substituting this into our minimization problem gives us the primal-dual formulation for inequality constraints, where we seek a saddle point of the Lagrangian:
+\[
+	\min_{\vec{x}} \max_{\vec{\lambda} \geq \vec{0}} \mathcal{L}(\vec{x}, \vec{\lambda}) = \min_{\vec{x}} \max_{\vec{\lambda} \geq \vec{0}} \left( f(\vec{x}) - \vec{\lambda}^{\top}\vec{c}(\vec{x}) \right)
+\]
+Whenever the constraint \(\vec{c}(\vec{x}) \not\geq \vec{0}\), the inner maximization problem with respect to \(\vec{\lambda}\) will blow up, effectively enforcing the constraint. Note the sign convention: for inequality constraints \(\vec{c}(\vec{x}) \geq \vec{0}\), the Lagrangian uses \(-\vec{\lambda}^{\top}\vec{c}(\vec{x})\) with \(\vec{\lambda} \geq \vec{0}\), in contrast to the equality case where we had \(+\vec{\lambda}^{\top}\vec{c}(\vec{x})\) with \(\vec{\lambda}\) unrestricted.
+
+\begin{intuition}
+	This saddle-point view is fundamental. The KKT conditions we derived earlier are precisely the conditions for a point \((\vec{x}^\star, \vec{\lambda}^\star)\) to be a stationary point (a saddle point) of the Lagrangian. At this point, the gradient with respect to both \(\vec{x}\) and \(\vec{\lambda}\) is zero. The KKT matrix from \autoref{eq:kkt_system} is the Hessian of the Lagrangian with respect to the concatenated vector \((\vec{x}, \vec{\lambda})\). For a true saddle point, this Hessian should not be positive definite, but rather \textbf{quasi-definite}: it must have a specific inertia, with a number of positive eigenvalues equal to the dimension of \(\vec{x}\) and a number of negative eigenvalues equal to the dimension of \(\vec{\lambda}\).
+\end{intuition}
+
+\subsection{Regularization of the KKT System}
+
+When we solve the KKT system (\autoref{eq:kkt_system}) using Newton's method, we rely on the KKT matrix having the correct inertia. If it does not, for example, if the Hessian of the Lagrangian \(\nabla^2_{\vec{x}\vec{x}} \mathcal{L}\) is not positive definite on the tangent space of the constraints, the resulting Newton step may not be a descent direction. This can cause the optimization to diverge.
+
+To robustify the solver, we can regularize the KKT matrix. Similar to the damped Newton's method for unconstrained optimization, we can add a multiple of the identity to ensure the correct matrix properties.
+\[
+	\begin{bmatrix}
+        \nabla^2_{\vec{x}\vec{x}} \mathcal{L} + \beta\mat{I} & (\pdv{\vec{c}}{\vec{x}})^{\top} \\
+        \pdv{\vec{c}}{\vec{x}} & -\beta\mat{I}
+    \end{bmatrix}
+    \begin{bmatrix} \delta\vec{x} \\ \delta\vec{\lambda} \end{bmatrix}
+    = - \begin{bmatrix} \nabla_{\vec{x}} \mathcal{L} \\ \vec{c}(\vec{x}) \end{bmatrix}
+\]
+where \(\beta > 0\) is a regularization parameter. By adding \(\beta\mat{I}\) to the top-left block and \(-\beta\mat{I}\) to the bottom-right, we can "push" the eigenvalues of the matrix to have the desired signs, guaranteeing that the computed step \((\delta\vec{x}, \delta\vec{\lambda})\) is a valid descent direction for our merit function.
+
+\begin{code}[Julia Notebook: Regularization]
+	The `regularization.ipynb` notebook provides a clear example of this issue. It sets up an equality constrained quadratic program. At a particular guess for \((\vec{x}, \lambda)\), it computes the eigenvalues of the KKT matrix and finds that it does not have the correct inertia (i.e., it is not quasi-definite). A standard Newton step from this point would fail.
+
+	The notebook then implements a regularized Newton step. It includes a `while` loop that checks the eigenvalues of the KKT matrix. If the inertia is incorrect, it adds a small damping term \(\beta\) and re-checks. This process continues until the matrix is guaranteed to be quasi-definite. The resulting step correctly moves towards the constrained minimum. This demonstrates how regularization is a crucial tool for creating robust, globalized solvers for constrained optimization.
+\end{code}
+
+\subsection{Merit Functions and Line Search}
+
+Regularization gives us a good search direction, but it doesn't tell us how far to step along it. A full Newton step \(\alpha=1\) might overshoot the minimum or even increase the objective or constraint violation. We need a scalar-valued \textbf{merit function} \(\Phi(\vec{x}, \vec{\lambda})\) that allows us to perform a line search to find an appropriate step size \(\alpha\).
+
+The goal of the merit function is to provide a single value that balances the competing goals of reducing the objective function and satisfying the constraints. There are several common choices:
+
+\begin{enumerate}
+    \item \textbf{\(l_2\) Merit Function}: Based on the squared norm of the KKT residual. This measures how close we are to satisfying the optimality conditions.
+    \[
+        \Phi(\vec{x}, \vec{\lambda}) = \frac{1}{2} \left\| \begin{bmatrix} \nabla_{\vec{x}} \mathcal{L}(\vec{x}, \vec{\lambda}) \\ \min (0,\vec{c}(\vec{x})) \\ \vec{d}(\vec{x}) \end{bmatrix} \right\|_2^2
+    \]
+    \item \textbf{\(l_1\) Penalty Function (Augmented Lagrangian)}: This is a very popular and effective choice. It combines the objective function with an \(l_1\) penalty on the constraint violation.
+    \[
+        \Phi(\vec{x}) = f(\vec{x}) + \rho \left\| \begin{bmatrix}
+            \min(0, \vec{c}(\vec{x})) \\
+            \vec{d}(\vec{x})
+        \end{bmatrix}
+    \right\|_1
+    \]
+    Here, \(\rho > 0\) is a penalty parameter that weights the importance of feasibility.
+\end{enumerate}
+
+Once we have a merit function \(\Phi\) and a search direction \(\Delta\vec{z} = (\delta\vec{x}, \delta\vec{\lambda})\), we can use a standard backtracking line search (like the Armijo rule from \autoref{eq:armijo}) to find a step length \(\alpha \in (0, 1]\) that ensures sufficient decrease in the merit function. Starting with \(\alpha = 1\), we iteratively reduce the step size:
+\[
+    \text{while } \Phi(\vec{z} + \alpha\Delta\vec{z}) > \Phi(\vec{z}) + c_1 \alpha \nabla\Phi(\vec{z})^{\top}\Delta\vec{z} \quad \text{do} \quad \alpha \gets \tau \alpha
+\]
+where \(\tau \in (0, 1)\) is the backtracking factor and \(c_1 \in (0, 1)\) is the Armijo parameter. The loop terminates when the the Armijo condition is satisfied, at which point we accept the step \(\vec{z}^{k+1} = \vec{z}^k + \alpha \Delta\vec{z}\).
+
+This combination of a robustly computed direction (via a regularized KKT solve) and a careful selection of step size (via a line search on a merit function) forms the core of modern Sequential Quadratic Programming (SQP) and Interior-Point solvers.
+
+\begin{code}[Julia Notebook: Merit Functions]
+	The `merit-functions.ipynb` notebook illustrates the necessity of a line search. It first computes a Gauss-Newton step for a constrained problem. The plot shows that taking a full step (\(\alpha=1\)) significantly overshoots the solution.
+
+	The notebook then defines an \(l_1\) merit function. It implements an Armijo backtracking line search that iteratively reduces \(\alpha\) by half until the sufficient decrease condition is met. The final step, scaled by the accepted \(\alpha\), makes clear progress towards the true minimum without overshooting. This powerfully demonstrates how a merit function and line search "globalize" the convergence of Newton-like methods, ensuring progress even when far from the optimal solution.
+\end{code}
