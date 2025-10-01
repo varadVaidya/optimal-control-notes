@@ -1,0 +1,91 @@
+% Lectures/lec_5.tex
+\lecture{5}{}{Solving Inequality-Constrained Problems}
+
+
+\subsection{Challenges with Inequality Constraints}
+
+Recall the KKT conditions for a problem \(\min f(\vec{x})\) s.t. \(\vec{c}(\vec{x}) \geq \vec{0}\):
+\begin{enumerate}
+    \item \textbf{Stationarity}: \(\nabla f(\vec{x}^*) - (\pdv{\vec{c}}{\vec{x}})^{\top}\vec{\lambda}^* = \vec{0}\) (note the sign change on \(\lambda\) is a common convention for \(\geq\) constraints)
+    \item \textbf{Primal Feasibility}: \(\vec{c}(\vec{x}^*) \geq \vec{0}\)
+    \item \textbf{Dual Feasibility}: \(\vec{\lambda}^* \geq \vec{0}\)
+    \item \textbf{Complementary Slackness}: \(\lambda \odot c(\vec{x}^*) = 0\)
+\end{enumerate}
+
+\paragraph{Role of Complementary Slackness ("Switching").} For each constraint component \(c_i(\vec{x}) \ge 0\) with multiplier \(\lambda_i \ge 0\), the complementarity condition \(\lambda_i c_i(\vec{x}^*) = 0\) enforces an automatic switch:
+\begin{itemize}
+    \item (Inactive case) If at the solution \(c_i(\vec{x}^*) > 0\), then necessarily \(\lambda_i = 0\). The stationarity condition then contains no contribution from this constraint, so locally this constraint behaves as if it were absent; i.e., the problem reduces (locally) to an unconstrained one in that direction.
+    \item (Active case) If \(c_i(\vec{x}^*) = 0\), the multiplier can be strictly positive \(\lambda_i > 0\). In that case the gradient contribution \(-\lambda_i \nabla c_i(\vec{x}^*)\) appears in stationarity, and \(c_i\) effectively acts like an equality constraint: motion that would violate \(c_i \ge 0\) is opposed by a restoring first-order term. The boundary is therefore ``sticky'': any feasible descent direction must be tangent to \(c_i(\vec{x})=0\).
+\end{itemize}
+Thus, complementary slackness encodes a discrete (active/inactive) combinatorial choice inside a continuous system of equations. This logical structure is the main obstacle to naively applying Newton's method directly to all KKT conditions: the feasible manifold changes dimension depending on which constraints are active.
+
+The presence of the inequality conditions (2 and 3) and the complementarity constraint (4) prevents us from directly applying Newton's method to solve this system as a standard root-finding problem. We need more sophisticated approaches.
+
+\subsection{Methods for Inequality-Constrained Optimization}
+
+\subsubsection{Active-Set Methods}
+These methods work by maintaining a "guess" of which constraints will be active (equal to zero) at the solution.
+\begin{enumerate}
+    \item Solve the equality-constrained problem assuming the current active set is correct.
+    \item Check the KKT conditions. If any Lagrange multipliers for the active set are negative, it means the objective could be improved by making that constraint inactive. Remove it from the active set.
+    \item If any inactive constraints are violated, add them to the active set.
+    \item Repeat until all conditions are satisfied.
+\end{enumerate}
+
+Active-set methods work well for problems where the active set doesn't change much between iterations, such as Quadratic Programs (QPs).
+
+\paragraph{Consequences of a Wrong Active Set Guess.}
+Suppose the true optimal active set is \(\mathcal{A}^* = \{ i : c_i(\vec{x}^*) = 0 \}\).
+\begin{itemize}
+    \item (Missing an active constraint) If we temporarily exclude some \(j \in \mathcal{A}^*\) from the working set, we solve a relaxation. The intermediate solution \(\tilde{\vec{x}}\) will typically violate feasibility with \(c_j(\tilde{\vec{x}}) < 0\) (if constraints were encoded as \(c_i(\vec{x}) \ge 0\)), flagging the need to add constraint \(j\).
+    \item (Including an inactive constraint) If we include some \(k \notin \mathcal{A}^*\), we may obtain a Lagrange multiplier \(\lambda_k < 0\). Violated dual feasibility indicates the constraint should be removed, since maintaining it would artificially restrict descent directions.
+\end{itemize}
+These tests (primal violation for missing constraints, negative multipliers for superfluous constraints) drive the update logic.
+
+\paragraph{Combinatorial Nature and Complexity.} In the worst case with \(m\) inequality constraints there are \(2^m\) possible active sets. Enumerating them is exponential. Active-set methods avoid this by iteratively refining a single guess, but they can still require many iterations if the active set changes frequently or if the problem is ill-conditioned. They are most effective when the optimal active set is small or changes little between similar problems (e.g., in sequential QPs for trajectory optimization).
+
+\subsubsection{Penalty and Augmented Lagrangian Methods}
+These methods transform the constrained problem into an unconstrained one by adding a penalty term to the objective that discourages constraint violation.
+For a problem \(\min f(\vec{x})\) s.t. \(c(x) \geq 0\), the penalty formulation is:
+\[
+\min_{\vec{x}} f(\vec{x}) + \frac{\rho}{2} (\min(0, c(x)))^2
+\]
+The solver gradually increases the penalty weight \(\rho \to \infty\). A major drawback is that large \(\rho\) values lead to an ill-conditioned Hessian, making the problem difficult to solve accurately. Additionally, at the constraint boundary, the Hessian is techinicaly not defined, so second order methods like Newton's method can struggle, even though they might work in practice. One of the recent modifications to
+
+The \textbf{Augmented Lagrangian} method improves upon this by introducing an estimate of the Lagrange multipliers, avoiding the need for \(\rho \to \infty\). This is a very powerful and popular technique.
+\subsubsection{The Barrier Problem}
+Consider the problem \(\min f(\vec{x})\) s.t. \(\vec{c}(\vec{x}) \geq \vec{0}\). We first introduce \textbf{slack variables} \(\vec{s} \geq \vec{0}\) to convert the general inequality into an equality:
+\begin{align*}
+    \min_{\vec{x}, \vec{s}} & \quad f(\vec{x}) \\
+    \text{s.t.} & \quad \vec{c}(\vec{x}) - \vec{s} = \vec{0} \\
+    & \quad \vec{s} \geq \vec{0}
+\end{align*}
+Now, we enforce the non-negativity constraint \(\vec{s} \geq \vec{0}\) by adding a logarithmic barrier term to the objective. This creates a new equality-constrained subproblem, parameterized by the barrier parameter \(\rho > 0\):
+\begin{equation}
+    \min_{\vec{x}, \vec{s}} \quad f(\vec{x}) - \rho \sum_i \log(s_i) \quad \text{s.t.} \quad \vec{c}(\vec{x}) - \vec{s} = \vec{0}
+\end{equation}
+The \(- \log(s_i)\) term acts as a barrier: as \(s_i \to 0^+\), its value goes to infinity, preventing the solver from ever making a slack variable non-positive. This keeps the iterates strictly "interior" to the feasible set.
+
+\subsection{Interior-Point Methods}
+
+% TODO: Explain the logarithmic barrier method's KKT equations and they way the soluation is reached. Possible extension is to contrast this with the primal-dual interior point method.
+
+\begin{code}[Julia Notebook: Interior-Point Method]
+The `interior-point.ipynb` notebook implements a simplified interior-point method to solve a quadratic program with a linear inequality constraint.
+\begin{itemize}
+    \item \textbf{Formulation}: Instead of slack variables, it uses a clever change of variables, \(s = \sqrt{\rho}e^{\sigma}\) and \(\lambda = \sqrt{\rho}e^{-\sigma}\), to implicitly enforce positivity and the relaxed complementarity condition. This transforms the problem into finding the roots of a system of two equations in \((\vec{x}, \sigma)\).
+    \item \textbf{Central Path Following}: The notebook demonstrates the concept of the central path. By starting with a large \(\rho\) and solving, and then using that solution as a warm start for a smaller \(\rho\), you can trace the path of solutions. The plot shows the solver taking a step towards the constraint boundary with a large \(\rho\), and then converging directly to the true solution as \(\rho\) is decreased to a small value (e.g., \(10^{-8}\)).
+    \item \textbf{Robustness}: The solver uses Newton's method with a line search to robustly solve the root-finding problem at each \(\rho\) value.
+\end{itemize}
+This method is the engine behind powerful, open-source solvers like IPOPT, which are widely used in robotics for problems like trajectory optimization.
+\end{code}
+
+\subsection{Quadratic Programs (QPs)}
+A particularly important class of optimization problems is the Quadratic Program (QP), which involves minimizing a quadratic objective subject to linear constraints.
+\begin{align*}
+    \min_{\vec{x}} & \quad \frac{1}{2}\vec{x}^{\top}\mat{Q}\vec{x} + \vec{q}^{\top}\vec{x} \\
+    \text{s.t.} & \quad \mat{A}\vec{x} \geq \vec{b} \\
+    & \quad \mat{C}\vec{x} = \vec{d}
+\end{align*}
+If the matrix \(\mat{Q}\) is positive definite, the problem is convex, meaning it has a single global minimum. QPs can be solved extremely quickly (often in kHz) by specialized solvers, making them a cornerstone of many real-time control and estimation algorithms, including Model Predictive Control (MPC) and contact-implicit optimal control.
+\newpage

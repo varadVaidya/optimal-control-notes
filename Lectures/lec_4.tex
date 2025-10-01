@@ -1,0 +1,215 @@
+% Lectures/lec_4.tex
+\lecture{4}{}{Constrained Minimization}
+
+\subsection{Globalization Strategy I: Line Search}
+
+While regularization ensures we take steps in the right direction, it doesn't control how far we step. The full Newton step \(\delta\vec{x} = -(\nabla^2 f)^{-1}\nabla f\) is derived from minimizing a quadratic approximation of the function. If the function is not well-approximated by a quadratic, this step can overshoot the actual minimum.
+
+A \textbf{line search} is a procedure to find an appropriate step size \(\alpha \in (0, 1]\) to scale the Newton direction \(\delta\vec{x}\), such that the update \(\vec{x}_{k+1} = \vec{x}_k + \alpha\delta\vec{x}\) makes sufficient progress.
+
+\begin{definition}[Armijo Backtracking Line Search]
+A simple and effective line search strategy is the Armijo rule. It ensures that the actual reduction in the function value is at least a fraction of the reduction predicted by the linear approximation.
+\end{definition}
+
+\begin{algorithm}[H]
+    \caption{Armijo Backtracking Line Search}
+    \DontPrintSemicolon
+    \KwIn{Current point \(\vec{x}\), search direction \(\delta\vec{x}\), parameters \(b \in (0, 1), c \in (0, 1)\)}
+    \KwOut{Step size \(\alpha\)}
+    \BlankLine
+    \(\alpha \leftarrow 1.0\) \;
+    \While{$f(\vec{x} + \alpha\delta\vec{x}) > f(\vec{x}) + b \alpha (\nabla f(\vec{x}))^{\top}\delta\vec{x}$}{
+        \(\alpha \leftarrow c \alpha\) \;
+    }
+    \Return \(\alpha\) \;
+\end{algorithm}
+
+\begin{note}
+The term \((\nabla f(\vec{x}))^{\top}\delta\vec{x}\) is the directional derivative, which represents the slope of the function along the search direction. The condition checks if our actual progress is better than a certain fraction (\(b\)) of the progress we would expect from a linear model. Typical values are \(b \approx 10^{-4}\) and \(c = 0.5\).
+\end{note}
+
+\begin{code}[Julia Notebook: Backtracking Newton's Method]
+The `minimization.ipynb` notebook implements this backtracking line search. When applied, it prevents the large, unproductive steps that the pure Newton method might take, especially when far from the optimum. This combination of **regularization** (to pick a good direction) and **line search** (to pick a good distance) makes Newton's method a robust and powerful "globalized" algorithm for finding local minima.
+\end{code}
+
+\subsection{Equality-Constrained Minimization}
+
+We now consider problems of the form:
+\begin{align*}
+    \min_{\vec{x} \in \mathbb{R}^n} & \quad f(\vec{x}) \\
+    \text{subject to} & \quad \vec{c}(\vec{x}) = \vec{0}
+\end{align*}
+where \(\vec{c}: \mathbb{R}^n \to \mathbb{R}^m\) is a set of \(m\) equality constraints.
+
+\begin{intuition}
+At a constrained optimum \(\vec{x}^\star\), you cannot make further progress by moving along the constraint surface. This means the gradient of the objective function, \(\nabla f(\vec{x}^\star)\), must be orthogonal to the constraint surface. The gradient of the constraint function, \(\nabla c(\vec{x}^\star)\), is also orthogonal to the constraint surface. Therefore, the two gradients must be parallel.
+\begin{center}
+    \input{Figures/equality_contraints.tex}
+\end{center}
+This geometric condition implies that at the optimum, \(\nabla f(\vec{x}^\star)\) must be a linear combination of the constraint gradients.
+\end{intuition}
+
+\begin{definition}[The Lagrangian]
+This leads to the first-order necessary conditions for optimality. There must exist a vector of \textbf{Lagrange multipliers} \(\vec{\lambda} \in \mathbb{R}^m\) such that:
+\begin{equation}
+    \nabla f(\vec{x}^\star) + (\pdv{\vec{c}}{\vec{x}})^{\top}\vec{\lambda} = \vec{0}
+\end{equation}
+We can elegantly combine this condition with the original feasibility condition, \(\vec{c}(\vec{x}) = \vec{0}\), by defining the \textbf{Lagrangian} function, \(\mathcal{L}: \mathbb{R}^n \times \mathbb{R}^m \to \mathbb{R}\):
+\begin{equation}
+    \mathcal{L}(\vec{x}, \vec{\lambda}) = f(\vec{x}) + \vec{\lambda}^{\top}\vec{c}(\vec{x})
+\end{equation}
+The optimality conditions are now equivalent to finding a stationary point of the Lagrangian:
+\begin{align*}
+    \nabla_{\vec{x}} \mathcal{L}(\vec{x}, \vec{\lambda}) &= \nabla f(\vec{x}) + (\pdv{\vec{c}}{\vec{x}})^{\top}\vec{\lambda} = \vec{0} \\
+    \nabla_{\vec{\lambda}} \mathcal{L}(\vec{x}, \vec{\lambda}) &= \vec{c}(\vec{x}) = \vec{0}
+\end{align*}
+This is a root-finding problem for the concatenated variable vector \((\vec{x}, \vec{\lambda})\). We can solve it using Newton's method! Applying Newton's method yields the following linear system, known as the Karush-Kuhn-Tucker (KKT) system:
+
+% TODO: Show via talor expansion of Lagrangian around (x, lambda) and setting to zero, how does the KKT system arise.
+\begin{equation}
+    \begin{bmatrix}
+        \nabla^2_{\vec{x}\vec{x}} \mathcal{L} & (\pdv{\vec{c}}{\vec{x}})^{\top} \\
+        \pdv{\vec{c}}{\vec{x}} & \mat{0}
+    \end{bmatrix}
+    \begin{bmatrix} \delta\vec{x} \\ \delta\vec{\lambda} \end{bmatrix}
+    = - \begin{bmatrix} \nabla_{\vec{x}} \mathcal{L} \\ \vec{c}(\vec{x}) \end{bmatrix}
+    \label{eq:kkt_system}
+\end{equation}
+\end{definition}
+
+\subsubsection{The Gauss-Newton Approximation}
+
+The full Hessian of the Lagrangian is \(\nabla^2_{\vec{x}\vec{x}} \mathcal{L} = \nabla^2 f(\vec{x}) + \sum_{i=1}^m \lambda_i \nabla^2 c_i(\vec{x})\). Another way to write this, that allows for using jacobian-vector product tricks from autodifferentiation, is:
+\[
+\nabla^2_{\vec{x}\vec{x}} \mathcal{L} = \nabla^2 f(\vec{x}) + \frac{\partial}{\partial x}\left[\left(\frac{\partial c}{\partial x}\right)^{\top}\vec{\lambda}\right]
+\]
+Computing the second derivatives of the constraints (the "constraint curvature" term) can be expensive. The \textbf{Gauss-Newton method} (or Sequential Quadratic Programming, SQP) approximates this Hessian by simply dropping the constraint curvature term:
+\[
+\nabla^2_{\vec{x}\vec{x}} \mathcal{L} \approx \nabla^2 f(\vec{x})
+\]
+This approximation often works very well, leading to cheaper iterations that still make good progress.
+
+\begin{code}[Julia Notebook: Equality Constrained Optimization]
+The `equality-constraints.ipynb` notebook solves a simple quadratic minimization problem subject to a nonlinear equality constraint. It compares the full Newton method with the Gauss-Newton method.
+\begin{itemize}
+    \item \textbf{Full Newton}: Converges very quickly (quadratically) to the solution from a good initial guess.
+    \item \textbf{Gauss-Newton}: Also converges, but may take a few more iterations since its model of the problem is less accurate. However, each iteration is computationally cheaper. In many large-scale robotics problems, this trade-off makes Gauss-Newton the preferred method.
+\end{itemize}
+The notebook also shows a case where the full Newton method can get "stuck" if the second-order constraint curvature term is problematic, while the simpler Gauss-Newton approximation avoids this issue and successfully finds the solution.
+\end{code}
+
+\subsection{Inequality-Constrained Minimization}
+
+Finally, we consider the general case:
+\begin{align*}
+    \min_{\vec{x} \in \mathbb{R}^n} & \quad f(\vec{x}) \\
+    \text{subject to} & \quad \vec{c}(\vec{x}) \geq \vec{0}
+\end{align*}
+At the solution \(\vec{x}^\star\), some constraints may be \textbf{active} (\(c_i(\vec{x}^\star) = 0\)) while others are \textbf{inactive} (\(c_i(\vec{x}^\star) > 0\)).
+
+\begin{intuition}
+Inactive constraints don't affect the solution locally, so we can ignore them. Active constraints behave like equality constraints. However, there is a key difference: for an inequality constraint, the gradient \(\nabla f\) must point "away" from the feasible region. This means \(\nabla f\) must be a \textit{non-negative} linear combination of the active constraint gradients.
+\begin{center}
+    \input{Figures/inequality_constraints.tex}
+\end{center}
+\end{intuition}
+
+\begin{theorem}[Karush-Kuhn-Tucker (KKT) Conditions]
+The first-order necessary conditions for a point \(\vec{x}^\star\) to be a local minimum are that there exists a vector of Lagrange multipliers \(\vec{\lambda}^\star\) satisfying:
+\begin{enumerate}
+    \item \textbf{Stationarity}: \(\nabla_{\vec{x}} \mathcal{L}(\vec{x}^\star, \vec{\lambda}^\star) = \nabla f(\vec{x}^\star) + (\pdv{\vec{c}}{\vec{x}})^{\top}\vec{\lambda}^\star = \vec{0}\)
+    \item \textbf{Primal Feasibility}: \(\vec{c}(\vec{x}^\star) \geq \vec{0}\)
+    \item \textbf{Dual Feasibility}: \(\vec{\lambda}^\star \geq \vec{0}\)
+    \item \textbf{Complementary Slackness}: \(\lambda_i^\star c_i(\vec{x}^\star) = 0\) for all \(i=1, \dots, m\).
+\end{enumerate}
+The complementary slackness condition is a clever way of stating that if a constraint is inactive (\(c_i > 0\)), its corresponding multiplier must be zero (\(\lambda_i = 0\)). This mathematically enforces our intuition. Modern algorithms for solving such problems, like interior-point methods, are designed to find points that satisfy these KKT conditions.
+\end{theorem}
+
+\subsection{Supplementary Material: Advanced Line Search Concepts}
+
+The backtracking line search using the Armijo rule is simple and effective. However, to fully appreciate the theory of optimization, it's crucial to understand the landscape of line search conditions and the convergence guarantees they provide.
+
+\subsubsection{The Challenge of Exact Line Search}
+At each iteration of a descent method, we have a current point \(\vec{x}_k\) and a descent direction \(\vec{p}_k\). The ideal step size \(\alpha\) would be the one that solves the one-dimensional optimization problem:
+\begin{equation}
+    \alpha_k = \arg\min_{\alpha > 0} \phi(\alpha) = \arg\min_{\alpha > 0} f(\vec{x}_k + \alpha \vec{p}_k)
+\end{equation}
+Solving this subproblem exactly is often computationally expensive, requiring many function and gradient evaluations. The cost of finding the exact minimum might be comparable to the cost of several iterations of the main algorithm. Therefore, in practice, we use \textbf{inexact line searches} that aim to find a step size that is "good enough" with minimal effort. The following conditions define what "good enough" means.
+
+\subsubsection{A Tour of Inexact Line Search Conditions}
+
+
+\paragraph{The Armijo (Sufficient Decrease) Condition}
+This is the condition we have already seen. It ensures that the step size \(\alpha\) leads to a decrease in the objective function that is at least a fraction of the decrease predicted by the linear approximation at \(\vec{x}_k\).
+\begin{equation}
+    f(\vec{x}_k + \alpha \vec{p}_k) \leq f(\vec{x}_k) + c_1 \alpha \nabla f(\vec{x}_k)^{\top} \vec{p}_k
+    \label{eq:armijo}
+\end{equation}
+with \(c_1 \in (0, 1)\). A typical value for \(c_1\) is \(10^{-4}\). While this condition prevents steps that are too long, it does not prevent steps that are excessively short. A backtracking algorithm based solely on this rule might produce a sequence of very small steps and converge slowly.
+
+\paragraph{The Wolfe Conditions}
+To rule out unacceptably short steps, the Armijo condition is often paired with a \textbf{curvature condition}. The combination is known as the \textbf{Wolfe conditions}.
+\begin{enumerate}
+    \item \textbf{Sufficient Decrease (Armijo):} Same as \eqref{eq:armijo}.
+    \item \textbf{Curvature Condition:}
+    \begin{equation}
+        \nabla f(\vec{x}_k + \alpha \vec{p}_k)^{\top} \vec{p}_k \geq c_2 \nabla f(\vec{x}_k)^{\top} \vec{p}_k
+        \label{eq:curvature}
+    \end{equation}
+    with \(c_2 \in (c_1, 1)\). This condition ensures that the slope of \(\phi(\alpha)\) at the new point is less negative than the initial slope, which means we have made reasonable progress and are not at a point where the function is still decreasing rapidly. It forces the step length \(\alpha\) to be in a region where the function is flatter.
+\end{enumerate}
+A step length satisfying both conditions is guaranteed to exist for many common functions, provided \(\vec{p}_k\) is a descent direction.
+
+\paragraph{The Strong Wolfe Conditions}
+A slight modification leads to the \textbf{Strong Wolfe conditions}, which constrain the slope to be closer to zero, forcing \(\alpha\) to be closer to a stationary point of \(\phi(\alpha)\).
+\begin{enumerate}
+    \item \textbf{Sufficient Decrease (Armijo):} Same as \eqref{eq:armijo}.
+    \item \textbf{Strong Curvature Condition:}
+    \begin{equation}
+        |\nabla f(\vec{x}_k + \alpha \vec{p}_k)^{\top} \vec{p}_k| \leq c_2 |\nabla f(\vec{x}_k)^{\top} \vec{p}_k|
+    \end{equation}
+\end{enumerate}
+This is particularly useful in quasi-Newton methods (like BFGS), where it helps ensure that the Hessian approximation matrix remains positive definite.
+
+\paragraph{The Goldstein Conditions}
+The Goldstein conditions are another pair of inequalities that ensure both sufficient decrease and that the step is not too short.
+\begin{align}
+    f(\vec{x}_k) + (1-c) \alpha \nabla f(\vec{x}_k)^{\top} \vec{p}_k &\leq f(\vec{x}_k + \alpha \vec{p}_k) \\
+    f(\vec{x}_k + \alpha \vec{p}_k) &\leq f(\vec{x}_k) + c \alpha \nabla f(\vec{x}_k)^{\top} \vec{p}_k
+\end{align}
+with \(0 < c < 1/2\). The first inequality ensures \(\alpha\) is not too large, while the second (the Armijo condition) ensures it's not too small. A disadvantage is that the first inequality might exclude the actual minimizer of \(\phi(\alpha)\), which is why the Wolfe conditions are generally preferred in modern algorithms.
+
+\subsubsection{Convergence of Backtracking Line Search}
+We can prove that a simple backtracking algorithm using the Armijo rule will terminate and that the overall optimization algorithm will converge. This analysis relies on the smoothness of the objective function, specifically that its gradient is Lipschitz continuous.
+
+\begin{definition}[Lipschitz Continuity of the Gradient]
+A function \(f\) has a Lipschitz continuous gradient if there exists a constant \(L > 0\) (the Lipschitz constant) such that for all \(\vec{x}, \vec{y}\) in the domain:
+\begin{equation}
+    \|\nabla f(\vec{x}) - \nabla f(\vec{y})\| \leq L \|\vec{x} - \vec{y}\|
+\end{equation}
+This is a measure of the smoothness of the gradient. For twice-differentiable functions, it is related to the maximum eigenvalue of the Hessian. A key consequence, derived from the Mean Value Theorem, is the following quadratic upper bound on the function:
+\begin{equation}
+    f(\vec{x} + \vec{p}) \leq f(\vec{x}) + \nabla f(\vec{x})^{\top}\vec{p} + \frac{L}{2}\|\vec{p}\|^2
+    \label{eq:lipschitz_bound}
+\end{equation}
+\end{definition}
+
+\paragraph{Proof of Termination for Backtracking Line Search}
+Here, we prove that the backtracking line search algorithm (using the Armijo rule) finds a step size \(\alpha\) that satisfies the condition in a finite number of iterations, assuming the gradient \(\nabla f\) is Lipschitz continuous.
+
+The Armijo condition is given by:
+\[ f(\vec{x}_k + \alpha \vec{p}_k) \leq f(\vec{x}_k) + c_1 \alpha \nabla f_k^{\top} \vec{p}_k \]
+From the definition of Lipschitz continuity, we have the quadratic upper bound on \(f\) shown in \eqref{eq:lipschitz_bound}. Applying this with \(\vec{p} = \alpha \vec{p}_k\), we get:
+\[ f(\vec{x}_k + \alpha \vec{p}_k) \leq f(\vec{x}_k) + \alpha \nabla f_k^{\top} \vec{p}_k + \frac{L}{2}\alpha^2 \|\vec{p}_k\|^2 \]
+For the Armijo condition to hold, it is sufficient that the upper bound on \(f(\vec{x}_k + \alpha \vec{p}_k)\) satisfies the condition. We therefore seek an \(\alpha\) such that:
+\[ f(\vec{x}_k) + \alpha \nabla f_k^{\top} \vec{p}_k + \frac{L}{2}\alpha^2 \|\vec{p}_k\|^2 \leq f(\vec{x}_k) + c_1 \alpha \nabla f_k^{\top} \vec{p}_k \]
+Subtracting \(f(\vec{x}_k)\) from both sides and rearranging gives:
+\[ (1 - c_1) \alpha \nabla f_k^{\top} \vec{p}_k + \frac{L}{2}\alpha^2 \|\vec{p}_k\|^2 \leq 0 \]
+Since \(\alpha > 0\), we can divide by it:
+\[ (1 - c_1) \nabla f_k^{\top} \vec{p}_k + \frac{L}{2}\alpha \|\vec{p}_k\|^2 \leq 0 \]
+Now, we solve for \(\alpha\). Since \(\vec{p}_k\) is a descent direction, we know \(\nabla f_k^{\top} \vec{p}_k < 0\). Also, \(c_1 \in (0,1)\) means \(1-c_1 > 0\).
+\begin{equation}
+    \alpha \leq \frac{2(1 - c_1)(-\nabla f_k^{\top} \vec{p}_k)}{L \|\vec{p}_k\|^2}
+\end{equation}
+This inequality shows that any \(\alpha\) that is sufficiently small (i.e., below the positive threshold on the right-hand side) will satisfy the Armijo condition. The backtracking algorithm starts with an initial \(\alpha\) (e.g., \(\alpha=1\)) and multiplies it by a contraction factor \(c \in (0,1)\) until the condition is met. Since each step reduces \(\alpha\), it is guaranteed to eventually fall below this threshold. Therefore, the backtracking line search terminates in a finite number of steps. This proves that the backtracking line search is a well-posed and practical compromise, avoiding the expense of exact search while still guaranteeing sufficient progress towards the minimum.
+\newpage

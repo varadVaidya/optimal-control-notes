@@ -10,11 +10,11 @@
 A fundamental concept in analyzing dynamical systems is the notion of an equilibrium point, a state where the system can remain indefinitely if undisturbed.
 
 \begin{definition}[Equilibrium Point]
-	An equilibrium point (or fixed point) \(\vec{x}^*\) of a continuous-time system \(\dot{\vec{x}} = f(\vec{x}, \vec{u})\) for a constant control input \(\vec{u}^*\) is a state that satisfies:
+	An equilibrium point (or fixed point) \(\vec{x}^\star\) of a continuous-time system \(\dot{\vec{x}} = f(\vec{x}, \vec{u})\) for a constant control input \(\vec{u}^\star\) is a state that satisfies:
 	\begin{equation}
-		f(\vec{x}^*, \vec{u}^*) = \vec{0}
+		f(\vec{x}^\star, \vec{u}^\star) = \vec{0}
 	\end{equation}
-	This means that if the system starts at \(\vec{x}^*\) with control \(\vec{u}^*\), its state derivative is zero, and it will not move.
+	This means that if the system starts at \(\vec{x}^\star\) with control \(\vec{u}^\star\), its state derivative is zero, and it will not move.
 \end{definition}
 
 \begin{eg}[Pendulum Equilibria]
@@ -24,16 +24,16 @@ A fundamental concept in analyzing dynamical systems is the notion of an equilib
 	\]
 	This system of equations requires \(\dot{\theta} = 0\) and \(\sin(\theta) = 0\). This occurs when \(\theta = k\pi\) for any integer \(k\). The two distinct physical equilibria are:
 	\begin{itemize}
-		\item \(\vec{x}^*_1 = [0, 0]^{\top}\): The pendulum is hanging straight down, at rest.
-		\item \(\vec{x}^*_2 = [\pi, 0]^{\top}\): The pendulum is balanced perfectly upright, at rest.
+		\item \(\vec{x}^\star_1 = [0, 0]^{\top}\): The pendulum is hanging straight down, at rest.
+		\item \(\vec{x}^\star_2 = [\pi, 0]^{\top}\): The pendulum is balanced perfectly upright, at rest.
 	\end{itemize}
 \end{eg}
 
-A basic control problem is to create a new equilibrium point. For instance, can we make the pendulum hang at \(\theta = \pi/2\)? We need to find a constant control \(u^*\) such that \(f([\pi/2, 0]^{\top}, u^*) = \vec{0}\).
+A basic control problem is to create a new equilibrium point. For instance, can we make the pendulum hang at \(\theta = \pi/2\)? We need to find a constant control \(u^\star\) such that \(f([\pi/2, 0]^{\top}, u^\star) = \vec{0}\).
 \[
-	\dot{\vec{x}} = \begin{bmatrix} 0 \\ \frac{1}{ml^2}(u^* - mgl\sin(\pi/2)) \end{bmatrix} = \begin{bmatrix} 0 \\ 0 \end{bmatrix}
+	\dot{\vec{x}} = \begin{bmatrix} 0 \\ \frac{1}{ml^2}(u^\star - mgl\sin(\pi/2)) \end{bmatrix} = \begin{bmatrix} 0 \\ 0 \end{bmatrix}
 \]
-This requires \(u^* - mgl(1) = 0\), so \(u^* = mgl\). A constant torque can indeed hold the pendulum at this new equilibrium.
+This requires \(u^\star - mgl(1) = 0\), so \(u^\star = mgl\). A constant torque can indeed hold the pendulum at this new equilibrium.
 
 \subsection{Stability of Equilibria}
 
@@ -44,24 +44,24 @@ It's not enough to know where the equilibria are; we need to know if they are st
 	\begin{center}
 		\input{Figures/phase_plot1d.tex}
 	\end{center}
-	An equilibrium \(x^*\) is \textbf{locally stable} if, for points \(x\) near \(x^*\), the dynamics push the state back towards \(x^*\). This happens when the slope of \(f(x)\) at \(x^*\) is negative.
+	An equilibrium \(x^\star\) is \textbf{locally stable} if, for points \(x\) near \(x^\star\), the dynamics push the state back towards \(x^\star\). This happens when the slope of \(f(x)\) at \(x^\star\) is negative.
 	\begin{itemize}
-		\item If \(\pdv{f}{x}|_{x^*} < 0\), the equilibrium is stable.
-		\item If \(\pdv{f}{x}|_{x^*} > 0\), the equilibrium is unstable.
-		\item If \(\pdv{f}{x}|_{x^*} = 0\), the analysis is inconclusive (marginally stable).
+		\item If \(\pdv{f}{x}|_{x^\star} < 0\), the equilibrium is stable.
+		\item If \(\pdv{f}{x}|_{x^\star} > 0\), the equilibrium is unstable.
+		\item If \(\pdv{f}{x}|_{x^\star} = 0\), the analysis is inconclusive (marginally stable).
 	\end{itemize}
 \end{intuition}
 
-This concept generalizes to higher dimensions. For a system \(\dot{\vec{x}} = f(\vec{x})\), we linearize the dynamics around an equilibrium \(\vec{x}^*\). Let \(\delta\vec{x} = \vec{x} - \vec{x}^*\).
+This concept generalizes to higher dimensions. For a system \(\dot{\vec{x}} = f(\vec{x})\), we linearize the dynamics around an equilibrium \(\vec{x}^\star\). Let \(\delta\vec{x} = \vec{x} - \vec{x}^\star\).
 \[
-	\delta\dot{\vec{x}} \approx \left.\pdv{f}{\vec{x}}\right|_{\vec{x}^*} \delta\vec{x} = \mat{A} \delta\vec{x}
+	\delta\dot{\vec{x}} \approx \left.\pdv{f}{\vec{x}}\right|_{\vec{x}^\star} \delta\vec{x} = \mat{A} \delta\vec{x}
 \]
-The stability of the nonlinear system near \(\vec{x}^*\) is determined by the stability of this linear system.
+The stability of the nonlinear system near \(\vec{x}^\star\) is determined by the stability of this linear system.
 
 \begin{theorem}[Stability by Linearization]
-	An equilibrium point \(\vec{x}^*\) of \(\dot{\vec{x}} = f(\vec{x})\) is:
+	An equilibrium point \(\vec{x}^\star\) of \(\dot{\vec{x}} = f(\vec{x})\) is:
 	\begin{itemize}
-		\item \textbf{Asymptotically Stable} if all eigenvalues of the Jacobian \(\mat{A} = \pdv{f}{\vec{x}}|_{\vec{x}^*}\) have strictly negative real parts (\(\text{Re}(\lambda_i) < 0\)).
+		\item \textbf{Asymptotically Stable} if all eigenvalues of the Jacobian \(\mat{A} = \pdv{f}{\vec{x}}|_{\vec{x}^\star}\) have strictly negative real parts (\(\text{Re}(\lambda_i) < 0\)).
 		\item \textbf{Unstable} if at least one eigenvalue of \(\mat{A}\) has a strictly positive real part (\(\text{Re}(\lambda_i) > 0\)).
 		\item \textbf{Marginally Stable} if all eigenvalues have non-positive real parts (\(\text{Re}(\lambda_i) \leq 0\)) and at least one has a zero real part.
 	\end{itemize}
@@ -73,13 +73,13 @@ The stability of the nonlinear system near \(\vec{x}^*\) is determined by the st
 		\mat{A} = \pdv{f}{\vec{x}} = \begin{bmatrix} 0 & 1 \\ -\frac{g}{l}\cos(\theta) & 0 \end{bmatrix}
 	\]
 	\begin{enumerate}
-		\item \textbf{At \(\vec{x}^*_1 = [0, 0]^{\top}\) (hanging down)}:
+		\item \textbf{At \(\vec{x}^\star_1 = [0, 0]^{\top}\) (hanging down)}:
 		      \[
 			      \mat{A}|_{\theta=0} = \begin{bmatrix} 0 & 1 \\ -\frac{g}{l} & 0 \end{bmatrix}
 		      \]
 		      The eigenvalues are \(\lambda = \pm i\sqrt{g/l}\). Since the real parts are zero, this equilibrium is \textbf{marginally stable}. A small push will cause it to oscillate forever (in this frictionless model). If we added any damping (e.g., \(u = -K_d \dot{\theta}\)), the eigenvalues would move into the left-half plane, making it asymptotically stable.
 
-		\item \textbf{At \(\vec{x}^*_2 = [\pi, 0]^{\top}\) (upright)}:
+		\item \textbf{At \(\vec{x}^\star_2 = [\pi, 0]^{\top}\) (upright)}:
 		      \[
 			      \mat{A}|_{\theta=\pi} = \begin{bmatrix} 0 & 1 \\ \frac{g}{l} & 0 \end{bmatrix}
 		      \]
@@ -165,7 +165,7 @@ A much better explicit integrator is the 4th-order Runge-Kutta (RK4) method. Ins
 
 \subsubsection{Lyapunov Stability Theory}
 
-Consider an autonomous system \(\dot{\vec{x}} = f(\vec{x})\) with an equilibrium \(\vec{x}^*\) (i.e. \(f(\vec{x}^*)=0\)). Define the error \(\vec{e} = \vec{x} - \vec{x}^*\) and rewrite about the origin (w.l.o.g. take \(\vec{x}^* = \vec{0}\) by translation). We recall several nested stability notions.
+Consider an autonomous system \(\dot{\vec{x}} = f(\vec{x})\) with an equilibrium \(\vec{x}^\star\) (i.e. \(f(\vec{x}^\star)=0\)). Define the error \(\vec{e} = \vec{x} - \vec{x}^\star\) and rewrite about the origin (w.l.o.g. take \(\vec{x}^\star = \vec{0}\) by translation). We recall several nested stability notions.
 
 \begin{definition}[Stability Notions]
 	Let \(\dot{\vec{x}} = f(\vec{x})\) with equilibrium at \(\vec{0}\).
@@ -207,11 +207,11 @@ Then \(V(\vec{x}) = \vec{x}^\top \mat{P} \vec{x}\) is a quadratic Lyapunov funct
 \subsubsection{Basin / Region of Attraction}
 
 \begin{definition}[Basin (Region) of Attraction]
-	For an asymptotically stable equilibrium \(\vec{x}^*\), its (open) basin of attraction \(\mathcal{B}(\vec{x}^*)\) is the set of initial conditions whose trajectories converge to \(\vec{x}^*\):
+	For an asymptotically stable equilibrium \(\vec{x}^\star\), its (open) basin of attraction \(\mathcal{B}(\vec{x}^\star)\) is the set of initial conditions whose trajectories converge to \(\vec{x}^\star\):
 	\[
-		\mathcal{B}(\vec{x}^*) := \{\vec{x}_0 \in \mathbb{R}^n : \lim_{t\to\infty} \phi_t(\vec{x}_0) = \vec{x}^*\},
+		\mathcal{B}(\vec{x}^\star) := \{\vec{x}_0 \in \mathbb{R}^n : \lim_{t\to\infty} \phi_t(\vec{x}_0) = \vec{x}^\star\},
 	\]
-	where \(\phi_t\) denotes the flow map. If \(\mathcal{B}(\vec{x}^*) = \mathbb{R}^n\), the equilibrium is globally asymptotically stable.
+	where \(\phi_t\) denotes the flow map. If \(\mathcal{B}(\vec{x}^\star) = \mathbb{R}^n\), the equilibrium is globally asymptotically stable.
 \end{definition}
 
 \paragraph{Lyapunov Level-Set Inner Approximations.} Suppose \(V\) is a Lyapunov function certifying asymptotic stability on domain \(\mathcal{D}\). Any sublevel set \(\mathcal{L}_c := \{\vec{x}: V(\vec{x}) \le c\}\) contained in \(\mathcal{D}\) with \(\dot{V}<0\) for nonzero points inside provides an inner approximation of \(\mathcal{B}(\vec{0})\). One may enlarge \(c\) until tangency with \(\dot{V}=0\) occurs. For polynomial systems, sum-of-squares (SOS) optimization can automate this search.

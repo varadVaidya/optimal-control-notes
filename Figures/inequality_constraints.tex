@@ -1,0 +1,39 @@
+% Figures/inequality_constraint.tex
+\begin{tikzpicture}[
+    font=\sansmath\sffamily,
+    scale=1.5
+]
+    % Axes
+    \draw[-Latex, thick] (-2.5,0) -- (2.5,0) node[below left] {$x_1$};
+    \draw[-Latex, thick] (0,-2) -- (0,2.5) node[below left] {$x_2$};
+
+    % f(x) contours
+    \draw[NavyBlue] (0,0) circle (0.5);
+    \draw[NavyBlue] (0,0) circle (1);
+    \draw[NavyBlue] (0,0) circle (1.5);
+
+    % Inequality constraint c(x) >= 0
+    \draw[thick, Red] plot[domain=-2.5:1, samples=100] (\x, {(\x+1.5)^2 - 1});
+    \node[Red] at (-2, 2) {$c(\vec{x}) = 0$};
+
+    % Feasible region shading
+    \begin{scope}
+        \clip plot[domain=-2.5:1, samples=100] (\x, {(\x+1.5)^2 - 1}) |- (2.5,-2) -- (-2.5,-2) -- cycle;
+        \fill[Red, opacity=0.1] (-2.5,-2) rectangle (2.5,2.5);
+    \end{scope}
+    \node[Red, font=\small] at (1,1.5) {Feasible Region $c(\vec{x}) \geq 0$};
+
+    % Optimal point
+    \coordinate (opt) at (-0.29, 0.46);
+    \fill[black] (opt) circle (1.5pt) node[above right, font=\small]{Active Constraint};
+
+    % Gradients at active constraint
+    \draw[-Latex, thick, ForestGreen] (opt) --++ (-0.2, 0.3) node[above] {$\nabla f$};
+    \draw[-Latex, thick, Orange] (opt) --++ (-0.2, 0.3) node[below right, xshift=-2pt] {$\nabla c$};
+
+    % Inactive constraint example
+    \coordinate (inactive) at (1.5,0);
+    \fill[gray] (inactive) circle (1.5pt) node[below, font=\small]{Inactive Constraint};
+    \draw[-Latex, thick, ForestGreen] (inactive) -- (inactive) node[above=2pt] {$\nabla f=0$};
+
+\end{tikzpicture}

@@ -32,7 +32,7 @@ To proceed, we must first establish a clear and consistent notation for derivati
 
 \subsection{Root Finding}
 
-A fundamental problem in numerical methods is root finding: for a given function \(g: \mathbb{R}^n \to \mathbb{R}^n\), find a point \(\vec{x}^*\) such that \(g(\vec{x}^*) = \vec{0}\).
+A fundamental problem in numerical methods is root finding: for a given function \(g: \mathbb{R}^n \to \mathbb{R}^n\), find a point \(\vec{x}^\star\) such that \(g(\vec{x}^\star) = \vec{0}\).
 
 \begin{eg}
 	Finding the equilibrium point of a dynamical system \(\dot{\vec{x}} = f(\vec{x})\) is a root-finding problem. Similarly, as we saw last lecture, solving the implicit equation in a Backward Euler step, \(\vec{x}_{k+1} - \vec{x}_k - h f(\vec{x}_{k+1}) = 0\), is also a root-finding problem for \(\vec{x}_{k+1}\).
@@ -40,7 +40,7 @@ A fundamental problem in numerical methods is root finding: for a given function
 
 \subsubsection{Fixed-Point Iteration}
 
-A closely related problem is finding a \textbf{fixed point}, i.e., an \(\vec{x}^*\) such that \(g(\vec{x}^*) = \vec{x}^*\). We can always convert a root-finding problem \(r(\vec{x}) = 0\) to a fixed-point problem by defining \(g(\vec{x}) = \vec{x} - r(\vec{x})\).
+A closely related problem is finding a \textbf{fixed point}, i.e., an \(\vec{x}^\star\) such that \(g(\vec{x}^\star) = \vec{x}^\star\). We can always convert a root-finding problem \(r(\vec{x}) = 0\) to a fixed-point problem by defining \(g(\vec{x}) = \vec{x} - r(\vec{x})\).
 
 The simplest method for finding a fixed point is \textbf{fixed-point iteration}:
 \[
@@ -65,7 +65,7 @@ The next guess is then \(\vec{x}_{k+1} = \vec{x}_k + \delta\vec{x}\). This proce
   \caption{Newton's Method for Root Finding}
 	\DontPrintSemicolon
 	\KwIn{Function \(g(\vec{x})\), initial guess \(\vec{x}_0\), tolerance \(\epsilon\)}
-	\KwOut{Root \(\vec{x}^*\)}
+	\KwOut{Root \(\vec{x}^\star\)}
 	\BlankLine
 	\(\vec{x}_k \leftarrow \vec{x}_0\) \;
 	\While{\(\|\vec{g}(\vec{x}_k)\| > \epsilon\)}{
@@ -89,9 +89,9 @@ The next guess is then \(\vec{x}_{k+1} = \vec{x}_k + \delta\vec{x}\). This proce
 \subsection{Unconstrained Minimization}
 
 We now turn to the problem of finding a local minimum of a smooth scalar function \(f: \mathbb{R}^n \to \mathbb{R}\).
-A \textbf{first-order necessary condition} for a point \(\vec{x}^*\) to be a local minimum is that the gradient vanishes:
+A \textbf{first-order necessary condition} for a point \(\vec{x}^\star\) to be a local minimum is that the gradient vanishes:
 \begin{equation}
-	\nabla f(\vec{x}^*) = \vec{0}
+	\nabla f(\vec{x}^\star) = \vec{0}
 \end{equation}
 This turns the minimization problem into a root-finding problem on the gradient! We can directly apply Newton's method.
 
@@ -103,9 +103,9 @@ This turns the minimization problem into a root-finding problem on the gradient!
 	The intuition here is that we are fitting a quadratic model to the function at the current point (based on the second-order Taylor expansion) and then jumping directly to the minimum of that quadratic model.
 \end{definition}
 
-However, there are pitfalls. The condition \(\nabla f(\vec{x}^*) = \vec{0}\) applies to local maxima and saddle points as well as minima. A standard Newton step can easily converge to the wrong type of point.
+However, there are pitfalls. The condition \(\nabla f(\vec{x}^\star) = \vec{0}\) applies to local maxima and saddle points as well as minima. A standard Newton step can easily converge to the wrong type of point.
 
-A \textbf{second-order sufficient condition} for \(\vec{x}^*\) to be a strict local minimum is that \(\nabla f(\vec{x}^*) = \vec{0}\) and the Hessian \(\nabla^2 f(\vec{x}^*)\) is \textbf{positive definite} (all its eigenvalues are positive).
+A \textbf{second-order sufficient condition} for \(\vec{x}^\star\) to be a strict local minimum is that \(\nabla f(\vec{x}^\star) = \vec{0}\) and the Hessian \(\nabla^2 f(\vec{x}^\star)\) is \textbf{positive definite} (all its eigenvalues are positive).
 A Newton step is a \textit{descent direction} (i.e., a step that decreases the function value) if and only if the Hessian is positive definite. If the Hessian is negative definite (at a maximum), Newton's method becomes an \textit{ascent} method.
 
 \begin{code}[Julia Notebook: The Pitfall of Standard Newton's Method]
@@ -174,17 +174,17 @@ Let \(f\) be differentiable and \(m>0\). The following are equivalent:
 \paragraph{Consequences.} Strong convexity implies uniqueness of the global minimizer. Plain convexity only guarantees that any local minimum is global (but possibly non-unique). For \(L\)-smooth functions (gradient Lipschitz with constant \(L\)), gradient descent with step size \(\alpha\in (0,2/L)\) converges; if additionally \(m\)-strongly convex, the convergence is linear with rate \(1 - m/L\).
 
 \subsubsection{Optimality Conditions (Unconstrained)}
-Let \(f\in C^2\). A point \(\vec{x}^*\) is a (local) minimizer only if the following hold.
+Let \(f\in C^2\). A point \(\vec{x}^\star\) is a (local) minimizer only if the following hold.
 \begin{theorem}[First-Order Necessary Condition]
-If \(\vec{x}^*\) is a local minimizer, then \(\nabla f(\vec{x}^*) = \vec{0}.\)
+If \(\vec{x}^\star\) is a local minimizer, then \(\nabla f(\vec{x}^\star) = \vec{0}.\)
 \end{theorem}
 
 \begin{theorem}[Second-Order Necessary Condition]
-If \(\vec{x}^*\) is a local minimizer and \(f\in C^2\), then \(\nabla f(\vec{x}^*) = 0\) and \(\nabla^2 f(\vec{x}^*)\) is PSD.
+If \(\vec{x}^\star\) is a local minimizer and \(f\in C^2\), then \(\nabla f(\vec{x}^\star) = 0\) and \(\nabla^2 f(\vec{x}^\star)\) is PSD.
 \end{theorem}
 
 \begin{theorem}[Second-Order Sufficient Condition]
-If \(\nabla f(\vec{x}^*) = 0\) and \(\nabla^2 f(\vec{x}^*)\) is positive definite (PD), then \(\vec{x}^*\) is a strict local minimizer. If \(\nabla^2 f(\vec{x}) \succeq m\mat{I}\) globally (\(m>0\)), then \(\vec{x}^*\) is the unique global minimizer.
+If \(\nabla f(\vec{x}^\star) = 0\) and \(\nabla^2 f(\vec{x}^\star)\) is positive definite (PD), then \(\vec{x}^\star\) is a strict local minimizer. If \(\nabla^2 f(\vec{x}) \succeq m\mat{I}\) globally (\(m>0\)), then \(\vec{x}^\star\) is the unique global minimizer.
 \end{theorem}
 
 \paragraph{Saddle Points.} If the Hessian has both positive and negative eigenvalues at a stationary point, Newton's method may be attracted there; regularization or negative curvature exploitation is needed to escape.
