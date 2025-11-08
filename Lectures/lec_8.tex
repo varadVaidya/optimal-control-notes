@@ -1,0 +1,206 @@
+% Lectures/lec_8.tex
+\lecture{8}{}{LQR Solutions: QP and the Riccati Recursion}
+
+
+\subsection{LQR as a single Quadratic Program (QP)}
+
+Last time, we treated the LQR problem as a search over the control sequence \(\vec{U}\) only, with the state \(\vec{X}\) being an implicit function of \(\vec{U}\). An alternative, "direct" approach is to make \emph{both} the states and controls decision variables in one large optimization problem.
+
+Recall the LQR problem:
+\begin{align*}
+    \min_{\vec{X}, \vec{U}} & \quad J = \frac{1}{2}\vec{x}_N^{\top}\mat{Q}_N\vec{x}_N + \sum_{k=1}^{N-1} \frac{1}{2}\left( \vec{x}_k^{\top}\mat{Q}_k\vec{x}_k + \vec{u}_k^{\top}\mat{R}_k\vec{u}_k \right) \\
+    \text{subject to} & \quad \vec{x}_{k+1} = \mat{A}_k \vec{x}_k + \mat{B}_k \vec{u}_k, \quad \vec{x}_1 = \vec{x}_0
+\end{align*}
+(Note: For simplicity, we can omit the \(\frac{1}{2}\vec{x}_1^\top \mat{Q}_1 \vec{x}_1\) term from the sum, as \(\vec{x}_1=\vec{x}_0\) is a fixed constant and doesn't affect the optimal solution.)
+
+We can stack all the decision variables into a single, large vector \(\vec{z}\). A convenient stacking is:
+\[
+    \vec{z} = \begin{bmatrix}
+        \vec{u}_1 \\ \vec{x}_2 \\ \vec{u}_2 \\ \vec{x}_3 \\ \vdots \\ \vec{u}_{N-1} \\ \vec{x}_N
+    \end{bmatrix} \in \mathbb{R}^{(N-1)(m+n)}
+\]
+The total cost \(J\) is a quadratic function of \(\vec{z}\), which we can write as \(\frac{1}{2}\vec{z}^\top \mat{H} \vec{z}\), where \(\mat{H}\) is a large block-diagonal matrix:
+\[
+    \mat{H} = \text{blockdiag}(\mat{R}_1, \mat{Q}_2, \mat{R}_2, \mat{Q}_3, \dots, \mat{R}_{N-1}, \mat{Q}_N)
+\]
+The dynamics constraints are all linear in \(\vec{z}\). We can express them in the standard QP form \(\mat{C}\vec{z} = \vec{d}\):
+\[
+    \begin{bmatrix}
+        \mat{B}_1 & -\mat{I} & \mat{0} & \mat{0} & \cdots \\
+        \mat{0} & \mat{A}_2 & \mat{B}_2 & -\mat{I} & \cdots \\
+        \vdots & & \ddots & \ddots & \\
+        \mat{0} & \cdots & \mat{0} & \mat{A}_{N-1} & \mat{B}_{N-1} & -\mat{I}
+    \end{bmatrix}
+    \begin{bmatrix}
+        \vec{u}_1 \\ \vec{x}_2 \\ \vec{u}_2 \\ \vec{x}_3 \\ \vdots \\ \vec{x}_N
+    \end{bmatrix}
+    =
+    \begin{bmatrix}
+        -\mat{A}_1 \vec{x}_1 \\
+        \vec{0} \\
+        \vec{0} \\
+        \vdots \\
+        \vec{0}
+    \end{bmatrix}
+\]
+Thus, the entire LQR problem is equivalent to the (convex) Quadratic Program:
+\begin{align*}
+    \min_{\vec{z}} & \quad \frac{1}{2}\vec{z}^\top \mat{H} \vec{z} \\
+    \text{subject to} & \quad \mat{C}\vec{z} = \vec{d}
+\end{align*}
+
+\subsection{Solving the QP: The KKT System}
+This is an equality-constrained QP. It can be solved directly by finding the stationary point of its Lagrangian:
+\[
+    \mathcal{L}(\vec{z}, \vec{\lambda}) = \frac{1}{2}\vec{z}^\top \mat{H} \vec{z} + \vec{\lambda}^\top (\mat{C}\vec{z} - \vec{d})
+\]
+The first-order necessary (and sufficient, by convexity) conditions are the KKT equations:
+\begin{align*}
+    \nabla_{\vec{z}} \mathcal{L} &= \mat{H}\vec{z} + \mat{C}^\top \vec{\lambda} = \vec{0} \\
+    \nabla_{\vec{\lambda}} \mathcal{L} &= \mat{C}\vec{z} - \vec{d} = \vec{0}
+\end{align*}
+This is a single, large, sparse linear system:
+\begin{equation}
+    \begin{bmatrix}
+        \mat{H} & \mat{C}^\top \\
+        \mat{C} & \mat{0}
+    \end{bmatrix}
+    \begin{bmatrix}
+        \vec{z} \\ \vec{\lambda}
+    \end{bmatrix}
+    =
+    \begin{bmatrix}
+        \vec{0} \\ \vec{d}
+    \end{bmatrix}
+    \label{eq:lqr_kkt_system}
+\end{equation}
+Solving this system yields \(\vec{z}\) (and the multipliers \(\vec{\lambda}\)) in a single linear solve. This yields a non-iterative, exact solution. The multipliers \(\vec{\lambda}\) coincide with the costate variables from the Pontryagin Maximum Principle (PMP).
+
+\begin{code}[Julia Notebook: LQR as QP]
+    The `lqr-qp.ipynb` notebook implements this exact approach.
+    \begin{itemize}
+        \item It uses `blockdiag` and `kron` (Kronecker product) to efficiently construct the large, sparse matrices \(\mat{H}\) and \(\mat{C}\).
+        \item It forms the right-hand-side vector \(\vec{d}\) using the initial state \(\vec{x}_0\).
+        \item It assembles and solves the full KKT system \eqref{eq:lqr_kkt_system} using Julia's backslash operator (`\`), which is highly optimized for sparse linear systems.
+        \item Finally, it extracts the state and control trajectories from the solution vector \(\vec{z}\).
+        \item The resulting plots show the double integrator being driven to the origin, exactly as in the shooting method, but this solution was found in one (large) linear solve, not via iteration.
+    \end{itemize}
+    \textbf{Trade-off:} This method is exact and non-iterative, but it requires building and solving a potentially massive linear system (size \(\mathcal{O}(N(n+m)) \times \mathcal{O}(N(n+m)))\)). This is often less efficient than methods that exploit the time-structure.
+\end{code}
+
+\subsection{Deriving the Riccati Recursion}
+The KKT system \eqref{eq:lqr_kkt_system} is large, but also extremely sparse and structured. It is advantageous to exploit this structure rather than rely on a generic sparse solver. In what follows, we solve this system using block substitution, proceeding backward in time.
+
+Assume a time-invariant system (\(\mat{A}, \mat{B}, \mat{Q}, \mat{R}\)) for simplicity. The KKT system's equations (from \(\nabla_z \mathcal{L} = 0\)) for the final steps are:
+\begin{enumerate}
+    \item \(\nabla_{\vec{x}_N} \mathcal{L} = \mat{Q}_N \vec{x}_N - \vec{\lambda}_N = 0 \implies \vec{\lambda}_N = \mat{Q}_N \vec{x}_N\)
+    \item \(\nabla_{\vec{u}_{N-1}} \mathcal{L} = \mat{R} \vec{u}_{N-1} + \mat{B}^\top \vec{\lambda}_N = 0\)
+    \item \(\nabla_{\vec{x}_{N-1}} \mathcal{L} = \mat{Q} \vec{x}_{N-1} + \mat{A}^\top \vec{\lambda}_N - \vec{\lambda}_{N-1} = 0\)
+\end{enumerate}
+This structure repeats. We posit that the costate is a linear function of the state at every time step, namely \(\vec{\lambda}_k = \mat{P}_k \vec{x}_k\).
+From (1), this holds at time \(N\) with \(\mat{P}_N = \mat{Q}_N\).
+
+We now proceed backward in time.
+\paragraph{Step 1: Find \(\vec{u}_{N-1}\).}
+Substitute the relation \(\vec{\lambda}_N = \mat{P}_N \vec{x}_N\) into (2):
+\[
+    \mat{R} \vec{u}_{N-1} + \mat{B}^\top \mat{P}_N \vec{x}_N = 0
+\]
+Substitute the dynamics \(\vec{x}_N = \mat{A} \vec{x}_{N-1} + \mat{B} \vec{u}_{N-1}\):
+\[
+    \mat{R} \vec{u}_{N-1} + \mat{B}^\top \mat{P}_N (\mat{A} \vec{x}_{N-1} + \mat{B} \vec{u}_{N-1}) = 0
+\]
+Group terms by \(\vec{u}_{N-1}\) and \(\vec{x}_{N-1}\):
+\[
+    (\mat{R} + \mat{B}^\top \mat{P}_N \mat{B}) \vec{u}_{N-1} = -(\mat{B}^\top \mat{P}_N \mat{A}) \vec{x}_{N-1}
+\]
+Solving for \(\vec{u}_{N-1}\) yields the feedback law \(\vec{u}_{N-1} = -\mat{K}_{N-1} \vec{x}_{N-1}\), where:
+\[
+    \mat{K}_{N-1} = (\mat{R} + \mat{B}^\top \mat{P}_N \mat{B})^{-1} (\mat{B}^\top \mat{P}_N \mat{A})
+\]
+Here, \(\mat{K}_{N-1}\) is the \textbf{feedback gain} at time \(N-1\).
+
+\paragraph{Step 2: Find \(\mat{P}_{N-1}\).}
+Next, use (3) to obtain the relationship for \(\vec{\lambda}_{N-1}\):
+\[
+    \vec{\lambda}_{N-1} = \mat{Q} \vec{x}_{N-1} + \mat{A}^\top \vec{\lambda}_N = \mat{Q} \vec{x}_{N-1} + \mat{A}^\top (\mat{P}_N \vec{x}_N)
+\]
+Substitute \(\vec{x}_N = \mat{A} \vec{x}_{N-1} + \mat{B} \vec{u}_{N-1}\) and \(\vec{u}_{N-1} = -\mat{K}_{N-1} \vec{x}_{N-1}\):
+\[
+    \vec{\lambda}_{N-1} = \mat{Q} \vec{x}_{N-1} + \mat{A}^\top \mat{P}_N (\mat{A} \vec{x}_{N-1} - \mat{B} \mat{K}_{N-1} \vec{x}_{N-1})
+\]
+Factor out \(\vec{x}_{N-1}\):
+\[
+    \vec{\lambda}_{N-1} = \left( \mat{Q} + \mat{A}^\top \mat{P}_N (\mat{A} - \mat{B} \mat{K}_{N-1}) \right) \vec{x}_{N-1}
+\]
+This confirms the proposed form, namely \(\vec{\lambda}_{N-1} = \mat{P}_{N-1} \vec{x}_{N-1}\), where:
+\[
+    \mat{P}_{N-1} = \mat{Q} + \mat{A}^\top \mat{P}_N (\mat{A} - \mat{B} \mat{K}_{N-1})
+\]
+The matrix \(\mat{P}_k\) is the Hessian of the \textbf{cost-to-go} function, representing the remaining cost from time \(k\) to \(N\).
+
+\paragraph{The Recursion}
+By repeating this process, we get the general \textbf{Discrete-Time Riccati Recursion}:
+\begin{enumerate}
+    \item Initialize: \(\mat{P}_N = \mat{Q}_N\)
+    \item For \(k = N-1\) down to 1:
+    \begin{align}
+        \mat{K}_k &= (\mat{R}_k + \mat{B}_k^\top \mat{P}_{k+1} \mat{B}_k)^{-1} (\mat{B}_k^\top \mat{P}_{k+1} \mat{A}_k) \\
+        \mat{P}_k &= \mat{Q}_k + \mat{A}_k^\top \mat{P}_{k+1} (\mat{A}_k - \mat{B}_k \mat{K}_k)
+    \end{align}
+\end{enumerate}
+
+\subsection{The LQR Algorithm (via Dynamic Programming)}
+\begin{algorithm}[H]
+    \caption{LQR via Riccati Recursion}
+    \DontPrintSemicolon
+    \KwIn{\(\mat{A}_k, \mat{B}_k, \mat{Q}_k, \mat{R}_k, \mat{Q}_N\), \(\vec{x}_0\)}
+    \KwOut{Optimal \(\vec{U}^\star, \vec{X}^\star\)}
+    \BlankLine
+    \Comment{1. Backward Pass (Compute Gains)}
+    \(\mat{P}_N \leftarrow \mat{Q}_N\)\;
+    \For{$k = N-1$ \KwTo $1$}{
+        \(\mat{K}_k \leftarrow (\mat{R}_k + \mat{B}_k^\top \mat{P}_{k+1} \mat{B}_k)^{-1} \mat{B}_k^\top \mat{P}_{k+1} \mat{A}_k\)\;
+        \(\mat{P}_k \leftarrow \mat{Q}_k + \mat{A}_k^\top \mat{P}_{k+1} (\mat{A}_k - \mat{B}_k \mat{K}_k)\)\;
+    }
+    \BlankLine
+    \Comment{2. Forward Pass (Rollout Trajectory)}
+    \(\vec{x}_1 \leftarrow \vec{x}_0\)\;
+    \For{$k = 1$ \KwTo $N-1$}{
+        \(\vec{u}_k \leftarrow -\mat{K}_k \vec{x}_k\)\;
+        \(\vec{x}_{k+1} \leftarrow \mat{A}_k \vec{x}_k + \mat{B}_k \vec{u}_k\)\;
+    }
+    \Return \(\vec{U} = (\vec{u}_1, \dots, \vec{u}_{N-1})\), \(\vec{X} = (\vec{x}_1, \dots, \vec{x}_N)\)\;
+\end{algorithm}
+
+This is the standard LQR solution. Its complexity is \(\mathcal{O}(N(n+m)^3)\), which is drastically better than the \(\mathcal{O}((N(n+m))^3)\) for the full QP solve.
+More importantly, it provides a \textbf{feedback policy} \(\vec{u}_k = -\mat{K}_k \vec{x}_k\). The gains \(\mat{K}_k\) are pre-computed offline and are independent of \(\vec{x}_0\). If the initial state changes, or if noise perturbs the system, we don't need to re-solve for \(\mat{K}_k\); we just apply the same feedback law. This makes it robust and computationally cheap at runtime.
+
+\begin{code}[Julia Notebook: LQR Riccati]
+    The `lqr-riccati.ipynb` notebook implements this exact two-pass algorithm.
+    \begin{itemize}
+        \item The first loop runs backward from `k = (N-1):-1:1` to compute and store the `K` and `P` matrices.
+        \item The second loop runs forward from `k = 1:(N-1)` to simulate the trajectory using the computed feedback gains \(\vec{u}_k = -\mat{K}_k \vec{x}_k\).
+        \item The resulting plots for \(\vec{x}\) and \(\vec{u}\) are identical to the previous methods.
+        \item The notebook also plots the components of the gain \(\mat{K}\) over time. It shows that for a long-horizon problem, the gains calculated backward from \(k=N-1\) quickly converge to a steady value.
+    \end{itemize}
+\end{code}
+
+\subsection{Infinite-Horizon LQR}
+For time-invariant systems (\(\mat{A}, \mat{B}, \mat{Q}, \mat{R}\) are constant) and a long horizon \(N \to \infty\), the gain \(\mat{K}_k\) and cost-to-go \(\mat{P}_k\) converge to steady-state values \(\mat{K}_\infty\) and \(\mat{P}_\infty\).
+
+The Riccati recursion \(\mat{P}_k = f(\mat{P}_{k+1})\) becomes a fixed-point equation:
+\[
+    \mat{P} = \mat{Q} + \mat{A}^\top \mat{P} (\mat{A} - \mat{B} (\mat{R} + \mat{B}^\top \mat{P} \mat{B})^{-1} \mat{B}^\top \mat{P} \mat{A})
+\]
+This is the \textbf{Discrete Algebraic Riccati Equation (DARE)}. We solve this equation (e.g., using `dare` in MATLAB/Python, or `dlqr` in Julia's `ControlSystems.jl`) to find the single, constant gain \(\mat{K}_\infty\).
+
+This constant gain \(\vec{u}_k = -\mat{K}_\infty \vec{x}_k\) is the optimal controller for the infinite-horizon LQR problem and is used to stabilize the system.
+\begin{code}[Julia Notebook: Infinite-Horizon]
+    The `lqr-riccati.ipynb` notebook demonstrates this.
+    \begin{itemize}
+        \item It calls `Kinf = dlqr(A,B,Q,R)` to solve the DARE.
+        \item It shows that `Kinf` is nearly identical to `K[:,:,1]` (the gain at the start of the time-horizon), confirming the convergence.
+        \item It computes the eigenvalues of the closed-loop system, `eigvals(A - B*Kinf)`. All eigenvalues have a magnitude less than 1, analytically proving that the feedback controller \(\mat{K}_\infty\) makes the system stable.
+    \end{itemize}
+\end{code}
