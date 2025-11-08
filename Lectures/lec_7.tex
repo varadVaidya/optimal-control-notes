@@ -1,0 +1,178 @@
+% Lectures/lec_7.tex
+\lecture{7}{}{Deterministic Optimal Control and LQR}
+
+
+\subsection{The Optimal Control Problem}
+
+We now formally define the problem of optimal control. We begin with the continuous-time formulation, which is the most general.
+
+\begin{definition}[Continuous-Time Optimal Control]
+Find the state trajectory \(\vec{x}(t) \in \mathbb{R}^n\) and control trajectory \(\vec{u}(t) \in \mathbb{R}^m\) that solve the following minimization problem:
+\begin{align*}
+    \min_{\vec{x}(t), \vec{u}(t)} & \quad J\left( \vec{x}(t), \vec{u}(t) \right)  = \int_{t_0}^{t_f} l(\vec{x}(t), \vec{u}(t), t) \,dt + l_F(\vec{x}(t_f)) \\
+    \text{subject to} & \quad \dot{\vec{x}}(t) = f(\vec{x}(t), \vec{u}(t)) \quad \text{(Dynamics Constraint)} \\
+    & \quad \vec{x}(t_0) = \vec{x}_0 \quad \text{(Initial Condition)} \\
+    & \quad \vec{g}(\vec{x}(t), \vec{u}(t)) \le \vec{0} \quad \text{(Path Constraints, optional)} \\
+    & \quad \vec{h}(\vec{x}(t_f)) = \vec{0} \quad \text{(Terminal Constraints, optional)}
+\end{align*}
+Here, \(l(\cdot)\) is the \textbf{stage cost} (or running cost) and \(l_F(\cdot)\) is the \textbf{terminal cost}.
+\end{definition}
+
+This is an \textbf{infinite-dimensional} optimization problem because we are optimizing over functions (\(\vec{x}(t)\) and \(\vec{u}(t)\)), which live in infinite-dimensional spaces. The solutions that we get from solving the above optimisation problems are open loop trajectories, not feedback control policies that we expect in robotic control. Analytic solutions are extremely rare, existing only for a few special cases (like LQR, which we will see).
+
+To make the problem computationally tractable, we discretize it in time.
+
+\begin{definition}[Discrete-Time Optimal Control]
+Find the sequence of states \(\vec{X} = \{\vec{x}_1,\allowbreak \dots,\allowbreak \vec{x}_N\}\) and controls \(\vec{U} = \{\vec{u}_1,\allowbreak \dots,\allowbreak \vec{u}_{N-1}\}\) that solve:
+\begin{align*}
+    \min_{\vec{X}, \vec{U}} & \quad J = \sum_{k=1}^{N-1} l(\vec{x}_k, \vec{u}_k) + l_F(\vec{x}_N) \\
+    \text{subject to} & \quad \vec{x}_{k+1} = f_d(\vec{x}_k, \vec{u}_k) \quad \text{for } k=1, \dots, N-1 \\
+    & \quad \vec{x}_1 = \vec{x}_0 \\
+    & \quad \vec{c}(\vec{x}_k, \vec{u}_k) \ge \vec{0} \quad \text{(e.g., torque limits, safety)}
+\end{align*}
+\end{definition}
+
+This is now a \textbf{finite-dimensional} (though very large) constrained optimization problem. The variables are the \textbf{knot points} \((\vec{x}_k, \vec{u}_k)\) of the trajectory. We can solve this using the KKT conditions we derived in previous lectures. To go from the continuous to discrete formulation, we need to choose a discretization scheme for the dynamics \(f_d\) (e.g., Euler, Runge-Kutta). While, to go from discrete to continuous, to upsample the trajectory for robot execution, we can use interpolation methods (e.g., cubic splines).
+
+\subsection{Pontryagin's Minimum Principle (Discrete-Time)}
+These provide the first-order necessary conditions for optimality for deterministic optimal control problems. In discrete time, they can be seen as an extension of the KKT conditions to account for the dynamics constraints.
+
+Let's derive them. We have a minimization problem with only equality constraints (\(\vec{x}_{k+1} - f_d(\vec{x}_k, \vec{u}_k) = \vec{0}\)). We can form the Lagrangian:
+
+\begin{definition}[Lagrangian for Optimal Control]
+\begin{equation}
+    \mathcal{L}(\vec{X}, \vec{U}, \vec{\Lambda}) = l_F(\vec{x}_N) + \sum_{k=1}^{N-1} \left( l(\vec{x}_k, \vec{u}_k) + \vec{\lambda}_{k+1}^{\top} \left( f_d(\vec{x}_k, \vec{u}_k) - \vec{x}_{k+1} \right) \right)
+\end{equation}
+where \(\vec{\Lambda} = \{\vec{\lambda}_2, \dots, \vec{\lambda}_N\}\) is the sequence of Lagrange multipliers, which we call the \textbf{costate}.
+\end{definition}
+
+To simplify notation, we introduce the \textbf{Hamiltonian}, which groups the terms inside the summation:
+\begin{equation}
+    H_k(\vec{x}_k, \vec{u}_k, \vec{\lambda}_{k}) = l(\vec{x}_k, \vec{u}_k) + \vec{\lambda}_{k}^{\top} f_d(\vec{x}_k, \vec{u}_k)
+\end{equation}
+The Lagrangian can then be rewritten as:
+\begin{equation}
+    \mathcal{L}(\vec{X}, \vec{U}, \vec{\Lambda}) = H_1(\vec{x}_1, \vec{u}_1, \vec{\lambda}_2) + \sum_{k=2}^{N-1} H_k(\vec{x}_k, \vec{u}_k, \vec{\lambda}_{k+1}) + l_F(\vec{x}_N) - \lambda_N^{\top} \vec{x}_N
+\end{equation}
+Now, we can find the stationary point of \(\mathcal{L}\) by taking its gradient with respect to all variables and setting them to zero.
+
+\begin{theorem}[Discrete-Time PMP (KKT Conditions)]
+A trajectory \((\vec{X}^\star, \vec{U}^\star)\) is a candidate for a local optimum only if there exists a costate trajectory \(\vec{\Lambda}^\star\) such that the following conditions hold:
+\begin{enumerate}
+    \item \textbf{State Equation (Primal Feasibility):}
+    \(\nabla_{\vec{\lambda}_{k+1}} \mathcal{L} = \vec{0} \implies \vec{x}_{k}^\star = f_d(\vec{x}_k^\star, \vec{u}_k^\star)\)
+    (This just recovers the dynamics).
+
+    \item \textbf{Costate Equation (Backward):}
+    \(\nabla_{\vec{x}_k} \mathcal{L} = \vec{0} \implies \vec{\lambda}_k^\star = \nabla_{\vec{x}} H_k = \nabla_{\vec{x}} l_k + \left(\pdv{f_d}{\vec{x}_k}\right)^{\top} \vec{\lambda}_{k+1}^\star\)
+    (This is a backward recurrence for \(\vec{\lambda}\)).
+
+    \item \textbf{Terminal Costate Condition:}
+    \(\nabla_{\vec{x}_N} \mathcal{L} = \vec{0} \implies \vec{\lambda}_N^\star = \nabla_{\vec{x}} l_F(\vec{x}_N^\star)\)
+    (This is the boundary condition for the costate).
+
+    \item \textbf{Stationarity of Hamiltonian:}
+    \(\nabla_{\vec{u}_k} \mathcal{L} = \vec{0} \implies \nabla_{\vec{u}} H_k = \nabla_{\vec{u}} l_k + \left(\pdv{f_d}{\vec{u}_k}\right)^{\top} \vec{\lambda}_{k+1}^\star = \vec{0}\)
+\end{enumerate}
+If control constraints \(\vec{u}_k \in \mathcal{U}\) exist, condition 4 is replaced by:
+\[
+    \vec{u}_k^\star = \argmin_{\vec{u} \in \mathcal{U}} H_k(\vec{x}_k^\star, \vec{u}, \vec{\lambda}_{k+1}^\star)
+\]
+\end{theorem}
+
+The discrete time PMP conditions can be converted into continuous time by taking the limit as the time step goes to zero. The resulting conditions are very similar, with the costate equation becoming a differential equation and the Hamiltonian stationarity condition remaining similar. These are as follows:
+\begin{enumerate}
+    \item \textbf{State Equation:} \(\dot{\vec{x}}^\star(t) = f(\vec{x}^\star(t), \vec{u}^\star(t))\)
+    \item \textbf{Costate Equation:} \( -\dot{\vec{\lambda}}^\star(t) = \nabla_{\vec{x}} H(\vec{x}^\star(t), \vec{u}^\star(t), \vec{\lambda}^\star(t))\)
+    \item \textbf{Terminal Condition:} \(\vec{\lambda}^\star(t_f) = \nabla_{\vec{x}} l_F(\vec{x}^\star(t_f))\)
+    \item \textbf{Hamiltonian Stationarity:} \(\vec{u}^\star(t) = \argmin_{\vec{u} \in \mathcal{U}} H(\vec{x}^\star(t), \vec{u}, \vec{\lambda}^\star(t))\)
+\end{enumerate}
+
+\subsection{The Linear Quadratic Regulator (LQR)}
+The LQR problem is a special case where the dynamics are linear and the cost is quadratic.
+\begin{definition}[Discrete-Time LQR]
+\begin{align*}
+    \min_{\vec{X}, \vec{U}} & \quad J = \frac{1}{2}\vec{x}_N^{\top}\mat{Q}_N\vec{x}_N + \sum_{k=1}^{N-1} \frac{1}{2}\left( \vec{x}_k^{\top}\mat{Q}_k\vec{x}_k + \vec{u}_k^{\top}\mat{R}_k\vec{u}_k \right) \\
+    \text{subject to} & \quad \vec{x}_{k+1} = \mat{A}_k \vec{x}_k + \mat{B}_k \vec{u}_k
+\end{align*}
+We assume \(\mat{Q}_k \succeq 0\) (positive semidefinite) and \(\mat{R}_k \succ 0\) (positive definite).
+\end{definition}
+
+LQR is foundational because it can be solved efficiently and serves as a local approximation for nonlinear problems.
+
+\subsubsection{Solving LQR via PMP}
+Let's apply the PMP conditions to the LQR problem.
+The Hamiltonian is:
+\[
+    H_k = \frac{1}{2}(\vec{x}_k^{\top}\mat{Q}_k\vec{x}_k + \vec{u}_k^{\top}\mat{R}_k\vec{u}_k) + \vec{\lambda}_{k+1}^{\top}(\mat{A}_k\vec{x}_k + \mat{B}_k\vec{u}_k)
+\]
+Applying the PMP conditions:
+\begin{enumerate}
+    \item \textbf{State Eq.:} \(\vec{x}_{k+1} = \mat{A}_k \vec{x}_k + \mat{B}_k \vec{u}_k\)
+    \item \textbf{Costate Eq.:} \(\vec{\lambda}_k = \nabla_{\vec{x}} H_k = \mat{Q}_k \vec{x}_k + \mat{A}_k^{\top} \vec{\lambda}_{k+1}\)
+    \item \textbf{Terminal Cond.:} \(\vec{\lambda}_N = \nabla_{\vec{x}} l_F = \mat{Q}_N \vec{x}_N\)
+    \item \textbf{Stationarity:} \(\nabla_{\vec{u}} H_k = \mat{R}_k \vec{u}_k + \mat{B}_k^{\top} \vec{\lambda}_{k+1} = \vec{0}\)
+\end{enumerate}
+From (4), we can find the optimal control \(\vec{u}_k^\star\) in terms of the costate:
+\begin{equation}
+    \vec{u}_k^\star = -\mat{R}_k^{-1} \mat{B}_k^{\top} \vec{\lambda}_{k+1}
+    \label{eq:lqr_pmp_control}
+\end{equation}
+
+\subsection{Indirect Shooting Methods}
+
+The PMP conditions give us a \textbf{two-point boundary value problem}. The state evolves forward from \(\vec{x}_1\), while the costate evolves backward from \(\vec{\lambda}_N\). These two are coupled: \(\vec{x}\) depends on \(\vec{u}\), which depends on \(\vec{\lambda}\), and \(\vec{\lambda}\) depends on \(\vec{x}\).
+
+\textbf{Indirect shooting} methods (now less common) try to solve this by guessing the initial costate \(\vec{\lambda}_1\) and integrating both systems forward, then adjusting \(\vec{\lambda}_1\) until the terminal condition \(\vec{\lambda}_N = \mat{Q}_N \vec{x}_N\) is met.
+
+A more modern approach, often called a "shooting method" in trajectory optimization, is to treat the problem as a large optimization on \emph{only} the control sequence \(\vec{U}\).
+\[
+    \min_{\vec{U}} J(\vec{U}) \quad \text{where} \quad J(\vec{U}) = J(\vec{X}(\vec{U}), \vec{U})
+\]
+We can solve this with gradient descent. The PMP equations give us a highly efficient way to compute the gradient \(\nabla_{\vec{U}} J\).
+
+The gradient of the total cost \(J\) with respect to a single control \(\vec{u}_k\) is exactly the gradient of the Hamiltonian:
+\[
+    \nabla_{\vec{u}_k} J = (\nabla_{\vec{u}_k} \mathcal{L})^{\top} = (\nabla_{\vec{u}} H_k)^{\top} = \mat{R}_k \vec{u}_k + \mat{B}_k^{\top} \vec{\lambda}_{k+1}
+\]
+This gives us a full algorithm.
+
+\begin{algorithm}[H]
+    \caption{Gradient Descent for LQR (Shooting Method)}
+    \DontPrintSemicolon
+    \KwIn{\(\mat{A}_k, \mat{B}_k, \mat{Q}_k, \mat{R}_k\), \(\vec{x}_1\), initial guess \(\vec{U} = (\vec{u}_1, \dots, \vec{u}_{N-1})\)}
+    \KwOut{Optimal \(\vec{U}^\star, \vec{X}^\star\)}
+    \BlankLine
+    \While{not converged}{
+        \Comment{1. Forward Pass (Rollout)}
+        \(\vec{x}_{k+1} \leftarrow \mat{A}_k \vec{x}_k + \mat{B}_k \vec{u}_k\) for \(k=1..N-1\)\;
+        \(\vec{X} \leftarrow (\vec{x}_1, \dots, \vec{x}_N)\)\;
+        Compute \(J_{old} = J(\vec{X}, \vec{U})\)\;
+
+        \Comment{2. Backward Pass (Compute Costate/Adjoint)}
+        \(\vec{\lambda}_N \leftarrow \mat{Q}_N \vec{x}_N\)\;
+        \(\vec{\lambda}_k \leftarrow \mat{Q}_k \vec{x}_k + \mat{A}_k^{\top} \vec{\lambda}_{k+1}\) for \(k=N-1..1\)\;
+
+        \Comment{3. Compute Search Direction}
+        \(\vec{g}_k \leftarrow \mat{R}_k \vec{u}_k + \mat{B}_k^{\top} \vec{\lambda}_{k+1}\) \Comment{Gradient \(\nabla_{\vec{u}_k} J\)}
+        \(\Delta\vec{u}_k \leftarrow -\mat{R}_k^{-1} \vec{g}_k\) \Comment{Newton step direction}
+        Set \(\Delta\vec{U} \leftarrow (\Delta\vec{u}_1, \dots, \Delta\vec{u}_{N-1})\)\;
+
+        \If{\(\|\Delta\vec{U}\|_\infty < \epsilon\)}{ \Return \(\vec{U}, \vec{X}\) }
+
+        \Comment{4. Backtracking Line Search}
+        \(\alpha \leftarrow 1.0\)\;
+        \(\vec{p} \leftarrow (\nabla J)^{\top} \Delta\vec{U} = \sum_k \vec{g}_k^{\top} \Delta\vec{u}_k = - \sum_k \vec{g}_k^{\top} \mat{R}_k^{-1} \vec{g}_k\) \;
+        \While{$J(\vec{U} + \alpha\Delta\vec{U}) > J_{old} + c_1 \alpha \vec{p}$}{
+            \(\alpha \leftarrow 0.5 \alpha\)\;
+        }
+
+        \Comment{5. Update Control}
+        \(\vec{U} \leftarrow \vec{U} + \alpha \Delta\vec{U}\)\;
+    }
+\end{algorithm}
+
+
+\begin{code}[Julia Notebook: LQR Shooting]
+FILL THIS OUT
+\end{code}
