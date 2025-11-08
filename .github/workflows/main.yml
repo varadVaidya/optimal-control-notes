@@ -1,8 +1,10 @@
 name: Build LaTeX document
-on: [workflow_dispatch]
+on: [workflow_dispatch, push]
 jobs:
   build_latex:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Set up Git repository
         uses: actions/checkout@v4
@@ -17,3 +19,15 @@ jobs:
         with:
           name: PDF
           path: optimal-control.pdf
+      - name: Create Release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: latest
+          name: Latest PDF Build
+          body: "Automatically generated PDF from latest commit"
+          files: optimal-control.pdf
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
