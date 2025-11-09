@@ -1,0 +1,162 @@
+% Lectures/lec_9.tex
+\lecture{9}{}{Controllability and Dynamic Programming}
+
+\subsection{Controllability}
+A fundamental question arises prior to solving the LQR problem: can the controls steer the system to a desired state? In the LQR context, this typically means: can the state be driven to the origin from an arbitrary initial condition? This property is termed \textbf{controllability}.
+
+For a time-invariant LTI system, \(\vec{x}_{k+1} = \mat{A}\vec{x}_k + \mat{B}\vec{u}_k\), consider the state \(\vec{x}_N\) after $N$ steps, starting from \(\vec{x}_0\):
+\begin{align*}
+    \vec{x}_1 &= \mat{A}\vec{x}_0 + \mat{B}\vec{u}_0 \\
+    \vec{x}_2 &= \mat{A}\vec{x}_1 + \mat{B}\vec{u}_1 = \mat{A}(\mat{A}\vec{x}_0 + \mat{B}\vec{u}_0) + \mat{B}\vec{u}_1 = \mat{A}^2\vec{x}_0 + \mat{A}\mat{B}\vec{u}_0 + \mat{B}\vec{u}_1 \\
+    &\vdots \\
+    \vec{x}_N &= \mat{A}^N \vec{x}_0 + \mat{A}^{N-1}\mat{B}\vec{u}_0 + \mat{A}^{N-2}\mat{B}\vec{u}_1 + \dots + \mat{B}\vec{u}_{N-1} \text{}
+\end{align*}
+The control-dependent terms can be grouped by factoring out a single matrix:
+\[
+    \vec{x}_N - \mat{A}^N \vec{x}_0 = \underbrace{\begin{bmatrix} \mat{B} & \mat{A}\mat{B} & \mat{A}^2\mat{B} & \cdots & \mat{A}^{N-1}\mat{B} \end{bmatrix}}_{\mathcal{C}_N}
+    \begin{bmatrix}
+        \vec{u}_{N-1} \\ \vec{u}_{N-2} \\ \vdots \\ \vec{u}_0
+    \end{bmatrix}
+\]
+The system is controllable if there exists a control sequence \(\vec{U} = [\vec{u}_{N-1}, \dots, \vec{u}_0]^\top\) that reaches \emph{any} target state. For LQR stabilization, the specific objective is \(\vec{x}_N = \vec{0}\). This requires solving the linear system \(\mathcal{C}_N \vec{U} = -\mat{A}^N \vec{x}_0\) for \(\vec{U}\).
+
+A solution exists for any \(\vec{x}_0\) if and only if the matrix \(\mathcal{C}_N\) has full row rank $n$ (the dimension of the state), i.e., its columns span \(\mathbb{R}^n\).
+
+\begin{theorem}[Cayley-Hamilton Theorem]
+A fundamental result from linear algebra states that any matrix \(\mat{A}\) satisfies its own characteristic polynomial. A consequence is that any power \(\mat{A}^k\) for \(k \ge n\) can be written as a linear combination of the lower powers:
+\[
+    \mat{A}^k = \sum_{i=0}^{n-1} \alpha_i \mat{A}^i \text{}
+\]
+\end{theorem}
+
+This theorem implies that any columns \(\mat{A}^k \mat{B}\) in the matrix \(\mathcal{C}_N\) for \(k \ge n\) are linearly dependent on the preceding columns. Consequently, adding more time steps (and hence additional columns) beyond \(k=n-1\) does not increase the rank.
+
+This yields the standard test for controllability.
+\begin{definition}[Controllability Matrix]
+The Controllability Matrix for a time-invariant LTI system is:
+\begin{equation}
+    \mathcal{C} = \begin{bmatrix} \mat{B} & \mat{A}\mat{B} & \mat{A}^2\mat{B} & \cdots & \mat{A}^{n-1}\mat{B} \end{bmatrix} \text{}
+\end{equation}
+The system is controllable if and only if \(\text{rank}(\mathcal{C}) = n\).
+\end{definition}
+
+\begin{code}[Julia Notebook: Controllability]
+    The `lqr-dp.ipynb` notebook evaluates controllability for the double integrator example:
+    \[
+        \mat{A} = \begin{bmatrix} 1 & h \\ 0 & 1 \end{bmatrix}, \quad \mat{B} = \begin{bmatrix} h^2/2 \\ h \end{bmatrix}
+    \]
+    The controllability matrix is \(\mathcal{C} = [\mat{B}, \mat{A}\mat{B}] = \begin{bmatrix} h^2/2 & 3h^2/2 \\ h & h \end{bmatrix}\).
+    The code `rank([B A*B])` computes the rank of this $2 \times 2$ matrix. Since $h \neq 0$, its determinant is $(h^3/2) - (3h^3/2) = -h^3 \neq 0$, hence the matrix has full rank 2 and the system is controllable.
+\end{code}
+
+\subsection{Dynamic Programming}
+Dynamic Programming (DP) is a general framework for optimal control based on a single principle.
+
+\begin{definition}[Bellman's Principle of Optimality]
+An optimal policy has the property that, for any initial state and initial decision, the remaining decisions form an optimal policy for the resulting state.
+Equivalently, every segment of an optimal trajectory is itself optimal for its sub-problem; otherwise a strictly better replacement would contradict global optimality.
+\end{definition}
+
+This principle enables construction of the solution by backward induction from the terminal time. This is precisely the mechanism underlying the Riccati recursion and the PMP costate backward pass.
+
+To formalize this, we define the optimal cost-to-go, or \textbf{Value Function}.
+\begin{definition}[Value Function]
+The Value Function \(V_k(x)\) is the optimal cost-to-go, defined as the minimal cost accumulated starting from state \(\vec{x}\) at time step $k$ while acting optimally until the final time $N$.
+\[
+    V_k(\vec{x}) = \min_{\vec{u}_{k \dots N-1}} \left( l_F(\vec{x}_N) + \sum_{j=k}^{N-1} l(\vec{x}_j, \vec{u}_j) \right) \quad \text{s.t.} \quad \vec{x}_k = \vec{x}
+\]
+\end{definition}
+
+The Bellman Principle gives us a recursive relationship for the Value Function:
+\begin{equation}
+    \quad V_k(\vec{x}) = \min_{\vec{u}} \left[ l(\vec{x}, \vec{u}) + V_{k+1}(f(\vec{x}, \vec{u})) \right]
+    \label{eq:bellman_general}
+\end{equation}
+The value of being at state $\vec{x}$ at time $k$ is the minimal cost achievable by taking one step: incurring the immediate cost $l(\vec{x}, \vec{u})$ and transitioning to a new state $f(\vec{x}, \vec{u})$, from which the optimal future cost $V_{k+1}(f(\vec{x}, \vec{u}))$ must be paid.
+
+\subsection{DP Derivation of the Riccati Recursion}
+We apply the Bellman equation to the LQR problem and prove by induction that $V_k(\vec{x})$ is quadratic for all $k$.
+
+\paragraph{Base Case (k=N):}
+The recursion terminates at time $N$. The cost-to-go from $N$ is the terminal cost.
+\[
+    V_N(\vec{x}) = l_F(\vec{x}) = \frac{1}{2}\vec{x}^\top \mat{Q}_N \vec{x} \text{}
+\]
+This is a quadratic form, \(V_N(\vec{x}) = \frac{1}{2}\vec{x}^\top \mat{P}_N \vec{x}\), where \(\mat{P}_N = \mat{Q}_N\).
+
+\paragraph{Inductive Step (k < N):}
+Assume \(V_{k+1}(\vec{x}) = \frac{1}{2}\vec{x}^\top \mat{P}_{k+1} \vec{x}\) for some matrix \(\mat{P}_{k+1}\).
+We now compute \(V_k(\vec{x})\) using \autoref{eq:bellman_general}:
+\[
+    V_k(\vec{x}) = \min_{\vec{u}} \left[ \frac{1}{2}\vec{x}^\top \mat{Q} \vec{x} + \frac{1}{2}\vec{u}^\top \mat{R} \vec{u} + V_{k+1}(\mat{A}\vec{x} + \mat{B}\vec{u}) \right]
+\]
+Substitute the assumed form for \(V_{k+1}\):
+\[
+    V_k(\vec{x}) = \min_{\vec{u}} \left[ \frac{1}{2}\vec{x}^\top \mat{Q} \vec{x} + \frac{1}{2}\vec{u}^\top \mat{R} \vec{u} + \frac{1}{2}(\mat{A}\vec{x} + \mat{B}\vec{u})^\top \mat{P}_{k+1} (\mat{A}\vec{x} + \mat{B}\vec{u}) \right] \text{}
+\]
+This is an unconstrained quadratic minimization problem in \(\vec{u}\). The minimum is attained where the gradient with respect to \(\vec{u}\) is zero:
+\[
+    \nabla_{\vec{u}} [\dots] = \mat{R}\vec{u} + \mat{B}^\top \mat{P}_{k+1} (\mat{A}\vec{x} + \mat{B}\vec{u}) = 0 \text{}
+\]
+Solving for \(\vec{u}\):
+\[
+    (\mat{R} + \mat{B}^\top \mat{P}_{k+1} \mat{B}) \vec{u} = - (\mat{B}^\top \mat{P}_{k+1} \mat{A}) \vec{x}
+\]
+This yields the optimal policy \(\vec{u}_k^\star(\vec{x})\):
+\[
+    \vec{u}_k^\star = - \underbrace{(\mat{R} + \mat{B}^\top \mat{P}_{k+1} \mat{B})^{-1} (\mat{B}^\top \mat{P}_{k+1} \mat{A})}_{\mat{K}_k} \vec{x} = -\mat{K}_k \vec{x} \text{}
+\]
+This coincides with the Riccati gain \(\mat{K}_k\) from Lecture~8.
+
+To obtain \(V_k(\vec{x})\), substitute the optimal control \(\vec{u}_k^\star = -\mat{K}_k \vec{x}\) into the expression for \(V_k(\vec{x})\). The algebra yields:
+\[
+    V_k(\vec{x}) = \frac{1}{2}\vec{x}^\top \left[ \mat{Q} + \mat{K}_k^\top \mat{R} \mat{K}_k + (\mat{A} - \mat{B}\mat{K}_k)^\top \mat{P}_{k+1} (\mat{A} - \mat{B}\mat{K}_k) \right] \vec{x}
+\]
+This demonstrates that \(V_k(\vec{x})\) is also a quadratic form, \(V_k(\vec{x}) = \frac{1}{2}\vec{x}^\top \mat{P}_k \vec{x}\), where \(\mat{P}_k\) is given by the recursive update:
+\[
+    \mat{P}_k = \mat{Q} + \mat{K}_k^\top \mat{R} \mat{K}_k + (\mat{A} - \mat{B}\mat{K}_k)^\top \mat{P}_{k+1} (\mat{A} - \mat{B}\mat{K}_k) \text{}
+\]
+This is the \textbf{Riccati Recursion}. This DP derivation confirms that the backward Riccati pass is a special, analytically tractable instance of solving the Bellman equation, wherein the quadratic form of the value function is preserved at each step.
+
+\subsection{The Curse of Dimensionality}
+The DP algorithm is general:
+\begin{enumerate}
+    \item Initialize \(V_N(\vec{x}) = l_F(\vec{x})\).
+    \item For \(k = N-1 \dots 1\):
+    \item \(V_k(\vec{x}) = \min_{\vec{u}} [ l(\vec{x}, \vec{u}) + V_{k+1}(f(\vec{x}, \vec{u})) ]\)
+\end{enumerate}
+This provides a sufficient condition for global optimality. Why is it not used universally?
+\begin{itemize}
+    \item \textbf{Tractability:} It is tractable only for relatively simple problems.
+    \item \textbf{Value Function Representation:} For LQR, \(V_k(\vec{x})\) is represented exactly by a single $n \times n$ matrix \(\mat{P}_k\). For a general nonlinear problem, \(V_k(\vec{x})\) becomes a complex, non-analytic function that cannot be represented exactly in closed form.
+    \item \textbf{Optimization Step:} For LQR, the step \(\min_{\vec{u}}[\dots]\) is a convex QP, solvable analytically. For nonlinear problems, this step \(\min_{\vec{u}} [ l(\vec{x}, \vec{u}) + V_{k+1}(f(\vec{x}, \vec{u})) ]\) is generally non-convex and computationally demanding, and must be solved at every \(\vec{x}\).
+    \item \textbf{The Curse:} The cost of representing the function \(V_k(\vec{x})\) (e.g., on a grid) grows exponentially with the dimension $n$ of the state \(\vec{x}\). This phenomenon is the \textbf{Curse of Dimensionality}.
+\end{itemize}
+This motivates Reinforcement Learning (RL): RL uses function approximators (e.g., neural networks) to find an \emph{approximate} solution to the Bellman equation, mitigating the curse in practice.
+
+\subsection{The Fundamental Connection}
+We now have two views of LQR:
+\begin{enumerate}
+    \item \textbf{PMP (Lecture 7-8):} We get a state trajectory \(\vec{x}_k\) and a costate trajectory \(\vec{\lambda}_k\). From the QP derivation, we found \(\vec{\lambda}_k = \mat{P}_k \vec{x}_k\).
+    \item \textbf{DP (Lecture 9):} We get a value function \(V_k(\vec{x}) = \frac{1}{2}\vec{x}^\top \mat{P}_k \vec{x}\).
+\end{enumerate}
+Let's compute the gradient of the value function from DP:
+\[
+    \nabla_{\vec{x}} V_k(\vec{x}) = \nabla_{\vec{x}} \left( \frac{1}{2}\vec{x}^\top \mat{P}_k \vec{x} \right) = \mat{P}_k \vec{x}
+\]
+Comparing the two, we arrive at a fundamental insight:
+\begin{equation}
+    \boxed{\vec{\lambda}_k = \nabla_{\vec{x}} V_k(\vec{x}_k)} \text{}
+\end{equation}
+The \textbf{costate \(\vec{\lambda}_k\)} (the Lagrange multiplier of the dynamics constraint at time $k$) is exactly equal to the \textbf{gradient of the optimal cost-to-go (Value) function} \(\nabla_{\vec{x}} V_k\) evaluated at the optimal state \(\vec{x}_k\).
+
+This connection is profound and holds true for nonlinear optimal control as well, linking the worlds of Pontryagin (PMP) and Bellman (DP).
+
+\begin{code}[Julia Notebook: Verifying the Connection]
+    The `lqr-dp.ipynb` notebook numerically verifies all of these concepts:
+    \begin{itemize}
+        \item It solves the LQR problem using both the QP method and the DP (Riccati) method and plots the trajectories, showing they are identical.
+        \item It numerically confirms Bellman's Principle by showing that the optimal sub-trajectory from time $k$  is identical to the corresponding slice of the full optimal trajectory.
+        \item Most importantly, it compares the Lagrange multipliers from the QP solve (the array \texttt{lambda\_hist\_qp[:,k-1]}) to the gradient of the DP value function computed with ForwardDiff on \texttt{xhist}, and shows that they are the same, numerically proving \(\vec{\lambda}_k = \nabla_{\vec{x}} V_k(\vec{x}_k)\).
+    \end{itemize}
+\end{code}
