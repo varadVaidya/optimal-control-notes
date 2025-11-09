@@ -156,7 +156,8 @@ This connection is profound and holds true for nonlinear optimal control as well
     The `lqr-dp.ipynb` notebook numerically verifies all of these concepts:
     \begin{itemize}
         \item It solves the LQR problem using both the QP method and the DP (Riccati) method and plots the trajectories, showing they are identical.
-        \item It numerically confirms Bellman's Principle by showing that the optimal sub-trajectory from time $k$  is identical to the corresponding slice of the full optimal trajectory.
+        \item It numerically confirms Bellman's Principle by showing that the optimal subtrajectory from time \(k\)  is identical to the corresponding slice of the full optimal trajectory.
         \item Most importantly, it compares the Lagrange multipliers from the QP solve (the array \texttt{lambda\_hist\_qp[:,k-1]}) to the gradient of the DP value function computed with ForwardDiff on \texttt{xhist}, and shows that they are the same, numerically proving \(\vec{\lambda}_k = \nabla_{\vec{x}} V_k(\vec{x}_k)\).
     \end{itemize}
 \end{code}
+\newpage
