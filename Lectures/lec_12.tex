@@ -1,0 +1,169 @@
+\lecture{12}{}{Free-Time Problems and Direct Collocation}
+
+We shift our focus from "shooting-based" methods (like DDP) to "direct" methods. These methods re-frame the entire trajectory optimization problem as a single, large Nonlinear Program (NLP) and solve it with off-the-shelf optimizers.
+
+\subsection{Handling Free/Minimum-Time Problems}
+
+A common problem in robotics is to find the \emph{fastest} path to a goal, not just \emph{a} path. This is a minimum-time problem.
+
+\begin{definition}[Minimum-Time Optimal Control]
+	The continuous-time minimum-time problem is often formulated as:
+	\begin{align*}
+	\min_{\vec{x}(t), \vec{u}(t), t_f} & \quad J = \int_{0}^{t_f} 1 \,dt = t_f \\
+	\text{subject to} & \quad \dot{\vec{x}}(t) = f(\vec{x}(t), \vec{u}(t)) \\
+	& \quad \vec{x}(0) = \vec{x}_0 \\
+	& \quad \vec{x}(t_f) = \vec{x}_{\text{goal}} \\
+	& \quad \vec{u}_{\min} \le \vec{u}(t) \le \vec{u}_{\max}
+	\end{align*}
+\end{definition}
+
+When we discretize this, the number of time steps \(N\) is no longer fixed. A common trick is to fix the number of knot points \(N\) but make the time step \(h_k\) between knot points a decision variable.
+
+Let the total time be \(T = \sum_{k=1}^{N-1} h_k\). The problem becomes:
+\begin{align*}
+\min_{\vec{X}, \vec{U}, \vec{h}} & \quad J = \sum_{k=1}^{N-1} h_k \\
+\text{subject to} & \quad \vec{x}_{k+1} = f_d(\vec{x}_k, \vec{u}_k, h_k) \quad \text{(Dynamics depend on } h_k \text{)} \\
+& \quad \vec{x}_1 = \vec{x}_0, \quad \vec{x}_N = \vec{x}_{\text{goal}} \\
+& \quad \vec{u}_{\min} \le \vec{u}_k \le \vec{u}_{\max} \\
+& \quad h_k \ge 0 \quad \text{(Time must move forward)}
+\end{align*}
+
+The stage cost \(l(\vec{x}_k, \vec{u}_k)\) must also be scaled by the time step, as it represents a cost \emph{rate}.
+\[
+	J = \sum_{k=1}^{N-1} h_k l(\vec{x}_k, \vec{u}_k) + l_F(\vec{x}_N)
+\]
+If we do not scale the cost by \(h_k\), the solver may exploit this by making \(h_k\) arbitrarily large or negative to minimize cost, which is physically meaningless.
+
+The inclusion of \(h_k\) as a decision variable makes the dynamics constraint \(\vec{x}_{k+1} = f_d(\vec{x}_k, \vec{u}_k, h_k)\) (e.g., from an RK4 step) non-convex, even if the original dynamics were linear. This firmly places free-time problems in the realm of nonlinear optimization.
+
+\subsection{Direct Trajectory Optimization}
+
+The strategy we just described is an example of \textbf{Direct Trajectory Optimization}. The basic strategy is to transcribe the continuous-time optimal control problem into a standard, large-scale Nonlinear Program (NLP).
+
+\begin{note}[Transcription Strategy]
+	\begin{enumerate}
+		\item \textbf{Discretize:} Choose a number of knot points \(N\).
+		\item \textbf{Define Decision Vector:} Stack all states and controls into one massive decision vector \(\vec{z}\):
+		      \[
+			      \vec{z} = \begin{bmatrix} \vec{x}_1 \\ \vec{u}_1 \\ \vec{x}_2 \\ \vec{u}_2 \\ \vdots \\ \vec{x}_{N-1} \\ \vec{u}_{N-1} \\ \vec{x}_N \end{bmatrix} \in \mathbb{R}^{N(n+m) - m}
+		      \]
+		\item \textbf{Formulate NLP:} Transcribe the OCP into the standard NLP form:
+		      \begin{align*}
+			      \min_{\vec{z}} & \quad f(\vec{z}) = \sum_{k=1}^{N-1} l(\vec{x}_k, \vec{u}_k) + l_F(\vec{x}_N) \\
+			      \text{s.t.} & \quad \vec{c}_{\text{dyn}}(\vec{z}) = \vec{0} \quad \text{(Dynamics as equality constraints)} \\
+			      & \quad \vec{d}(\vec{z}) \le \vec{0} \quad \text{(State/control path constraints)}
+		      \end{align*}
+	\end{enumerate}
+	This NLP is large but \textbf{sparse}. The dynamics constraint for time \(k\), for example, only involves variables from time \(k\) and \(k+1\).
+
+	We can then use powerful, general-purpose NLP solvers like \textbf{IPOPT} (Interior-Point Optimizer), \textbf{SNOPT}, or \textbf{KNITRO} to find \(\vec{z}^\star\).
+\end{note}
+
+\subsubsection{Sequential Quadratic Programming (SQP)}
+
+The most common class of algorithms for solving these NLPs is \textbf{Sequential Quadratic Programming (SQP)}.
+SQP is to constrained optimization what Newton's method is to unconstrained optimization.
+
+\begin{intuition}
+	SQP is a generalization of Newton's method that handles inequality constraints.
+	\begin{itemize}
+		\item \textbf{Goal:} Solve the KKT conditions for the NLP.
+		\item \textbf{Strategy:} At each iteration \(k\), form a \textbf{Quadratic Program (QP)} subproblem by:
+		      \begin{enumerate}
+			      \item Taking a 2nd-order Taylor expansion of the \textbf{Lagrangian} \(\mathcal{L}(\vec{z}, \vec{\lambda}, \vec{\mu})\) around \(\vec{z}_k\).
+			      \item Taking a 1st-order (linear) expansion of the constraints \(\vec{c}(\vec{z})\) and \(\vec{d}(\vec{z})\).
+			      \item If, the inequalities are convex (i.e. conic), we can generalise SQP into \textbf{Sequential Convex Programming (SCP)} by keeping the original inequalities instead of linearising them.
+		      \end{enumerate}
+		\item \textbf{Subproblem:} Solve this QP (which is convex if \(\nabla^2_{\vec{z}\vec{z}} \mathcal{L}\) is positive definite) to find a primal-dual search direction \(\Delta\vec{z} = (\delta\vec{z}, \delta\vec{\lambda}, \delta\vec{\mu})\).
+		\item \textbf{Update:} Perform a line search along this direction using a \textbf{merit function} (which balances objective decrease vs. constraint violation) to find \(\vec{z}_{k+1}\).
+	\end{itemize}
+\end{intuition}
+
+For trajectory optimization, the KKT system formed by this NLP is massive but has a strong, sparse, block-banded structure. High-performance solvers for trajectory optimization (like iLQR, DDP, and those used in DIRCOL) are all fundamentally about solving this sparse KKT system efficiently.
+
+\subsection{Direct Collocation (DIRCOL)}
+
+The shooting methods (such as DDP) and simple direct transcription (using Euler integration) have a limitation: they are only first-order accurate. If we use a simple \(\vec{x}_{k+1} = \vec{x}_k + h f(\vec{x}_k, \vec{u}_k)\) as the dynamics constraint, we need a very small \(h\) (and thus a very large NLP) to obtain an accurate trajectory.
+
+\textbf{Direct Collocation} methods provide a much more accurate transcription.
+
+\begin{definition}[Direct Collocation]
+	Direct Collocation methods represent the state trajectory \(\vec{x}(t)\) as a \textbf{piecewise polynomial spline}. The dynamics \(\dot{\vec{x}} = f(\vec{x}, \vec{u})\) are not enforced everywhere, but are enforced as equality constraints at a finite number of \textbf{collocation points}.
+\end{definition}
+
+The most common variant is \textbf{Hermite-Simpson Collocation}.
+\begin{itemize}
+	\item \textbf{State Spline:} The state \(\vec{x}(t)\) over the interval \([t_k, t_{k+1}]\) is represented by a \textbf{cubic Hermite polynomial}. This spline is uniquely defined by four values: the state and its derivative at the start and end of the interval, \((\vec{x}_k, \dot{\vec{x}}_k)\) and \((\vec{x}_{k+1}, \dot{\vec{x}}_{k+1})\).
+	\item \textbf{Control Spline:} The control \(\vec{u}(t)\) is typically represented by a piecewise-linear spline, i.e., linear interpolation between \(\vec{u}_k\) and \(\vec{u}_{k+1}\).
+\end{itemize}
+
+The key approach in DIRCOL is that we make \(\vec{x}_k\) and \(\vec{u}_k\) the decision variables, and then \emph{approximate} the derivatives \(\dot{\vec{x}}_k\) using the dynamics:
+\[
+	\dot{\vec{x}}_k \approx f(\vec{x}_k, \vec{u}_k) \quad \text{and} \quad \dot{\vec{x}}_{k+1} \approx f(\vec{x}_{k+1}, \vec{u}_{k+1})
+\]
+With these four values \((\vec{x}_k, f(\vec{x}_k, \vec{u}_k), \vec{x}_{k+1}, f(\vec{x}_{k+1}, \vec{u}_{k+1}))\), the cubic spline is fully defined.
+
+\paragraph{The Collocation Constraint}
+We now enforce the dynamics \(\dot{\vec{x}} = f(\vec{x}, \vec{u})\) at a single \textbf{collocation point} in the middle of the interval: \(t_{k+1/2} = t_k + h/2\).
+
+\begin{enumerate}
+	\item \textbf{Spline value at midpoint:} The cubic Hermite spline equations give the state \emph{value} at the midpoint as:
+	      \[
+		      \vec{x}_{k+1/2} = \frac{1}{2}(\vec{x}_k + \vec{x}_{k+1}) + \frac{h}{8}(\dot{\vec{x}}_k - \dot{\vec{x}}_{k+1})
+	      \]
+	\item \textbf{Spline derivative at midpoint:} The derivative of the spline at the midpoint is:
+	      \[
+		      \dot{\vec{x}}_{k+1/2} = -\frac{3}{2h}(\vec{x}_k - \vec{x}_{k+1}) - \frac{1}{4}(\dot{\vec{x}}_k + \dot{\vec{x}}_{k+1})
+	      \]
+	\item \textbf{Control at midpoint:} From linear interpolation:
+	      \[
+		      \vec{u}_{k+1/2} = \frac{1}{2}(\vec{u}_k + \vec{u}_{k+1})
+	      \]
+\end{enumerate}
+Now, we substitute \(\dot{\vec{x}}_k \approx f_k = f(\vec{x}_k, \vec{u}_k)\) and \(\dot{\vec{x}}_{k+1} \approx f_{k+1} = f(\vec{x}_{k+1}, \vec{u}_{k+1})\) into these equations.
+
+The \textbf{collocation constraint} (or defect) requires that the spline's derivative \(\dot{\vec{x}}_{k+1/2}\) must equal the dynamics evaluated at the spline's midpoint value \(f(\vec{x}_{k+1/2}, \vec{u}_{k+1/2})\).
+\[
+	\vec{c}_k(\vec{x}_k, \vec{u}_k, \vec{x}_{k+1}, \vec{u}_{k+1}) = \dot{\vec{x}}_{k+1/2} - f(\vec{x}_{k+1/2}, \vec{u}_{k+1/2}) = \vec{0}
+\]
+Writing this out in full, the dynamics constraint for the NLP is:
+\begin{align*}
+	\vec{c}_k = & \left( -\frac{3}{2h}(\vec{x}_k - \vec{x}_{k+1}) - \frac{1}{4}(f_k + f_{k+1}) \right) \\
+	& - f\left( \frac{1}{2}(\vec{x}_k + \vec{x}_{k+1}) + \frac{h}{8}(f_k - f_{k+1}), \;\; \frac{1}{2}(\vec{u}_k + \vec{u}_{k+1}) \right) = \vec{0}
+\end{align*}
+This single, complex equation provides a 3rd-order accurate integration scheme!
+
+\begin{note}[Efficiency]
+	This approach appears computationally expensive, but it is actually very efficient. To evaluate the constraint and its Jacobian, we need \(f_k\), \(f_{k+1}\), and \(f_{k+1/2}\).
+	However, the \(f_k\) and \(f_{k+1}\) terms are shared with the adjacent constraints (\(c_{k-1}\) and \(c_{k+1}\)).
+	The net cost is approximately 2 dynamics evaluations per time step, which is \emph{less} than a standard RK4 (which requires 4).
+\end{note}
+
+\begin{code}[Julia Notebook: \texttt{dircol.ipynb} (Acrobot Swing-up)]
+	The provided Julia notebook, \texttt{dircol.ipynb}, demonstrates the implementation of the Hermite-Simpson Direct Collocation method.
+
+	\paragraph{Objective}
+	The notebook solves the Acrobot swing-up problem. The goal is to find a trajectory from the hanging-down state (\(\vec{x}_0 = [-\pi/2, 0, 0, 0]\)) to the upright, balanced state (\(\vec{x}_{\text{goal}} = [\pi/2, 0, 0, 0]\)). This is a classic, highly nonlinear and underactuated problem.
+
+	\paragraph{Transcription}
+	The notebook transcribes this problem into an NLP to be solved by \textbf{Ipopt}.
+	\begin{itemize}
+		\item \textbf{Decision Vector:} It defines \texttt{n\_nlp = (Nx+Nu)*Nt} as the total number of variables in the flattened decision vector \(\vec{z}\), which contains all \(\vec{x}_k\) and \(\vec{u}_k\).
+		\item \textbf{NLP Functions:} It provides two key functions to Ipopt:
+		      \begin{enumerate}
+			      \item \texttt{cost(ztraj)}: This is the NLP objective \(f(\vec{z})\). It sums a simple quadratic stage cost \(\frac{1}{2}(\vec{x}_k-\vec{x}_{\text{goal}})^\top \mat{Q} (\vec{x}_k-\vec{x}_{\text{goal}}) + \frac{1}{2}\vec{u}_k^\top \mat{R} \vec{u}_k\) over all time steps.
+			      \item \texttt{con!(c, ztraj)}: This is the NLP constraint function \(\vec{g}(\vec{z})\). It fills the constraint vector \texttt{c} with:
+			            \begin{itemize}
+				            \item The initial condition: \(\vec{c}[1:Nx] = \vec{x}_1 - \vec{x}_0\)
+				            \item The terminal condition: \(\vec{c}[end-Nx+1:end] = \vec{x}_N - \vec{x}_{\text{goal}}\)
+				            \item The dynamics: The middle of the vector is filled by the \texttt{dircol\_dynamics} function for each time step.
+			            \end{itemize}
+		      \end{enumerate}
+		\item \textbf{Collocation Constraint:} The function \texttt{dircol\_dynamics(x1,\allowbreak u1,\allowbreak x2,\allowbreak u2)} implements the constraint we derived. It computes \texttt{xm}, \texttt{um}, \texttt{xdotm} (from the spline) and \texttt{fm} (from the dynamics) and returns the defect \texttt{fm - xdotm}.
+	\end{itemize}
+
+	\paragraph{Solving and Results}
+	The notebook uses \texttt{ForwardDiff.jacobian!} to compute the sparse Jacobians of the cost and constraint functions automatically. It passes all this information to the \texttt{Ipopt.Optimizer}.
+
+\end{code}
+\newpage
