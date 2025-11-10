@@ -1,0 +1,154 @@
+% Lectures/lec_10.tex
+\lecture{10}{}{Convexity and Model Predictive Control}
+
+\begin{prev}
+    In our last lecture, we formalized the backward-in-time reasoning of the Riccati recursion by introducing the general theory of \textbf{Dynamic Programming (DP)}. We showed that the LQR solution is a special case of DP where the Value Function \(V_k(\vec{x})\) remains quadratic. We also established the fundamental connection between the costate (Lagrange multiplier) and the value function: \(\vec{\lambda}_k = \nabla_{\vec{x}} V_k(\vec{x})\).
+\end{prev}
+
+Today, we address the primary weakness of LQR: its inability to handle constraints. This will lead us to \textbf{Model Predictive Control (MPC)}, a method that leverages our knowledge of optimization to control systems in real-time. First, we must build a foundation in \textbf{convexity}.
+
+\subsection{The Problem: Constraints in Optimal Control}
+
+The LQR problem \(\min J\) s.t. \(\vec{x}_{k+1} = \mat{A}\vec{x}_k + \mat{B}\vec{u}_k\) is powerful, but its dynamics are \emph{unconstrained}. In robotics, we must reason about real-world limitations, such as:
+\begin{itemize}
+    \item \textbf{Actuator Limits:} A motor can only produce so much torque, and a thruster has minimum and maximum thrusts. \(\vec{u}_{\min} \le \vec{u}_k \le \vec{u}_{\max}\).
+    \item \textbf{State Constraints:} A joint angle must stay within its limits, or a robot must not enter a "keep-out" zone. \(\vec{x}_{\min} \le \vec{x}_k \le \vec{x}_{\max}\).
+\end{itemize}
+These constraints \textbf{break the analytic Riccati solution}. The unconstrained LQR solution does not account for these limits. A common but significantly flawed heuristic is to "clip" or "saturate" the LQR output: \(\vec{u}_k = \max(\vec{u}_{\min}, \min(\vec{u}_{\max}, \vec{u}_{\text{LQR}}))\). This approach is suboptimal and can even destabilize the system.
+
+A more principled approach is to solve the full constrained optimization problem. While the LQR QP formulation (from Lecture 8) can be modified to include constraints, a superior method exists. This leads to MPC, which solves a constrained optimization problem \emph{at every time step}. As computational power has increased, this "online" optimization has become a dominant strategy in robotics.
+
+\subsection{Background: Convex Optimization}
+
+The reason we can solve these problems in real-time is that they are often \textbf{convex}.
+
+\begin{definition}[Convex Set]
+    A set \(\mathcal{C}\) is \textbf{convex} if for any two points \(\vec{x}, \vec{y} \in \mathcal{C}\), the line segment connecting them is also fully contained in \(\mathcal{C}\).
+    \[
+        \theta \vec{x} + (1 - \theta)\vec{y} \in \mathcal{C} \quad \forall \vec{x}, \vec{y} \in \mathcal{C}, \theta \in [0, 1]
+    \]
+\end{definition}
+
+
+\begin{note}[Examples of Convex Sets] \leavevmode
+    \begin{itemize}
+        \item \textbf{Linear Subspaces:} Solutions to \(\mat{A}\vec{x} = \vec{b}\).
+        \item \textbf{Polytopes (Boxes, Half-spaces):} Solutions to \(\mat{A}\vec{x} \le \vec{b}\) (e.g., actuator limits).
+        \item \textbf{Ellipsoids:} Solutions to \(\vec{x}^\top \mat{P} \vec{x} \le 1\) for \(\mat{P} \succ 0\).
+        \item \textbf{Second-Order Cones:} \(\{\vec{x} \mid x_1 \ge \|\vec{x}_{2:n}\|_2 \}\).
+    \end{itemize}
+\end{note}
+
+\begin{definition}[Convex Function]
+    A function \(f: \mathbb{R}^n \to \mathbb{R}\) is \textbf{convex} if its \textbf{epigraph} (the set of points \(\{(\vec{x}, t) \mid t \ge f(\vec{x})\}\) lying on or above the function) is a convex set.
+\end{definition}
+
+
+
+\begin{note}[Examples of Convex Functions] \leavevmode
+    \begin{itemize}
+        \item \textbf{Linear/Affine:} \(f(\vec{x}) = \vec{c}^\top \vec{x} + d\).
+        \item \textbf{Quadratic:} \(f(\vec{x}) = \frac{1}{2}\vec{x}^\top \mat{Q} \vec{x} + \vec{q}^\top \vec{x}\), but only if the Hessian \(\mat{Q}\) is positive semidefinite (\(\mat{Q} \succeq 0\)).
+        \item \textbf{Norms:} \(f(\vec{x}) = \|\vec{x}\|\) for any valid norm.
+    \end{itemize}
+\end{note}
+
+\begin{definition}[Convex Optimization Problem]
+    A convex optimization problem is one that minimizes a convex function over a convex set.
+    \begin{align*}
+        \min_{\vec{x}} & \quad f_0(\vec{x}) \quad \text{(convex)} \\
+        \text{s.t.} & \quad f_i(\vec{x}) \le 0 \quad \text{(convex)} \\
+        & \quad \mat{A}\vec{x} = \vec{b}
+    \end{align*}
+    Common examples include \textbf{Linear Programs (LP)}, \textbf{Quadratic Programs (QP)}, and \textbf{Second-Order Cone Programs (SOCP)}.
+\end{definition}
+
+\begin{intuition}[Why Convexity is Valuable]
+    Convex problems are considered effectively solved in the field of optimization. This is due to the following properties:
+    \begin{enumerate}
+        \item \textbf{No Spurious Local Minima:} Any local minimum is a global minimum. The KKT conditions are not just necessary, but also \emph{sufficient} for a global optimum.
+        \item \textbf{Reliable Solvers:} Algorithms (such as interior-point methods) are guaranteed to converge to the global optimum.
+        \item \textbf{Computational Efficiency:} These solvers are remarkably efficient and reliable, often converging in a small number of iterations, regardless of the problem size.
+    \end{enumerate}
+    This combination of reliability and computational efficiency allows us to bound the solution time and use optimization for real-time control.
+\end{intuition}
+
+\subsection{Convex Model Predictive Control (MPC)}
+
+MPC, also known as \textbf{Receding Horizon Control}, is a strategy that turns the full, infinite-horizon optimal control problem into a series of small, solvable, finite-horizon problems.
+
+Recall from Dynamic Programming, the optimal control \(\mu_k(\vec{x})\) is the solution to the one-step problem:
+\[
+    \mu_k(\vec{x}) = \argmin_{\vec{u}} \left[ l(\vec{x}, \vec{u}) + V_{k+1}(f_d(\vec{x}, \vec{u})) \right]
+\]
+For LQR, \(V_{k+1}(\vec{x}) = \frac{1}{2}\vec{x}^\top \mat{P}_{k+1} \vec{x}\) (where \(\mat{P}\) comes from the DARE). We could \emph{try} to add constraints to this:
+\begin{align*}
+    \min_{\vec{u}} & \quad \frac{1}{2}\vec{u}^\top \mat{R} \vec{u} + \frac{1}{2}(\mat{A}\vec{x} + \mat{B}\vec{u})^\top \mat{P} (\mat{A}\vec{x} + \mat{B}\vec{u}) \\
+    \text{s.t.} & \quad \vec{u}_{\min} \le \vec{u} \le \vec{u}_{\max}
+\end{align*}
+\textbf{This approach yields poor performance}. The value function \(V_{k+1}\) (and its associated matrix \(\mat{P}\)) represents the anticipated future cost, but it was computed under the assumption of no future constraints. Therefore, it provides an inaccurate approximation of the true, constrained cost-to-go.
+
+\subsubsection{The MPC Formulation}
+Rather than solving a 1-step problem with an inaccurate terminal cost approximation, we solve an \(H\)-step problem where the approximation only affects the final step. We define a planning \textbf{horizon} \(H\) (e.g., \(H=20\) steps). At the current state \(\vec{x}_t\), we solve the following QP:
+\begin{align*}
+    \min_{\vec{X}_{t:t+H}, \vec{U}_{t:t+H-1}} & \quad \sum_{k=t}^{t+H-1} \left( \frac{1}{2}\delta\vec{x}_k^\top \mat{Q} \delta\vec{x}_k + \frac{1}{2}\delta\vec{u}_k^\top \mat{R} \delta\vec{u}_k \right) + \frac{1}{2}\delta\vec{x}_{t+H}^\top \mat{P} \delta\vec{x}_{t+H} \\
+    \text{subject to} & \\
+    & \vec{x}_{k+1} = \mat{A}\vec{x}_k + \mat{B}\vec{u}_k & \text{(Linear Dynamics)} \\
+    & \vec{u}_{\min} \le \vec{u}_k \le \vec{u}_{\max} & \text{(Actuator Limits)} \\
+    & \vec{x}_t = \vec{x}_{\text{current}} & \text{(Initial Condition)}
+\end{align*}
+where \(\delta\vec{x}_k = \vec{x}_k - \vec{x}_{\text{ref}}\), \(\delta\vec{u}_k = \vec{u}_k - \vec{u}_{\text{ref}}\), and \(\mat{P}\) is the terminal cost from the unconstrained DARE solution.
+
+\begin{algorithm}[H]
+    \caption{Model Predictive Control (MPC) Loop}
+    \DontPrintSemicolon
+    \KwIn{Current state \(\vec{x}_{\text{current}}\), reference \(\vec{x}_{\text{ref}}\), horizon \(H\), cost matrices \(\mat{Q}, \mat{R}, \mat{P}\), dynamics \(\mat{A}, \mat{B}\), constraints \(\vec{u}_{\min}, \vec{u}_{\max}\)}
+    \KwOut{Control \(\vec{u}_{\text{apply}}\)}
+    \BlankLine
+    1. Formulate the \(H\)-step QP based on \(\vec{x}_{\text{current}}\) and \(\vec{x}_{\text{ref}}\)\;
+    2. Solve the QP to find the optimal \emph{sequence} \(\vec{U}^\star = \{\vec{u}_t^\star, \vec{u}_{t+1}^\star, \dots, \vec{u}_{t+H-1}^\star\}\)\;
+    3. \textbf{Apply only the first step:} \(\vec{u}_{\text{apply}} \leftarrow \vec{u}_t^\star\)\;
+    4. \textbf{Discard the rest of the plan:} \(\{\vec{u}_{t+1}^\star, \dots\}\)\;
+    5. At the next time step, get new state \(\vec{x}_{\text{current}}\) and \textbf{repeat from step 1}.
+\end{algorithm}
+
+\subsubsection{MPC Trade-offs}
+\begin{itemize}
+    \item \textbf{The Terminal Cost \(\mat{P}\):} The LQR cost-to-go provides an accurate approximation for the cost of the remaining trajectory after the horizon \(H\).
+    \item \textbf{The Horizon \(H\):}
+    \begin{itemize}
+        \item A \textbf{longer horizon \(H\)} yields improved performance (it can plan around constraints more effectively) but requires more computation time. It relies less on the terminal cost \(\mat{P}\).
+        \item A \textbf{shorter horizon \(H\)} is computationally faster, but depends more heavily on an accurate terminal cost approximation \(\mat{P}\).
+    \end{itemize}
+    \item \textbf{Key Insight:} By optimizing over the first \(H\) steps, the controller can plan to approach the unconstrained reference trajectory, such that by step \(H\), the constraints are no longer active, and the LQR terminal cost becomes a valid and accurate approximation of the future cost.
+\end{itemize}
+
+\subsection{Code Analysis: \texttt{mpc.ipynb} (Planar Quadrotor)}
+
+The \texttt{mpc.ipynb} notebook provides a complete implementation of the MPC framework described above.
+\begin{code}[Julia Notebook: MPC for Planar Quadrotor]
+  The notebook implements MPC for a planar quadrotor system with actuator constraints.
+    \begin{itemize}
+        \item \textbf{System:} The notebook defines the nonlinear dynamics of a planar quadrotor and its RK4 discretization.
+        \item \textbf{Linearization:} The nonlinear dynamics are linearized around the hover equilibrium (\(\vec{x}=\vec{0}\), \(\vec{u} = [mg/2, mg/2]\)) to obtain the \(\mat{A}\) and \(\mat{B}\) matrices for the MPC model.
+        \item \textbf{LQR Baseline:} The unconstrained DARE is solved (\texttt{P = dare(...)}) and \texttt{dlqr} is computed to obtain the infinite-horizon terminal cost \(\mat{P}\) and the LQR gain \(\mat{K}\).
+        \item \textbf{MPC QP Formulation:}
+        \begin{itemize}
+            \item The notebook sets a horizon \texttt{Nh = 20} (1 second at 20 Hz).
+            \item The large, sparse QP matrices are constructed. The cost matrix \texttt{H} is constructed as \texttt{blockdiag(R, Q, ..., R, Q, P)}, correctly using the DARE solution \texttt{P} as the terminal cost.
+            \item The constraint matrix \texttt{D} includes both the dynamics \texttt{C} (\(\vec{x}_{k+1} = \mat{A}\vec{x}_k + \mat{B}\vec{u}_k\)) and the actuator bounds \texttt{U} (\(\vec{u}_{\min} \le \vec{u}_k \le \vec{u}_{\max}\)).
+        \end{itemize}
+        \item \textbf{MPC Controller Loop:} The function \texttt{mpc\_controller} implements the receding horizon strategy:
+        \begin{enumerate}
+            \item The function takes the current state \(\vec{x}\) and reference \(\vec{x}_{\text{ref}}\) as input.
+            \item The QP is updated:
+            \begin{itemize}
+                \item The initial state constraint is updated: \texttt{lb[1:6] .= -A*x} and \texttt{ub[1:6] .= -A*x}. This implements \(\vec{x}_1 = \mat{A}\vec{x}_{\text{current}} + \mat{B}\vec{u}_0\).
+                \item The cost vector \texttt{b} is updated to track the reference \texttt{xref}.
+            \end{itemize}
+            \item The function calls \texttt{OSQP.solve!} to find the optimal \emph{sequence} of 20 control inputs.
+            \item It returns \textbf{only the first} control action \texttt{results.x[1:Nu]} from that sequence.
+        \end{enumerate}
+    \end{itemize}
+    \item \textbf{Simulation:} The \texttt{closed\_loop} function simulates both the saturating LQR controller and the MPC controller against the \emph{nonlinear} dynamics. The resulting plots and visualizations demonstrate that MPC achieves accurate tracking while explicitly respecting the actuator limits, whereas the saturated LQR controller exhibits different (and typically inferior) performance characteristics.
+\end{code}
