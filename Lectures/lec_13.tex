@@ -1,0 +1,175 @@
+\lecture{13}{}{Algorithm Recap and Attitude Kinematics}
+
+\begin{prev}
+	In our last lecture, we discussed direct methods for trajectory optimization, focusing on Sequential Quadratic Programming (SQP) as a general solver for Nonlinear Programs (NLPs). We then detailed the Direct Collocation (DIRCOL) method, specifically Hermite-Simpson integration, as a highly accurate and efficient way to transcribe the optimal control problem into a sparse NLP.
+\end{prev}
+
+Today's lecture begins with a high-level recap to organize the various optimal control algorithms we've discussed. Then, we will tackle a critical and challenging topic in robotics: how to properly represent and integrate 3D rotations (attitude) in our dynamic models without encountering singularities.
+
+\subsection{Recap: A Map of Deterministic Optimal Control Algorithms}
+
+We have covered a wide range of algorithms, each suited to different problem types. The following provides a decision-making framework for choosing an algorithm:
+
+\begin{itemize}
+	\item \textbf{Problem: Stabilization (Time-Invariant)}
+	      \begin{itemize}
+		      \item If the system is linear and has no constraints: Use LQR (Linear Quadratic Regulator). This involves solving the Discrete Algebraic Riccati Equation (DARE) once to get a single, stabilizing gain \(\mat{K}\).
+		      \item If the system is linear and has constraints (e.g., actuator limits): Use Model Predictive Control (MPC). The subproblem to solve at each time step is a Quadratic Program (QP) or a Second-Order Cone Program (SOCP) for conic constraints. The LQR solution is typically used as the terminal cost.
+	      \end{itemize}
+	\item \textbf{Problem: Reference Tracking (Time-Varying)}
+	      \begin{itemize}
+		      \item If the system is linear (or linearized about the reference trajectory) and has no constraints: Use TVLQR (Time-Varying LQR). This involves solving the Riccati recursion backward in time to get a time-varying gain sequence \(\mat{K}_k\).
+	      \end{itemize}
+	\item \textbf{Problem: Nonlinear Trajectory Optimization (far from equilibrium)}
+	      \begin{itemize}
+		      \item This is the most general problem, and the choice is between the two main families of algorithms we've studied: DDP and DIRCOL.
+	      \end{itemize}
+\end{itemize}
+
+The following table provides a direct comparison of the trade-offs between Direct Collocation (as a sparse NLP) and DDP/iLQR.
+
+\begin{table}[H]
+	\centering
+	\caption{Comparison of Nonlinear Trajectory Optimization Methods}
+	\label{tab:trajopt_comparison}
+	\small
+	\begin{tabular}{@{}p{2.5cm}p{5.5cm}p{5.5cm}@{}}
+		\toprule
+		\textbf{Property}            & \textbf{Direct Collocation (DIRCOL)}                                & \textbf{DDP / iLQR}                                                   \\ \midrule
+		Dynamics            & Enforced as constraints \(\vec{c}(\vec{x}_k, \vec{u}_k, \vec{x}_{k+1}) = 0\). & Always dynamically feasible (rollouts use exact dynamics).            \\
+		Initial Guess       & Can use any infeasible guess for states and controls.                 & Can only guess the control sequence \(\vec{U}\).                         \\
+		Constraints         & Handles arbitrary state/control constraints easily (as NLP constraints). & State constraints are difficult to handle; requires methods like AL or penalties. \\
+		Tracking Controller & Must be designed separately (e.g., by running TVLQR on the result). & Produces a TVLQR tracking controller (\(\mat{K}_k\)) for free. \\
+		Convergence         & Numerically robust; relies on mature large-scale SQP solvers.         & Very fast (quadratic) local convergence, but can be ill-conditioned.  \\
+		Implementation      & Complex; relies on an external sparse NLP solver (e.g., IPOPT).       & Relatively simple to implement; self-contained.                         \\ \bottomrule
+	\end{tabular}
+\end{table}
+
+\subsection{The Challenge of Attitude}
+
+Many robotic systems, such as quadrotors, spacecraft, and legged robots, undergo large-angle 3D rotations.
+\begin{itemize}
+	\item \textbf{The Problem:} Naive parameterizations like Euler angles (\(\phi, \theta, \psi\)) have \textbf{singularities} (e.g., gimbal lock at \(\theta = \pm 90^\circ\)). An optimizer or controller will fail at these points.
+	\item \textbf{The Need:} We require a singularity-free representation to optimize and control motion through all possible attitudes.
+\end{itemize}
+This leaves two primary choices: \textbf{Rotation Matrices} and \textbf{Unit Quaternions}.
+
+\subsection{Representation 1: Rotation Matrices (SO(3))}
+
+
+Attitude describes the orientation of a body-fixed coordinate frame \(\{\mathcal{B}\}\) relative to a fixed world or navigation frame \(\{\mathcal{N}\}\). We can represent this with a \(3 \times 3\) \textbf{rotation matrix} (or Direction Cosine Matrix, DCM), \(\mat{R}\), that rotates vectors from the body frame to the world frame:
+\[
+\vec{v}_{\mathcal{N}} = \mat{R} \vec{v}_{\mathcal{B}}
+\]
+\begin{definition}[Special Orthogonal Group, SO(3)]
+	A valid rotation matrix \(\mat{R}\) must belong to the \textbf{Special Orthogonal Group}, \(SO(3)\). This imposes two constraints:
+	\begin{enumerate}
+		\item \textbf{Orthogonal:} The matrix's columns are orthonormal, \(\mat{R}^\top \mat{R} = \mat{I}\). This ensures it preserves lengths and angles.
+		\item \textbf{Special:} The determinant is positive one, \(\det(\mat{R}) = 1\). This ensures it's a right-handed system (i.e., not a reflection).
+	\end{enumerate}
+\end{definition}
+
+\paragraph{Kinematics.}
+To use \(\mat{R}\) in a dynamic model, we must know how it evolves in time given a body-frame angular velocity \(\vec{\omega} \in \mathbb{R}^3\) (which is what a gyro measures).
+
+The kinematic relationship is:
+\[
+\dot{\mat{R}} = \mat{R} \hat{\vec{\omega}}
+\]
+where \(\hat{\vec{\omega}}\) is the \textbf{hat map}, which converts the vector \(\vec{\omega}\) into its skew-symmetric matrix form:
+\[
+\vec{\omega} = \begin{bmatrix} \omega_x \\ \omega_y \\ \omega_z \end{bmatrix} \quad \implies \quad \hat{\vec{\omega}} = \begin{bmatrix} 0 & -\omega_z & \omega_y \\ \omega_z & 0 & -\omega_x \\ -\omega_y & \omega_x & 0 \end{bmatrix}
+\]
+such that \(\hat{\vec{\omega}} \vec{p} = \vec{\omega} \times \vec{p}\) for any vector \(\vec{p}\).
+
+\begin{note}[Derivation of Rotation Kinematics]
+	Consider a point \(\vec{p}\) that is fixed in the body frame (\(\dot{\vec{p}}_{\mathcal{B}} = \vec{0}\)). Its representation in the world frame is \(\vec{p}_{\mathcal{N}}(t) = \mat{R}(t) \vec{p}_{\mathcal{B}}\).
+
+	Differentiating this using the product rule gives:
+	\[
+	\dot{\vec{p}}_{\mathcal{N}} = \dot{\mat{R}} \vec{p}_{\mathcal{B}} + \mat{R} \dot{\vec{p}}_{\mathcal{B}} = \dot{\mat{R}} \vec{p}_{\mathcal{B}}
+	\]
+	From physics, we also know that the linear velocity of the point is \(\dot{\vec{p}}_{\mathcal{N}} = \vec{\omega}_{\mathcal{N}} \times \vec{p}_{\mathcal{N}}\).
+
+	We can express the angular velocity and position in the body frame: \(\vec{\omega}_{\mathcal{N}} = \mat{R}\vec{\omega}\) and \(\vec{p}_{\mathcal{N}} = \mat{R}\vec{p}_{\mathcal{B}}\).
+	\[
+	\dot{\vec{p}}_{\mathcal{N}} = (\mat{R}\vec{\omega}) \times (\mat{R}\vec{p}_{\mathcal{B}}) = \mat{R} (\vec{\omega} \times \vec{p}_{\mathcal{B}}) = \mat{R} \hat{\vec{\omega}} \vec{p}_{\mathcal{B}} \text{}
+	\]
+	Equating the two expressions for \(\dot{\vec{p}}_{\mathcal{N}}\), we get \(\dot{\mat{R}} \vec{p}_{\mathcal{B}} = \mat{R} \hat{\vec{\omega}} \vec{p}_{\mathcal{B}}\). Since this must hold for any \(\vec{p}_{\mathcal{B}}\), we find \(\dot{\mat{R}} = \mat{R} \hat{\vec{\omega}}\).
+\end{note}
+
+\paragraph{Problem with SO(3):}
+We can use \(\mat{R}\) as part of our state, but:
+\begin{enumerate}
+	\item \textbf{Redundancy:} We use 9 numbers (and 6 constraints) to represent 3 DOFs.
+	\item \textbf{Numerical Drift:} When we numerically integrate \(\dot{\mat{R}} = \mat{R} \hat{\vec{\omega}}\), small integration errors will accumulate. After many steps, the resulting \(\mat{R}\) will no longer be perfectly orthogonal (i.e., \(\mat{R}^\top \mat{R} \neq \mat{I}\)). The matrix "drifts" off the \(SO(3)\) manifold, leading to simulation errors.
+\end{enumerate}
+
+\subsection{Representation 2: Unit Quaternions (\(S^3\))}
+
+Quaternions are a 4-dimensional number system that is extremely efficient and stable for representing rotations.
+
+\begin{definition}[Unit Quaternion]
+	Based on Euler's Rotation Theorem, any rotation can be defined by an angle \(\theta\) about a unit axis \(\vec{a}\). A unit quaternion \(\vec{q} \in \mathbb{R}^4\) is defined as:
+	\[
+	\vec{q} = \begin{bmatrix} s \\ \vec{v} \end{bmatrix} = \begin{bmatrix} \cos(\theta/2) \\ \vec{a} \sin(\theta/2) \end{bmatrix}
+	\]
+	where \(s\) is the "scalar part" and \(\vec{v}\) is the "vector part".
+
+	All valid rotations correspond to \textbf{unit quaternions}, which live on the 4D unit sphere (called \(S^3\)), satisfying the constraint:
+	\[
+	\vec{q}^\top \vec{q} = s^2 + v_x^2 + v_y^2 + v_z^2 = \cos^2(\theta/2) + \sin^2(\theta/2) = 1 \text{}
+	\]
+\end{definition}
+\begin{note}
+	Quaternions are a \textbf{double cover} of \(SO(3)\). \(\vec{q}\) and \(-\vec{q}\) represent the exact same 3D rotation (corresponding to a rotation by \(\theta\) and \(\theta + 2\pi\)). This is a topological ambiguity but not a singularity.
+\end{note}
+
+\paragraph{Key Operations.}
+\begin{itemize}
+	\item \textbf{Conjugate:} \(\vec{q}^* = \begin{bmatrix} s \\ -\vec{v} \end{bmatrix}\).
+	\item \textbf{Multiplication:} Quaternion multiplication \(\vec{q}_a \otimes \vec{q}_b\) (which corresponds to composing rotations) is defined as:
+	      \[
+	      \vec{q}_a \otimes \vec{q}_b = \begin{bmatrix} s_a s_b - \vec{v}_a^\top \vec{v}_b \\ s_a \vec{v}_b + s_b \vec{v}_a + \vec{v}_a \times \vec{v}_b \end{bmatrix}
+	      \]
+	      This can be written in matrix form as \(\mat{L}(\vec{q}_a)\vec{q}_b\) or \(\mat{R}(\vec{q}_b)\vec{q}_a\).
+	\item \textbf{Rotate a Vector:} To rotate \(\vec{x} \in \mathbb{R}^3\), we "embed" it as a pure quaternion \(\vec{x}_p = \begin{bmatrix} 0 \\ \vec{x} \end{bmatrix}\) and compute the "sandwich product":
+	      \[
+	      \begin{bmatrix} 0 \\ \vec{y} \end{bmatrix} = \vec{q} \otimes \vec{x}_p \otimes \vec{q}^*
+	      \]
+	      The vector part \(\vec{y}\) is the rotated vector.
+\end{itemize}
+
+\paragraph{Quaternion Kinematics.}
+This is the central equation for dynamics. The derivative of the quaternion \(\vec{q}\) is related to the body-frame angular velocity \(\vec{\omega}\) by:
+\[
+\dot{\vec{q}} = \frac{1}{2} \vec{q} \otimes \begin{bmatrix} 0 \\ \vec{\omega} \end{bmatrix} \text{}
+\]
+This is most useful when written in matrix form. Let \(\mat{H} = \begin{bmatrix} \vec{0}^\top \\ \mat{I}_{3\times 3} \end{bmatrix}\) be the matrix that embeds \(\vec{\omega}\) into a pure quaternion. The kinematics are:
+\[
+\dot{\vec{q}} = \frac{1}{2} \mat{L}(\vec{q}) \begin{bmatrix} 0 \\ \vec{\omega} \end{bmatrix} = \frac{1}{2} \mat{L}(\vec{q}) \mat{H} \vec{\omega} \text{}
+\]
+This equation is linear in \(\vec{\omega}\), which is extremely convenient for control design.
+
+
+\begin{code}[Julia Notebook: \texttt{rbsim.ipynb}]
+	Goal: torque-free rigid-body simulation; compare DCM vs. quaternion integration.
+
+	\paragraph{Part 1 — DCM}
+  \begin{itemize}
+    \item State: \(\vec{x}\in\mathbb{R}^{12}=[\text{vec}(\mat{R});\,\vec{\omega}]\).
+    \item Dynamics: \(\dot{\mat{R}}=\mat{R}\hat{\vec{\omega}},\; \dot{\vec{\omega}}=-\mat{J}^{-1}(\hat{\vec{\omega}}\,\mat{J}\,\vec{\omega})\).
+    \item Integrator: RK4.
+    \item Result: after \(10^4\) steps, \(\mat{R}_k^\top\mat{R}_k\neq\mat{I}\) (drift off \(SO(3)\)).
+  \end{itemize}
+
+	\paragraph{Part 2 — Quaternion}
+  \begin{itemize}
+  \item State: \(\vec{x}\in\mathbb{R}^{7}=[\vec{q};\,\vec{\omega}]\).
+  \item Dynamics: \(\dot{\vec{q}}=\tfrac{1}{2}\mat{L}(\vec{q})\mat{H}\vec{\omega}\), \(\dot{\vec{\omega}}\) as above.
+  \item Integrator: RK4 + re-normalize \(\vec{q}\leftarrow\vec{q}/\|\vec{q}\|\) each step.
+  \end{itemize}
+
+	\paragraph{Conclusion}
+	Projection enforces \(\vec{q}^\top\vec{q}=1\), so \(\|\vec{q}_k\|=1\) and \(\mat{R}(\vec{q}_k)^\top\mat{R}(\vec{q}_k)=\mat{I}\). Quaternions with re-normalization are the robust default for attitude simulation.
+\end{code}
