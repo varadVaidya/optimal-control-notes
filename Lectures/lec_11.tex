@@ -1,0 +1,184 @@
+% Lectures/lec_11.tex
+\lecture{11}{}{Nonlinear Trajectory Optimization and DDP}
+
+
+\subsection{What About Nonlinear Dynamics?}
+
+The MPC controller we built in the last lecture, while powerful, relied on a \textbf{linear} model of the dynamics, \(\vec{x}_{k+1} = \mat{A}\vec{x}_k + \mat{B}\vec{u}_k\). This model is an approximation, linearized around an equilibrium (e.g., hovering).
+
+\begin{itemize}
+    \item \textbf{Regime of validity:} For tasks near the equilibrium, such as stabilization or tracking small motions, this linear model is often sufficiently accurate.
+    \item \textbf{Limitations:} For aggressive maneuvers or tasks that move far from the equilibrium (e.g., the Acrobot swing-up), the linear model can be an inadequate representation of the underlying nonlinear dynamics.
+\end{itemize}
+
+Using nonlinear dynamics, \(\vec{x}_{k+1} = f(\vec{x}_k, \vec{u}_k)\), inside an MPC-like optimization makes the problem \textbf{non-convex}. The implications are:
+\begin{enumerate}
+    \item Global optimality guarantees are lost.
+    \item Solvers may converge to suboptimal local minima.
+    \item Real-time guarantees are weakened, as solving non-convex problems can be slow and unpredictable.
+\end{enumerate}
+
+We address this problem directly by formulating the full \textbf{nonlinear trajectory optimization} problem and introducing an algorithm to solve it: Differential Dynamic Programming (DDP).
+
+\begin{definition}[Nonlinear Trajectory Optimization]
+Find the sequences of states \(\vec{X} = \{\allowbreak \vec{x}_1, \dots, \vec{x}_N\}\) and controls \(\vec{U} = \{\vec{u}_1, \dots, \vec{u}_{N-1}\}\) that solve:
+\begin{align*}
+    \min_{\vec{X}, \vec{U}} & \quad J = \sum_{k=1}^{N-1} l_k(\vec{x}_k, \vec{u}_k) + l_N(\vec{x}_N) \\
+    \text{subject to} & \quad \vec{x}_{k+1} = f_k(\vec{x}_k, \vec{u}_k) \quad \text{(Nonlinear Dynamics)} \\
+    & \quad \vec{x}_k \in \mathcal{X}_k, \quad \vec{u}_k \in \mathcal{U}_k \quad \text{(Non-convex Constraints)}
+\end{align*}
+We will assume all cost functions \(l_k\) and dynamics functions \(f_k\) are \(C^2\) (twice continuously differentiable).
+\end{definition}
+
+\subsection{Differential Dynamic Programming (DDP)}
+
+DDP is an effective algorithm for solving this problem. It is essentially \textbf{Newton's method applied to trajectory optimization}. Like Newton's method, it uses a second-order approximation to determine an improvement step.
+
+DDP is based on \textbf{approximate Dynamic Programming}. It follows the same logic as the Riccati recursion:
+\begin{enumerate}
+    \item It performs a \textbf{backward pass} from \(k=N-1\) down to \(1\), but instead of computing the LQR gain \(\mat{K}_k\), it computes a local \emph{quadratic model} of the cost-to-go function, \(V_k(\vec{x})\).
+    \item It then performs a \textbf{forward pass} (a "rollout") from \(k=1\) to \(N-1\) to update the trajectory using the policy computed in the backward pass.
+    \item It iterates these two passes until convergence.
+\end{enumerate}
+
+\subsubsection{The DDP Backward Pass}
+
+Let's assume we have a nominal trajectory \((\bar{\vec{X}}, \bar{\vec{U}})\) and we want to find a better one.
+\paragraph{Base Case (k=N):}
+We approximate the terminal cost \(l_N\) as a quadratic function around the nominal terminal state \(\bar{\vec{x}}_N\). This defines our initial cost-to-go model:
+\[
+    V_N(\bar{\vec{x}}_N + \delta\vec{x}) \approx V_N(\bar{\vec{x}}_N) + \vec{p}_N^\top \delta\vec{x} + \frac{1}{2}\delta\vec{x}^\top \mat{P}_N \delta\vec{x}
+\]
+where
+\begin{align*}
+    \vec{p}_N &= \nabla l_N(\bar{\vec{x}}_N) \\
+    \mat{P}_N &= \nabla^2 l_N(\bar{\vec{x}}_N)
+\end{align*}
+
+\paragraph{Inductive Step (k < N):}
+Now, assume we have a quadratic model for \(V_{k+1}\) (defined by \(\vec{p}_{k+1}, \mat{P}_{k+1}\)). We want to find the quadratic model for \(V_k\) (i.e., find \(\vec{p}_k, \mat{P}_k\)).
+
+From DP, we know the Bellman equation:
+\[
+    V_k(\vec{x}) = \min_{\vec{u}} \left[ l_k(\vec{x}, \vec{u}) + V_{k+1}(f_k(\vec{x}, \vec{u})) \right]
+\]
+We define the \textbf{Action-Value Function} (or Q-function) as the term inside the \(\min\):
+\[
+    Q_k(\vec{x}, \vec{u}) = l_k(\vec{x}, \vec{u}) + V_{k+1}(f_k(\vec{x}, \vec{u}))
+\]
+DDP works by finding a quadratic approximation of \(Q_k\) around the nominal state-control pair \((\bar{\vec{x}}_k, \bar{\vec{u}}_k)\). Let \(\delta\vec{x} = \vec{x} - \bar{\vec{x}}_k\) and \(\delta\vec{u} = \vec{u} - \bar{\vec{u}}_k\):
+\[
+    Q_k(\bar{\vec{x}}_k+\delta\vec{x}, \bar{\vec{u}}_k+\delta\vec{u}) \approx Q_k(\bar{\vec{x}}_k, \bar{\vec{u}}_k) +
+    \begin{bmatrix} \vec{g}_x \\ \vec{g}_u \end{bmatrix}^\top \begin{bmatrix} \delta\vec{x} \\ \delta\vec{u} \end{bmatrix} +
+    \frac{1}{2} \begin{bmatrix} \delta\vec{x} \\ \delta\vec{u} \end{bmatrix}^\top \begin{bmatrix} \mat{G}_{xx} & \mat{G}_{xu} \\ \mat{G}_{ux} & \mat{G}_{uu} \end{bmatrix} \begin{bmatrix} \delta\vec{x} \\ \delta\vec{u} \end{bmatrix}
+\]
+Since, the Hessian is symmetric, we have \(\mat{G}_{xu} = \mat{G}_{ux}^\top\).
+The new cost-to-go is \(V_k(\bar{\vec{x}}_k+\delta\vec{x}) = \min_{\delta\vec{u}} Q_k(\dots)\). Since this is a quadratic function in \(\delta\vec{u}\), we can find the minimum by setting the gradient to zero:
+\[
+    \nabla_{\delta\vec{u}} Q_k(\dots) = \vec{g}_u + \mat{G}_{uu}\delta\vec{u} + \mat{G}_{ux}\delta\vec{x} = \vec{0}
+\]
+Solving for \(\delta\vec{u}\) gives the \textbf{optimal control policy} for the deviation:
+\[
+    \delta\vec{u}^\star = -(\mat{G}_{uu})^{-1}\vec{g}_u - (\mat{G}_{uu})^{-1}\mat{G}_{ux}\delta\vec{x}
+\]
+This policy has two parts,
+\begin{align*}
+    \vec{d}_k &= -(\mat{G}_{uu})^{-1}\vec{g}_u && \text{(Feedforward / open-loop correction)} \\
+    \mat{K}_k &= -(\mat{G}_{uu})^{-1}\mat{G}_{ux} && \text{(Feedback gain)}
+\end{align*}
+The local policy is \(\delta\vec{u}^\star = \vec{d}_k + \mat{K}_k \delta\vec{x}\). We plug this policy back into the quadratic expansion for \(Q_k\) to get the new quadratic model for \(V_k\), yielding the update rules for \(\vec{p}_k\) and \(\mat{P}_k\):
+\begin{align*}
+    \vec{p}_k &= \vec{g}_x + \mat{K}_k^\top \mat{G}_{uu} \vec{d}_k - \mat{K}_k^\top \vec{g}_u - \mat{G}_{xu} \vec{d}_k \\
+    \mat{P}_k &= \mat{G}_{xx} + \mat{K}_k^\top \mat{G}_{uu} \mat{K}_k - \mat{G}_{xu} \mat{K}_k - \mat{K}_k^\top \mat{G}_{ux}
+\end{align*}
+
+\subsection{DDP vs. Iterative LQR (iLQR)}
+
+The final piece of the puzzle is: what are the terms \(\vec{g}\) and \(\mat{G}\)?
+We find them by applying the chain rule to \(Q_k = l_k + V_{k+1}(f_k)\), using our quadratic model for \(V_{k+1}\) and a Taylor expansion of \(f_k\).
+
+\paragraph{First-Order Terms (Gradients):}
+Let \(\mat{A}_k = \nabla_{\vec{x}} f_k\) and \(\mat{B}_k = \nabla_{\vec{u}} f_k\). The chain rule gives:
+\begin{align*}
+    \vec{g}_x &= \nabla_{\vec{x}} Q_k = \nabla_{\vec{x}} l_k + (\nabla_{\vec{x}} f_k)^\top \nabla_{\vec{x}} V_{k+1} = \nabla_{\vec{x}} l_k + \mat{A}_k^\top \vec{p}_{k+1} \\
+    \vec{g}_u &= \nabla_{\vec{u}} Q_k = \nabla_{\vec{u}} l_k + (\nabla_{\vec{u}} f_k)^\top \nabla_{\vec{x}} V_{k+1} = \nabla_{\vec{u}} l_k + \mat{B}_k^\top \vec{p}_{k+1}
+\end{align*}
+
+\paragraph{Second-Order Terms (Hessians):}
+This is where DDP and iLQR differ. The full Hessian of \(Q_k\) (using the chain rule) is:
+\[
+    \mat{G}_{xx} = \nabla^2_{\vec{x}\vec{x}} l_k + \mat{A}_k^\top \mat{P}_{k+1} \mat{A}_k + (\nabla_{\vec{x}} \vec{p}_{k+1})^\top \cdot \nabla^2_{\vec{x}\vec{x}} f_k
+\]
+\begin{itemize}
+    \item \textbf{DDP (Differential DP):} The full DDP algorithm includes that last term: \((\dots)\nabla^2 f_k\). This term involves the second-order derivatives of the dynamics (\(\nabla^2 f_k\)), which is a \textbf{third-rank tensor}. This is computationally demanding and more burdensome to implement.
+
+    \item \textbf{iLQR (Iterative LQR):} The iLQR algorithm makes a key simplification: it \textbf{ignores all second-order derivatives of the dynamics \(f_k\)}. It assumes \(\nabla^2 f_k = 0\). This is equivalent to making a \emph{first-order} (linear) approximation of the dynamics, but a \emph{second-order} (quadratic) approximation of the cost.
+\end{itemize}
+
+This simplification yields the following Hessian terms:
+\begin{align*}
+    \mat{G}_{xx} &= \nabla^2_{\vec{x}\vec{x}} l_k + \mat{A}_k^\top \mat{P}_{k+1} \mat{A}_k \\
+    \mat{G}_{uu} &= \nabla^2_{\vec{u}\vec{u}} l_k + \mat{B}_k^\top \mat{P}_{k+1} \mat{B}_k \\
+    \mat{G}_{ux} &= \nabla^2_{\vec{u}\vec{x}} l_k + \mat{B}_k^\top \mat{P}_{k+1} \mat{A}_k
+\end{align*}
+This simplification is widely used in practice.
+
+\subsection{The Full iLQR Algorithm}
+
+\begin{algorithm}[H]
+    \caption{Iterative LQR (iLQR)}
+    \DontPrintSemicolon
+    \KwIn{Initial trajectory \(\bar{\vec{U}} = \{\bar{\vec{u}}_1, \dots, \bar{\vec{u}}_{N-1}\}\), initial state \(\vec{x}_1\), dynamics \(f_k\), costs \(l_k, l_N\)}
+    \KwOut{Optimal \(\vec{U}^\star, \vec{X}^\star\)}
+    \BlankLine
+    Rollout \(\bar{\vec{X}}\) using \(\bar{\vec{U}}\) and \(f_k\); Compute \(J(\bar{\vec{X}}, \bar{\vec{U}})\)\;
+    \While{not converged}{
+        \Comment{1. Backward Pass (Compute Policy)}
+        \(\vec{p}_N \leftarrow \nabla l_N(\bar{\vec{x}}_N)\); \(\mat{P}_N \leftarrow \nabla^2 l_N(\bar{\vec{x}}_N)\);
+        \For{$k = N-1$ \KwTo $1$}{
+            Compute cost derivatives at \((\bar{\vec{x}}_k, \bar{\vec{u}}_k)\): \(\vec{l}_x, \vec{l}_u, \mat{L}_{xx}, \mat{L}_{uu}, \mat{L}_{ux}\)\;
+            Compute dynamics Jacobians at \((\bar{\vec{x}}_k, \bar{\vec{u}}_k)\): \(\mat{A}_k, \mat{B}_k\)\;
+            Compute Q-function model: \\
+            \quad \(\vec{g}_x \leftarrow \vec{l}_x + \mat{A}_k^\top \vec{p}_{k+1}\); \quad \(\vec{g}_u \leftarrow \vec{l}_u + \mat{B}_k^\top \vec{p}_{k+1}\)\;
+            \quad \(\mat{G}_{xx} \leftarrow \mat{L}_{xx} + \mat{A}_k^\top \mat{P}_{k+1} \mat{A}_k\)\;
+            \quad \(\mat{G}_{uu} \leftarrow \mat{L}_{uu} + \mat{B}_k^\top \mat{P}_{k+1} \mat{B}_k\); \quad \(\mat{G}_{ux} \leftarrow \mat{L}_{ux} + \mat{B}_k^\top \mat{P}_{k+1} \mat{A}_k\)\;
+            (Regularize \(\mat{G}_{uu}\) to be positive-definite)\;
+            Compute policy: \(\vec{d}_k \leftarrow -(\mat{G}_{uu})^{-1}\vec{g}_u\); \quad \(\mat{K}_k \leftarrow -(\mat{G}_{uu})^{-1}\mat{G}_{ux}\)\;
+            Compute new V-model: \(\vec{p}_k, \mat{P}_k\) using update rules from \S11.2\;
+        }
+        \BlankLine
+        \Comment{2. Forward Pass (Line Search)}
+        \(\alpha \leftarrow 1.0\); \(\vec{x}_1^{\text{new}} \leftarrow \vec{x}_1\)\;
+        \While{true}{
+            \For{$k = 1$ \KwTo $N-1$}{
+                \(\delta\vec{x}_k = \vec{x}_k^{\text{new}} - \bar{\vec{x}}_k\)\;
+                \(\vec{u}_k^{\text{new}} \leftarrow \bar{\vec{u}}_k + \alpha \vec{d}_k + \mat{K}_k \delta\vec{x}_k\)\;
+                \(\vec{x}_{k+1}^{\text{new}} \leftarrow f_k(\vec{x}_k^{\text{new}}, \vec{u}_k^{\text{new}})\)\;
+            }
+            \(J_{\text{new}} \leftarrow J(\vec{X}^{\text{new}}, \vec{U}^{\text{new}})\)\;
+            \If{$J_{\text{new}} < J$}{
+                \textbf{break} \Comment{Accept step}
+            }
+            \(\alpha \leftarrow 0.5 \alpha\); \Comment{Backtrack}
+        }
+        \BlankLine
+        \Comment{3. Update Trajectory}
+        \(J \leftarrow J_{\text{new}}\); \(\bar{\vec{X}} \leftarrow \vec{X}^{\text{new}}\); \(\bar{\vec{U}} \leftarrow \vec{U}^{\text{new}}\)\;
+    }
+\end{algorithm}
+
+\begin{code}[Julia Notebook: \texttt{acrobot-ilqr.ipynb}]
+    The provided \texttt{acrobot-ilqr.ipynb} notebook implements exactly this iLQR algorithm.
+    \begin{itemize}
+        \item \textbf{System:} It defines the nonlinear \texttt{acrobot\_dynamics} and its \texttt{dynamics\_rk4} discretization. The Acrobot is a classic underactuated system (like a pendulum on a pendulum, but only the "elbow" is motorized), which is highly nonlinear.
+        \item \textbf{Goal:} The goal is to swing up from the hanging position (\(\vec{x}_0 = [-\pi/2, 0, 0, 0]\)) to the upright, balanced position (\(\vec{x}_{\text{goal}} = [\pi/2, 0, 0, 0]\)).
+        \item \textbf{Derivatives:} It uses \texttt{ForwardDiff.jacobian} (\texttt{dfdx}) and \texttt{ForwardDiff.derivative} (\texttt{dfdu}) to compute \(\mat{A}_k\) and \(\mat{B}_k\) at each point along the trajectory. It never computes second derivatives of the dynamics, confirming it is iLQR, not DDP.
+        \item \textbf{Backward Pass:} The loop \texttt{for k = (Nt-1):-1:1} computes \texttt{gx}, \texttt{gu}, \texttt{Gxx}, \texttt{Guu}, \texttt{Gxu} using the iLQR equations. It then computes the feedforward gain \texttt{d[k]} and feedback gain \texttt{K[:,:,k]}.
+    \item \textbf{Forward Pass:} The line search performs robust backtracking when
+    \[
+        	ext{isnan}(J_{\text{new}})\;\;\text{or}\;\; J_{\text{new}} > J - 10^{-2} \, \alpha \, \Delta J,
+    \]
+    rolls out a new trajectory using the computed policy \(\vec{u}_{\text{new}} = \bar{\vec{u}} + \alpha \vec{d} + \mat{K}(\vec{x}_{\text{new}} - \bar{\vec{x}})\), and accepts the step only if it makes sufficient progress.
+        \item \textbf{Result:} The algorithm converges in a number of iterations, finding a dynamic swing-up motion that gets the Acrobot to its goal state. The plots and animation show this complex, nonlinear behavior.
+    \end{itemize}
+\end{code}
