@@ -1,0 +1,137 @@
+\lecture{14}{}{Optimization with Quaternions}
+We will develop the tools necessary to perform optimization (e.g., Gauss-Newton, DDP, SQP) directly on functions involving quaternions.
+
+\subsection{The Geometry of Quaternion Optimization}
+
+The central challenge in optimizing with quaternions is that they live on a 3D manifold (the sphere \(S^3\)) embedded in a 4D space.
+\begin{itemize}
+	\item We cannot simply add an unconstrained update vector \(\delta\vec{q} \in \mathbb{R}^4\) to \(\vec{q}_k\), as \(\vec{q}_k + \delta\vec{q}\) will not be a unit quaternion.
+	\item Any valid update \(\dot{\vec{q}}\) must lie in the 3D \emph{tangent space} at \(\vec{q}\).
+\end{itemize}
+Our optimization algorithms (like Newton or Gauss-Newton) are designed to solve for unconstrained correction vectors \(\phi \in \mathbb{R}^3\). We need a way to map these 3D corrections to the 4D tangent space.
+
+\begin{intuition}[Analogy to 2D Rotations]
+	This is analogous to 2D rotations on the unit circle \(S^1\). A 2D rotation can be represented by a vector \(\vec{v} = [\cos\theta, \sin\theta]^\top\).
+	A 1D update (an angular velocity \(\dot{\theta} \in \mathbb{R}^1\)) is mapped to the 2D tangent space at \(\vec{v}\) by the kinematics:
+	\[
+		\dot{\vec{v}} = \pdv{\vec{v}}{\theta} \dot{\theta} = \begin{bmatrix} -\sin\theta \\ \cos\theta \end{bmatrix} \dot{\theta}
+	\]
+	We must do the same for quaternions: map a 3D update \(\phi \in \mathbb{R}^3\) to a 4D derivative \(\delta\vec{q} \in \mathbb{R}^4\).
+\end{intuition}
+
+\subsection{Differentiating Functions of Quaternions}
+\begin{note}
+  This currently does not make sense to me. Come back and revisit this section.
+\end{note}
+Our optimization update \(\phi \in \mathbb{R}^3\) is an unconstrained 3D vector. We must define how this 3D vector perturbs our 4D quaternion \(\vec{q}\). A natural choice is to use a \textbf{multiplicative update}:
+\[
+\vec{q}_{k+1} = \vec{q}_k \otimes \delta\vec{q}(\phi)
+\]
+where \(\delta\vec{q}(\phi)\) is a small rotation quaternion that is parameterized by \(\phi\).
+
+\paragraph{The "Attitude Jacobian" \(\mat{G}(\vec{q})\)}
+We need to apply the chain rule. For any function \(f(\vec{q})\), we want to find its derivative with respect to the 3D perturbation \(\phi\):
+\[
+\nabla_\phi f = \frac{\partial f}{\partial \vec{q}} \frac{\partial \vec{q}}{\partial \phi}
+\]
+Let's find the term \(\frac{\partial \vec{q}}{\partial \phi}\). This is the "Attitude Jacobian" \(\mat{G}(\vec{q})\).
+
+Let \(\vec{q}'(\phi) = \vec{q} \otimes \delta\vec{q}(\phi)\). We need to choose a parameterization for \(\delta\vec{q}(\phi)\).
+\begin{itemize}
+	\item \textbf{Axis-Angle:} One choice is to let \(\phi\) be an axis-angle vector. For small \(\phi\), \(\delta\vec{q}(\phi) \approx [1, \frac{1}{2}\phi]^\top\).
+	\item \textbf{Vector Part (Rodrigues):} A simpler choice (used in the \texttt{wahba.ipynb} notebook) is to let \(\phi\) be the \textbf{vector part} of the update quaternion:
+	      \[
+		      \delta\vec{q}(\phi) = \begin{bmatrix} \sqrt{1 - ||\phi||^2} \\ \phi \end{bmatrix}
+	      \]
+\end{itemize}
+Let's use the second definition, as it matches the code. We need the derivative \emph{at the identity} (\(\phi = \vec{0}\)):
+\[
+\frac{\partial \delta\vec{q}}{\partial \phi} \bigg|_{\phi=\vec{0}} = \frac{\partial}{\partial \phi} \begin{bmatrix} \sqrt{1 - \phi^\top\phi} \\ \phi \end{bmatrix} \bigg|_{\phi=\vec{0}} = \begin{bmatrix} \frac{-\phi^\top}{\sqrt{1 - \phi^\top\phi}} \\ \mat{I} \end{bmatrix} \bigg|_{\phi=\vec{0}} = \begin{bmatrix} \vec{0}^\top \\ \mat{I} \end{bmatrix} = \mat{H}
+\]
+Now we can find \(\mat{G}(\vec{q})\) using the chain rule for \(\vec{q}' = \mat{L}(\vec{q}) \delta\vec{q}(\phi)\):
+\[
+\mat{G}(\vec{q}) = \frac{\partial \vec{q}'}{\partial \phi} \bigg|_{\phi=\vec{0}} = \mat{L}(\vec{q}) \frac{\partial \delta\vec{q}}{\partial \phi} \bigg|_{\phi=\vec{0}} = \mat{L}(\vec{q}) \mat{H}
+\]
+This \(4 \times 3\) matrix \(\mat{G}(\vec{q})\) is the crucial "Attitude Jacobian". It maps 3D unconstrained corrections \(\phi\) from our solver into the 4D tangent space at our current attitude \(\vec{q}\).
+
+\paragraph{Chain Rules for Optimization}
+Now we can differentiate any function with respect to our 3D parameterization \(\phi\).
+\begin{itemize}
+	\item \textbf{Scalar-Valued Function (\(f: \mathbb{R}^4 \to \mathbb{R}\)):}
+	      The 3D tangent-space gradient \(\nabla_\phi f \in \mathbb{R}^{1 \times 3}\) is:
+	      \[
+		      \nabla_\phi f(\vec{q}) = \frac{\partial f}{\partial \vec{q}} \mat{G}(\vec{q})
+	      \]
+	\item \textbf{Vector-Valued Function (\(\vec{r}: \mathbb{R}^4 \to \mathbb{R}^m\)):}
+	      The 3D tangent-space Jacobian \(\mat{J}_\phi \in \mathbb{R}^{m \times 3}\) is:
+	      \[
+		      \mat{J}_\phi(\vec{q}) = \frac{\partial \vec{r}}{\partial \vec{q}} \mat{G}(\vec{q})
+	      \]
+\end{itemize}
+
+\subsection{Example: Wahba's Problem \& Gauss-Newton}
+
+A classic robotics problem is "pose estimation" or "attitude determination".
+
+\begin{definition}[Wahba's Problem]
+	Given a set of \(m\) unit vectors known in a world frame, \(\{\vec{v}_1^N, \dots, \vec{v}_m^N\}\), and a corresponding set of measurements of those same vectors in the robot's body frame, \(\{\vec{v}_1^B, \dots, \vec{v}_m^B\}\), find the attitude \(\vec{q}\) that best aligns them.
+\end{definition}
+
+This is a nonlinear least-squares problem. We seek to minimize the sum of squared errors:
+\[
+J(\vec{q}) = \sum_{i=1}^m || \vec{v}_i^N - \mat{Q}(\vec{q}) \vec{v}_i^B ||_2^2
+\]
+where \(\mat{Q}(\vec{q})\) is the rotation matrix for quaternion \(\vec{q}\).
+
+To solve this with the Gauss-Newton method, we first stack all errors into a single residual vector \(\vec{r}(\vec{q}) \in \mathbb{R}^{3m}\):
+\[
+\vec{r}(\vec{q}) = \begin{bmatrix} \vec{v}_1^N - \mat{Q}(\vec{q}) \vec{v}_1^B \\ \vdots \\ \vec{v}_m^N - \mat{Q}(\vec{q}) \vec{v}_m^B \end{bmatrix}
+\]
+The cost is \(J(\vec{q}) = \frac{1}{2} ||\vec{r}(\vec{q})||_2^2\).
+
+\paragraph{Gauss-Newton Method}
+Recall that the Gauss-Newton step \(\Delta\vec{x}\) for a cost \(\frac{1}{2}||\vec{r}(\vec{x})||^2\) is:
+\[
+\Delta\vec{x} = - \left( \mat{J}(\vec{x})^\top \mat{J}(\vec{x}) \right)^{-1} \mat{J}(\vec{x})^\top \vec{r}(\vec{x})
+\]
+where \(\mat{J}(\vec{x}) = \frac{\partial \vec{r}}{\partial \vec{x}}\).
+
+In our case, the unconstrained variable is the 3D correction \(\phi\), not the 4D state \(\vec{q}\). The Jacobian we need is the \(3m \times 3\) attitude Jacobian, \(\mat{J}_\phi\):
+\[
+\mat{J}_\phi(\vec{q}) = \frac{\partial \vec{r}}{\partial \vec{q}} \mat{G}(\vec{q})
+\]
+The Gauss-Newton step \(\phi \in \mathbb{R}^3\) is the solution to the \(3 \times 3\) linear system:
+\[
+\left( \mat{J}_\phi^\top \mat{J}_\phi \right) \phi = - \mat{J}_\phi^\top \vec{r}(\vec{q})
+\]
+
+\paragraph{The Full Algorithm (Gauss-Newton for Wahba's Problem):}
+1.  Start with an initial guess \(\vec{q}_k\) (e.g., \(\vec{q}_0 = [1,0,0,0]^\top\)).
+2.  \textbf{while} \(||\mat{J}_\phi^\top \vec{r}|| > \epsilon\):
+3.  \hspace{1em} Compute residual: \(\vec{r} = \vec{r}(\vec{q}_k)\).
+4.  \hspace{1em} Compute 4D Jacobian: \(\frac{\partial \vec{r}}{\partial \vec{q}}\) (e.g., using auto-differentiation).
+5.  \hspace{1em} Compute Attitude Jacobian: \(\mat{G}(\vec{q}_k) = \mat{L}(\vec{q}_k)\mat{H}\).
+6.  \hspace{1em} Compute 3D Jacobian: \(\mat{J}_\phi = \frac{\partial \vec{r}}{\partial \vec{q}} \mat{G}(\vec{q}_k)\).
+7.  \hspace{1em} Solve for 3D update: \(\phi = - \left( \mat{J}_\phi^\top \mat{J}_\phi \right)^{-1} \mat{J}_\phi^\top \vec{r}\).
+8.  \hspace{1em} Form 4D update quaternion: \(\delta\vec{q} = \begin{bmatrix} \sqrt{1 - ||\phi||^2} \\ \phi \end{bmatrix}\).
+9.  \hspace{1em} Apply multiplicative update: \(\vec{q}_{k+1} = \mat{L}(\vec{q}_k) \delta\vec{q}\).
+10. \textbf{end while}
+
+\begin{code}[Julia Notebook: \texttt{wahba.ipynb}]
+	The \texttt{wahba.ipynb} notebook implements this exact algorithm.
+	\begin{itemize}
+		\item \textbf{Setup:} It defines the helper functions \texttt{Q(q)} (quaternion to DCM), \texttt{L(q)}, \texttt{H}, and \texttt{G(q) = L(q)*H}.
+		\item \textbf{Data:} It generates a random \texttt{qtrue}, then creates \(m=10\) pairs of corresponding world vectors \texttt{vN} and body vectors \texttt{vB}.
+		\item \textbf{Residual:} The \texttt{residual(q)} function computes \(\vec{r}(\vec{q}) = \text{vec}(\texttt{vN} - \mat{Q}(\vec{q}) \texttt{vB})\).
+		\item \textbf{Gauss-Newton Loop:} The \texttt{while} loop implements the algorithm described above:
+		      \begin{itemize}
+			      \item \texttt{r = residual(q)}: Computes the \(30 \times 1\) residual vector.
+			      \item \texttt{dr = ForwardDiff.jacobian(residual, q)}: Auto-differentiates to get the \(30 \times 4\) Jacobian \(\frac{\partial \vec{r}}{\partial \vec{q}}\).
+			      % \item \texttt{∇r = dr*G(q)}: Computes the \(30 \times 3\) Jacobian \(\mat{J}_\phi\).
+			      % \item \texttt{ϕ = -(∇r'*∇r)\\(∇r'*r)}: Solves the \(3 \times 3\) Gauss-Newton step.
+			      % \item \texttt{q = L(q)*[sqrt(1-ϕ'*ϕ); ϕ]}: Applies the multiplicative update.
+		      \end{itemize}
+		\item \textbf{Result:} The algorithm converges in a few iterations. The final cell shows that \texttt{q} is either very close to \texttt{qtrue} or \texttt{-qtrue}, correctly identifying the true attitude (up to the double-cover ambiguity).
+	\end{itemize}
+\end{code}
+\newpage

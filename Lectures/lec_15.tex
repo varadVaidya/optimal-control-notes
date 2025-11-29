@@ -1,0 +1,200 @@
+\lecture{15}{}{LQR with Quaternions and Quadrotor Control}
+
+\begin{prev}
+	In previous lectures, we explored trajectory optimization methods like DDP and Direct Collocation.
+	We also introduced unit quaternions as a singularity-free representation for attitude.
+	However, we noted that using quaternions introduces a constraint \(\|\vec{q}\| = 1\), which complicates standard control techniques like LQR.
+\end{prev}
+
+Today, we bridge the gap between quaternion kinematics and optimal control.
+We will derive how to apply LQR to systems with quaternion states by linearizing in the tangent space (error state).
+Then, we will apply this to a full 3D quadrotor model.
+
+\subsection{LQR with Quaternions}
+
+A naive approach to linearizing a system with quaternion states leads to issues.
+Consider a state vector \(\vec{x} \in \mathbb{R}^{13}\) containing a position \(\vec{r} \in \mathbb{R}^3\), a quaternion \(\vec{q} \in \mathbb{R}^4\), a linear velocity \(\vec{v} \in \mathbb{R}^3\), and an angular velocity \(\vec{\omega} \in \mathbb{R}^3\).
+\[
+	\vec{x} = \begin{bmatrix} \vec{r} \\ \vec{q} \\ \vec{v} \\ \vec{\omega} \end{bmatrix}
+\]
+If we linearize the discrete-time dynamics \(\vec{x}_{k+1} = f(\vec{x}_k, \vec{u}_k)\) directly to obtain \(\mat{A} \in \mathbb{R}^{13 \times 13}\) and \(\mat{B} \in \mathbb{R}^{13 \times m}\), the resulting linear system will be \textbf{uncontrollable}.
+
+\begin{intuition}
+	The quaternion constraint \(\vec{q}^\top \vec{q} = 1\) confines the state to a manifold.
+	There is no control authority that can move the state off this manifold (i.e., change the norm of the quaternion).
+	Consequently, the controllability matrix will be rank-deficient (rank \(< 13\)), and the standard Riccati recursion will fail (specifically, \(\mat{P}\) matrices may become singular or ill-conditioned).
+\end{intuition}
+
+To solve this, we must linearize the dynamics in the \textbf{error state} space, often called the ``tangent space.''
+While the global orientation is represented by a quaternion (4 numbers), the \emph{error} in orientation is 3-dimensional (like a rotation vector).
+
+\subsubsection{Error State Dynamics}
+
+Let the nominal state be \(\bar{\vec{x}}\) and the true state be \(\vec{x}\).
+We define an error state \(\delta\tilde{\vec{x}} \in \mathbb{R}^{12}\) (note the dimension reduction from 13 to 12):
+\[
+	\delta\tilde{\vec{x}} = \begin{bmatrix} \delta\vec{r} \\ \delta\vec{\phi} \\ \delta\vec{v} \\ \delta\vec{\omega} \end{bmatrix}.
+\]
+The position, velocity, and angular velocity errors are standard arithmetic differences (e.g., \(\delta\vec{r} = \vec{r} - \bar{\vec{r}}\)).
+The orientation error \(\delta\vec{\phi} \in \mathbb{R}^3\) is defined such that it relates the nominal quaternion \(\bar{\vec{q}}\) to the true quaternion \(\vec{q}\).
+
+Commonly, the error quaternion \(\delta\vec{q}\) is defined as the rotation required to go from the nominal frame to the true frame:
+\begin{equation}
+	\delta\vec{q} = \bar{\vec{q}}^{-1} \otimes \vec{q} = \bar{\vec{q}}^* \otimes \vec{q}
+\end{equation}
+For small errors, \(\delta\vec{q} \approx \begin{bmatrix} 1 \\ \frac{1}{2}\delta\vec{\phi} \end{bmatrix}\).
+We define a mapping matrix \(\mat{E}(\vec{q})\) that projects variations from the full state space to the error state space.
+For the quaternion part, we use the matrix \(\mat{G}(\vec{q})\) discussed in previous lectures (where \(\dot{\vec{q}} = \frac{1}{2}\mat{G}(\vec{q})\vec{\omega}\)).
+Typically, \(\mat{G}(\vec{q}) = \mat{L}(\vec{q})\mat{H}\), where \(\mat{H} = [\vec{0}_{1\times 3}; \mat{I}_3]\).
+The full projection matrix is chosen block-diagonal:
+\[
+	\mat{E}(\vec{x}) = \text{blockdiag}(\mat{I}_3, \mat{G}(\vec{q}), \mat{I}_6) \in \mathbb{R}^{13 \times 12} .
+\]
+Near the nominal trajectory we can write, to first order,
+\begin{equation}
+	\delta\vec{x}_k \approx \mat{E}(\bar{\vec{x}}_k)\, \delta\tilde{\vec{x}}_k,
+\end{equation}
+meaning that \(\mat{E}(\bar{\vec{x}}_k)\) ``lifts'' the error state into a perturbation in the original coordinates.
+Conversely, the transpose \(\mat{E}(\bar{\vec{x}}_k)^\top\) acts as a local projection from the ambient 13D perturbation back onto the 12D tangent space.
+
+\paragraph{Chain-rule view.}
+The nonlinear dynamics are
+\begin{equation}
+	\vec{x}_{k+1} = f(\vec{x}_k, \vec{u}_k).
+\end{equation}
+Linearizing around the nominal trajectory \((\bar{\vec{x}}_k, \bar{\vec{u}}_k)\) gives the usual 13-state Jacobians
+\begin{equation}
+	\delta\vec{x}_{k+1} \approx \mat{A}_k \, \delta\vec{x}_k + \mat{B}_k \, \delta\vec{u}_k,
+\end{equation}
+where
+\[
+	\mat{A}_k = \left. \pdv{f}{\vec{x}} \right|_{\bar{\vec{x}}_k, \bar{\vec{u}}_k}, \qquad
+	\mat{B}_k = \left. \pdv{f}{\vec{u}} \right|_{\bar{\vec{x}}_k, \bar{\vec{u}}_k}.
+\]
+We want dynamics directly in the error variables \(\delta\tilde{\vec{x}}\).
+Using the projection at the next time step,
+\begin{equation}
+	\delta\tilde{\vec{x}}_{k+1} \approx \mat{E}(\bar{\vec{x}}_{k+1})^\top \, \delta\vec{x}_{k+1} ,
+\end{equation}
+and substituting the linearized dynamics, we obtain
+\begin{align}
+	\delta\tilde{\vec{x}}_{k+1}
+	&\approx \mat{E}(\bar{\vec{x}}_{k+1})^\top \bigl( \mat{A}_k \, \delta\vec{x}_k + \mat{B}_k \, \delta\vec{u}_k \bigr). \\
+	&\approx \mat{E}(\bar{\vec{x}}_{k+1})^\top \bigl( \mat{A}_k \, \mat{E}(\bar{\vec{x}}_k) \, \delta\tilde{\vec{x}}_k + \mat{B}_k \, \delta\vec{u}_k \bigr),
+\end{align}
+where in the last step we used \(\delta\vec{x}_k \approx \mat{E}(\bar{\vec{x}}_k)\,\delta\tilde{\vec{x}}_k\).
+Collecting terms, the error dynamics take the standard linear form
+\begin{equation}
+	\delta\tilde{\vec{x}}_{k+1} = \tilde{\mat{A}}_k \, \delta\tilde{\vec{x}}_k + \tilde{\mat{B}}_k \, \delta\vec{u}_k,
+\end{equation}
+with
+\begin{equation}
+	\tilde{\mat{A}}_k = \mat{E}(\bar{\vec{x}}_{k+1})^\top \left( \pdv{f}{\vec{x}}\bigg|_{\bar{\vec{x}}_k, \bar{\vec{u}}_k} \right) \mat{E}(\bar{\vec{x}}_k)
+\end{equation}
+\begin{equation}
+	\tilde{\mat{B}}_k = \mat{E}(\bar{\vec{x}}_{k+1})^\top \left( \pdv{f}{\vec{u}}\bigg|_{\bar{\vec{x}}_k, \bar{\vec{u}}_k} \right)
+\end{equation}
+
+
+Geometrically, we first lift a small tangent-space perturbation at time \(k\) into the ambient 13D space, evolve it forward through the linearized dynamics, and finally project the result back onto the tangent space at time \(k+1\).
+The resulting system \(\delta\tilde{\vec{x}}_{k+1} = \tilde{\mat{A}}_k \delta\tilde{\vec{x}}_k + \tilde{\mat{B}}_k \delta\vec{u}_k\) is a standard linear system of dimension 12.
+It is controllable (assuming the underlying physical system is), and we can apply the standard LQR algorithm to find the gain matrix \(\mat{K} \in \mathbb{R}^{m \times 12}\).
+
+\subsubsection{Attitude Control Loop}
+
+The resulting control law is:
+\[
+	\vec{u}_k = \bar{\vec{u}}_k - \mat{K}_k \delta\tilde{\vec{x}}_k
+\]
+To implement this, we must compute \(\delta\tilde{\vec{x}}_k\) given the current state \(\vec{x}\) and reference \(\bar{\vec{x}}\):
+\begin{enumerate}
+	\item Compute standard errors: \(\delta\vec{r} = \vec{r} - \bar{\vec{r}}\), \(\delta\vec{v} = \vec{v} - \bar{\vec{v}}\), etc.
+	\item Compute orientation error \(\delta\vec{\phi}\).
+	      First, compute the error quaternion: \(\delta\vec{q} = \bar{\vec{q}}^* \otimes \vec{q}\).
+	      Then, convert the vector part of \(\delta\vec{q}\) to the error vector \(\delta\vec{\phi}\).
+	      A simple approximation often used is \(\delta\vec{\phi} = 2 \cdot \text{vector}(\delta\vec{q}) \cdot \sgn(\text{scalar}(\delta\vec{q}))\) (to ensure we take the shortest path).
+	\item Stack these to form \(\delta\tilde{\vec{x}}\) and multiply by \(\mat{K}\).
+\end{enumerate}
+
+\subsection{3D Quadrotor Dynamics}
+
+We apply this theory to a 3D quadrotor.
+
+\subsubsection{State and Inputs}
+The state vector is \(\vec{x} = [\vec{r}^\top, \vec{q}^\top, \vec{v}^\top, \vec{\omega}^\top]^\top \in \mathbb{R}^{13}\).
+\begin{itemize}
+	\item \(\vec{r} \in \mathbb{R}^3\): Position in World frame \(\mathcal{N}\).
+	\item \(\vec{q} \in \mathbb{R}^4\): Attitude quaternion (Rotation from \(\mathcal{B}\) to \(\mathcal{N}\)).
+	\item \(\vec{v} \in \mathbb{R}^3\): Linear velocity in \textbf{Body} frame \(\mathcal{B}\) (Note: some formulations use World frame; we follow the provided notes/notebook which use Body frame velocity).
+	\item \(\vec{\omega} \in \mathbb{R}^3\): Angular velocity in Body frame \(\mathcal{B}\).
+\end{itemize}
+The inputs are the motor forces (or speeds squared) \(\vec{u} \in \mathbb{R}^4\).
+Typically, \(F_i = k_f u_i\) and \(\tau_i = k_\tau u_i\).
+
+\subsubsection{Equations of Motion}
+
+\paragraph{Kinematics.}
+\begin{align}
+	\dot{\vec{r}} & = \mat{R}(\vec{q}) \vec{v}                                     \\
+	\dot{\vec{q}} & = \frac{1}{2} \mat{L}(\vec{q}) \mat{H} \vec{\omega} = \frac{1}{2} \vec{q} \otimes \begin{bmatrix} 0 \\ \vec{\omega} \end{bmatrix}
+\end{align}
+where \(\mat{R}(\vec{q})\) is the rotation matrix corresponding to \(\vec{q}\).
+
+\paragraph{Dynamics.}
+The translational dynamics are derived from Newton's Second Law.
+Since \(\vec{v}\) is in the body frame, we must account for the rotating frame (Coriolis effect).
+Force balance in world frame: \(m \vec{a}_{\mathcal{N}} = \vec{F}_{\text{gravity}} + \mat{R} \vec{F}_{\text{thrust}}\).
+Rotating to body frame:
+\begin{align}
+	m (\dot{\vec{v}} + \vec{\omega} \times \vec{v}) & = \mat{R}^\top \begin{bmatrix} 0 \\ 0 \\ -mg \end{bmatrix} + \begin{bmatrix} 0 \\ 0 \\ \sum F_i \end{bmatrix} \\
+	\dot{\vec{v}}                                   & = \mat{R}(\vec{q})^\top \vec{g} + \frac{1}{m} \vec{F}_{\text{thrust}} - \vec{\omega} \times \vec{v}
+\end{align}
+The rotational dynamics follow Euler's equations:
+\begin{equation}
+	\mat{J} \dot{\vec{\omega}} + \vec{\omega} \times (\mat{J} \vec{\omega}) = \vec{\tau}_{\text{total}}
+\end{equation}
+where \(\vec{\tau}_{\text{total}}\) comes from the differential thrust of the motors.
+
+\paragraph{Input Mapping.}
+The mapping from motor inputs \(\vec{u}\) to body wrench (Force \(F_z\) and Torques \(\vec{\tau}\)) is constant:
+\[
+	\begin{bmatrix} F_z \\ \tau_x \\ \tau_y \\ \tau_z \end{bmatrix} =
+	\begin{bmatrix}
+		k_f & k_f & k_f & k_f \\
+		0   & l k_f & 0 & -l k_f \\
+		-l k_f & 0 & l k_f & 0 \\
+		k_\tau & -k_\tau & k_\tau & -k_\tau
+	\end{bmatrix} \vec{u}
+\]
+(Note: The signs depend on the specific motor numbering and spin directions).
+
+\subsection{Code Analysis: \texttt{quadrotor.ipynb}}
+
+The notebook provides a concrete implementation of these concepts.
+
+\begin{code}[Julia Notebook: Quadrotor LQR]
+	The notebook demonstrates the failure of naive linearization and the success of the quaternion-error approach.
+
+	\begin{itemize}
+		\item \textbf{Naive Linearization:}
+		      Computing the Jacobian \(\mat{A}\) of the 13-state system results in a matrix that is rank-deficient.
+		      The controllability matrix \(\mathcal{C}\) is also rank-deficient.
+		      This confirms that we cannot control the system ``off the manifold''.
+
+		\item \textbf{Reduced Linearization:}
+		      The code constructs the projection matrix \(\mat{E}(\vec{q})\) (denoted as \texttt{E} in the code) using the quaternion kinematics map \(\mat{G}(\vec{q})\).
+		      \[ \tilde{\mat{A}} = \mat{E}^\top \mat{A} \mat{E}, \quad \tilde{\mat{B}} = \mat{E}^\top \mat{B} \]
+		      The resulting system matrices \(\tilde{\mat{A}}\) (12x12) and \(\tilde{\mat{B}}\) (12x4) form a controllable pair.
+
+		\item \textbf{LQR Gain:}
+		      The function \texttt{dlqr} is called on the reduced system to compute \(\mat{K}\).
+
+		\item \textbf{Controller Implementation:}
+		      Inside the simulation loop, the controller computes the orientation error using the quaternion product \(\bar{\vec{q}}^* \otimes \vec{q}\) (implemented as \texttt{L(q0)'*q}).
+		      It extracts the vector part to form the error state \(\delta\tilde{\vec{x}}\) and applies \(\vec{u} = \vec{u}_{\text{hover}} - \mat{K} \delta\tilde{\vec{x}}\).
+
+		\item \textbf{Simulation:}
+		      The dynamics are integrated using RK4. Crucially, the quaternion is re-normalized (\(\vec{q} \leftarrow \vec{q} / \|\vec{q}\|\)) after every integration step to prevent numerical drift from violating the unit norm constraint.
+	\end{itemize}
+\end{code}
+\newpage

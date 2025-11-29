@@ -1,13 +1,5 @@
 \lecture{13}{}{Algorithm Recap and Attitude Kinematics}
 
-\begin{prev}
-	In our last lecture, we discussed direct methods for trajectory optimization, focusing on Sequential Quadratic Programming (SQP) as a general solver for Nonlinear Programs (NLPs). We then detailed the Direct Collocation (DIRCOL) method, specifically Hermite-Simpson integration, as a highly accurate and efficient way to transcribe the optimal control problem into a sparse NLP.
-\end{prev}
-
-Today's lecture begins with a high-level recap to organize the various optimal control algorithms we've discussed. Then, we will tackle a critical and challenging topic in robotics: how to properly represent and integrate 3D rotations (attitude) in our dynamic models without encountering singularities.
-
-\subsection{Recap: A Map of Deterministic Optimal Control Algorithms}
-
 We have covered a wide range of algorithms, each suited to different problem types. The following provides a decision-making framework for choosing an algorithm:
 
 \begin{itemize}
@@ -33,7 +25,7 @@ The following table provides a direct comparison of the trade-offs between Direc
 	\caption{Comparison of Nonlinear Trajectory Optimization Methods}
 	\label{tab:trajopt_comparison}
 	\small
-	\begin{tabular}{@{}p{2.5cm}p{5.5cm}p{5.5cm}@{}}
+	\begin{tabular}{@{}p{2.5cm}p{6cm}p{6cm}@{}}
 		\toprule
 		\textbf{Property}            & \textbf{Direct Collocation (DIRCOL)}                                & \textbf{DDP / iLQR}                                                   \\ \midrule
 		Dynamics            & Enforced as constraints \(\vec{c}(\vec{x}_k, \vec{u}_k, \vec{x}_{k+1}) = 0\). & Always dynamically feasible (rollouts use exact dynamics).            \\
@@ -132,7 +124,11 @@ Quaternions are a 4-dimensional number system that is extremely efficient and st
 	      \[
 	      \vec{q}_a \otimes \vec{q}_b = \begin{bmatrix} s_a s_b - \vec{v}_a^\top \vec{v}_b \\ s_a \vec{v}_b + s_b \vec{v}_a + \vec{v}_a \times \vec{v}_b \end{bmatrix}
 	      \]
-	      This can be written in matrix form as \(\mat{L}(\vec{q}_a)\vec{q}_b\) or \(\mat{R}(\vec{q}_b)\vec{q}_a\).
+	      This can be written in matrix form as \(\mat{L}(\vec{q}_a)\vec{q}_b\) or \(\mat{R}(\vec{q}_b)\vec{q}_a\), where:
+        \[
+        \mat{L}(\vec{q}) = \begin{bmatrix} s & -\vec{v}^\top \\ \vec{v} & s\mat{I} + \hat{\vec{v}} \end{bmatrix}, \quad
+        \mat{R}(\vec{q}) = \begin{bmatrix} s & -\vec{v}^\top \\ \vec{v} & s\mat{I} - \hat{\vec{v}} \end{bmatrix}
+        \]
 	\item \textbf{Rotate a Vector:} To rotate \(\vec{x} \in \mathbb{R}^3\), we "embed" it as a pure quaternion \(\vec{x}_p = \begin{bmatrix} 0 \\ \vec{x} \end{bmatrix}\) and compute the "sandwich product":
 	      \[
 	      \begin{bmatrix} 0 \\ \vec{y} \end{bmatrix} = \vec{q} \otimes \vec{x}_p \otimes \vec{q}^*
@@ -173,3 +169,7 @@ This equation is linear in \(\vec{\omega}\), which is extremely convenient for c
 	\paragraph{Conclusion}
 	Projection enforces \(\vec{q}^\top\vec{q}=1\), so \(\|\vec{q}_k\|=1\) and \(\mat{R}(\vec{q}_k)^\top\mat{R}(\vec{q}_k)=\mat{I}\). Quaternions with re-normalization are the robust default for attitude simulation.
 \end{code}
+\begin{note}
+  Note that optimisation w.r.t.\  to qwuaterinions and rotation matrixes are often non-convex, as the space of valid soluitions is a shell of unit sphere, hence the the set ofg solutions is non-convex in lature. But often these roatations optimisation problems admit strong convex relaxations. In particular you can show that when dealing with linear constraints, tthe solution will be pushed to the bundary of the set, allowing for converting the unit norm consstraint to a unit ball one. Wahba's problem is one such example.
+\end{note}
+\newpage
