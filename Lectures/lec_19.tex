@@ -1,0 +1,198 @@
+% Lectures/lec_21.tex
+\lecture{19}{}{Optimal Estimation and the Kalman Filter}
+
+\subsection{Optimal State Estimation}
+
+We are given a history of measurements \(\vec{y}_{0:k}\) and controls \(\vec{u}_{0:k-1}\). We want to find the "best" estimate \(\hat{\vec{x}}_k\) of the true state \(\vec{x}_k\).
+Two common statistical objectives are:
+
+\begin{enumerate}
+	\item \textbf{Maximum A Posteriori (MAP):} Find the most likely state given the data.
+	      \[ \hat{\vec{x}}_{\text{MAP}} = \argmax_{\vec{x}} p(\vec{x} | \vec{y}) \]
+	\item \textbf{Minimum Mean Squared Error (MMSE):} Find the estimator that minimizes the expected squared error.
+	      \[ \hat{\vec{x}}_{\text{MMSE}} = \argmin_{\hat{\vec{x}}} \mathbb{E}[ \|\vec{x} - \hat{\vec{x}}\|^2 ] = \mathbb{E}[\tr((\vec{x} - \hat{\vec{x}})(\vec{x} - \hat{\vec{x}})^\top)] = \argmin_{\hat{\vec{x}}} \tr(\mat{\Sigma}) \]
+        where \(\mat{\Sigma} = \mathbb{E}[(\vec{x} - \hat{\vec{x}})(\vec{x} - \hat{\vec{x}})^\top]\) is the estimation error covariance.
+\end{enumerate}
+
+\begin{intuition}
+	The MMSE estimator corresponds to the \textbf{mean} of the posterior distribution \(\mathbb{E}[\vec{x}|\vec{y}]\), while the MAP estimator corresponds to the \textbf{mode}.
+	For a Gaussian distribution, the mean and the mode are identical. Thus, in the Linear-Gaussian setting, both objectives yield the same result.
+\end{intuition}
+
+\subsection{The Kalman Filter}
+
+The Kalman Filter is the recursive linear MMSE estimator for linear dynamical systems with Gaussian noise.
+
+\begin{definition}[System Model]
+	\begin{align*}
+		\vec{x}_{k+1} &= \mat{A}\vec{x}_k + \mat{B}\vec{u}_k + \vec{w}_k, & \vec{w}_k &\sim \mathcal{N}(\vec{0}, \mat{W}) \\
+		\vec{y}_k &= \mat{C}\vec{x}_k + \vec{v}_k, & \vec{v}_k &\sim \mathcal{N}(\vec{0}, \mat{V})
+	\end{align*}
+	We define the conditional mean and covariance:
+	\begin{itemize}
+		\item \textbf{A Posteriori (Updated) Estimate:}
+		      \[ \hat{\vec{x}}_{k|k} = \mathbb{E}[\vec{x}_k | \vec{y}_{0:k}], \quad \mat{\Sigma}_{k|k} = \mathbb{E}[(\vec{x}_k - \hat{\vec{x}}_{k|k})(\vec{x}_k - \hat{\vec{x}}_{k|k})^\top] \]
+		\item \textbf{A Priori (Predicted) Estimate:}
+		      \[ \hat{\vec{x}}_{k+1|k} = \mathbb{E}[\vec{x}_{k+1} | \vec{y}_{0:k}], \quad \mat{\Sigma}_{k+1|k} = \mathbb{E}[(\vec{x}_{k+1} - \hat{\vec{x}}_{k+1|k})(\vec{x}_{k+1} - \hat{\vec{x}}_{k+1|k})^\top] \]
+	\end{itemize}
+\end{definition}
+
+The filter operates in two steps: \textbf{Prediction} (Propagation) and \textbf{Correction} (Measurement Update).
+
+\subsubsection{Step 1: Prediction (Time Update)}
+
+We project the current belief forward in time using the dynamics.
+Given \(\hat{\vec{x}}_{k|k}\) and \(\mat{\Sigma}_{k|k}\):
+
+\paragraph{Mean Prediction:}
+\[
+\hat{\vec{x}}_{k+1|k} = \mathbb{E}[\mat{A}\vec{x}_k + \mat{B}\vec{u}_k + \vec{w}_k] = \mat{A}\hat{\vec{x}}_{k|k} + \mat{B}\vec{u}_k
+\]
+(Since \(\mathbb{E}[\vec{w}_k] = \vec{0}\)).
+
+\paragraph{Covariance Prediction:}
+Define the error \(\vec{e}_{k+1|k} = \vec{x}_{k+1} - \hat{\vec{x}}_{k+1|k}\).
+\begin{align*}
+	\vec{e}_{k+1|k} &= (\mat{A}\vec{x}_k + \mat{B}\vec{u}_k + \vec{w}_k) - (\mat{A}\hat{\vec{x}}_{k|k} + \mat{B}\vec{u}_k) \\
+	&= \mat{A}(\vec{x}_k - \hat{\vec{x}}_{k|k}) + \vec{w}_k = \mat{A}\vec{e}_{k|k} + \vec{w}_k
+\end{align*}
+The covariance is \(\mat{\Sigma}_{k+1|k} = \mathbb{E}[\vec{e}_{k+1|k}\vec{e}_{k+1|k}^\top]\).
+Since the process noise \(\vec{w}_k\) is uncorrelated with the past estimation error \(\vec{e}_{k|k}\):
+\[
+\mat{\Sigma}_{k+1|k} = \mat{A} \mat{\Sigma}_{k|k} \mat{A}^\top + \mat{W}
+\]
+
+\subsubsection{Step 2: Correction (Measurement Update)}
+
+We now incorporate the new measurement \(\vec{y}_{k+1}\).
+First, we define the \textbf{Innovation} (or residual), which is the part of the measurement that we could not predict:
+\[
+\vec{z}_{k+1} = \vec{y}_{k+1} - \mat{C}\hat{\vec{x}}_{k+1|k}
+\]
+The \textbf{Innovation Covariance} \(\mat{S}_{k+1}\) is:
+\begin{align*}
+	\vec{z}_{k+1} &= (\mat{C}\vec{x}_{k+1} + \vec{v}_{k+1}) - \mat{C}\hat{\vec{x}}_{k+1|k} = \mat{C}\vec{e}_{k+1|k} + \vec{v}_{k+1} \\
+	\mat{S}_{k+1} &= \mathbb{E}[\vec{z}_{k+1}\vec{z}_{k+1}^\top] = \mat{C}\mat{\Sigma}_{k+1|k}\mat{C}^\top + \mat{V}
+\end{align*}
+
+We look for a linear update rule of the form:
+\[
+\hat{\vec{x}}_{k+1|k+1} = \hat{\vec{x}}_{k+1|k} + \mat{L}_{k+1} \vec{z}_{k+1}
+\]
+where \(\mat{L}_{k+1}\) is the \textbf{Kalman Gain}.
+The new error is:
+\begin{align*}
+	\vec{e}_{k+1|k+1} &= \vec{x}_{k+1} - (\hat{\vec{x}}_{k+1|k} + \mat{L}_{k+1}(\mat{C}\vec{e}_{k+1|k} + \vec{v}_{k+1})) \\
+	&= (\mat{I} - \mat{L}_{k+1}\mat{C})\vec{e}_{k+1|k} - \mat{L}_{k+1}\vec{v}_{k+1}
+\end{align*}
+The updated covariance \(\mat{\Sigma}_{k+1|k+1}\) follows:
+\begin{equation}
+	\mat{\Sigma}_{k+1|k+1} = (\mat{I} - \mat{L}\mat{C})\mat{\Sigma}_{k+1|k}(\mat{I} - \mat{L}\mat{C})^\top + \mat{L}\mat{V}\mat{L}^\top
+	\label{eq:joseph_form}
+\end{equation}
+This symmetric equation is known as the \textbf{Joseph Form}. It guarantees positive definiteness numerically even with round-off errors.
+
+\paragraph{Deriving the Optimal Gain.}
+We find \(\mat{L}\) that minimizes the MMSE cost, which is the trace of the covariance: \(J = \tr(\mat{\Sigma}_{k+1|k+1})\).
+Taking the derivative with respect to \(\mat{L}\) and setting to zero:
+\begin{align*}
+	\pdv{J}{\mat{L}} &= 2(\mat{I} - \mat{L}\mat{C})\mat{\Sigma}_{k+1|k}(-\mat{C}^\top) + 2\mat{L}\mat{V} = \vec{0} \\
+	& -\mat{\Sigma}_{k+1|k}\mat{C}^\top + \mat{L}\mat{C}\mat{\Sigma}_{k+1|k}\mat{C}^\top + \mat{L}\mat{V} = \vec{0} \\
+	& \mat{L}(\underbrace{\mat{C}\mat{\Sigma}_{k+1|k}\mat{C}^\top + \mat{V}}_{\mat{S}_{k+1}}) = \mat{\Sigma}_{k+1|k}\mat{C}^\top
+\end{align*}
+This gives the famous Kalman Gain formula:
+\[
+\boxed{\mat{L}_{k+1} = \mat{\Sigma}_{k+1|k}\mat{C}^\top \mat{S}_{k+1}^{-1}}
+\]
+Substituting this back into \eqref{eq:joseph_form} yields the simplified covariance update:
+\[
+\mat{\Sigma}_{k+1|k+1} = (\mat{I} - \mat{L}_{k+1}\mat{C})\mat{\Sigma}_{k+1|k}
+\]
+
+\begin{algorithm}[H]
+	\caption{Kalman Filter}
+	\DontPrintSemicolon
+	\KwIn{\(\hat{\vec{x}}_{0|0}, \mat{\Sigma}_{0|0}\), measurements \(\vec{y}\), controls \(\vec{u}\)}
+	\For{\(k = 0, 1, \dots\)}{
+		\Comment{1. Prediction}
+		\(\hat{\vec{x}}_{k+1|k} \leftarrow \mat{A}\hat{\vec{x}}_{k|k} + \mat{B}\vec{u}_k\)\;
+		\(\mat{\Sigma}_{k+1|k} \leftarrow \mat{A}\mat{\Sigma}_{k|k}\mat{A}^\top + \mat{W}\)\;
+		\Comment{2. Innovation}
+		\(\vec{z}_{k+1} \leftarrow \vec{y}_{k+1} - \mat{C}\hat{\vec{x}}_{k+1|k}\)\;
+		\(\mat{S}_{k+1} \leftarrow \mat{C}\mat{\Sigma}_{k+1|k}\mat{C}^\top + \mat{V}\)\;
+		\Comment{3. Gain and Update}
+		\(\mat{L}_{k+1} \leftarrow \mat{\Sigma}_{k+1|k}\mat{C}^\top \mat{S}_{k+1}^{-1}\)\;
+		\(\hat{\vec{x}}_{k+1|k+1} \leftarrow \hat{\vec{x}}_{k+1|k} + \mat{L}_{k+1}\vec{z}_{k+1}\)\;
+		\(\mat{\Sigma}_{k+1|k+1} \leftarrow (\mat{I} - \mat{L}_{k+1}\mat{C})\mat{\Sigma}_{k+1|k}\)\;
+	}
+\end{algorithm}
+
+\subsection{Extended Kalman Filter (EKF)}
+For nonlinear systems \(\vec{x}_{k+1} = f(\vec{x}_k, \vec{u}_k) + \vec{w}_k\), \(\vec{y}_k = h(\vec{x}_k) + \vec{v}_k\):
+\begin{itemize}
+	\item We propagate the mean using the nonlinear dynamics: \(\hat{\vec{x}}_{k+1|k} = f(\hat{\vec{x}}_{k|k}, \vec{u}_k)\).
+	\item We propagate the covariance using the \textbf{linearized} dynamics Jacobians:
+	      \[ \mat{A}_k = \pdv{f}{\vec{x}}\bigg|_{\hat{\vec{x}}_{k|k}}, \quad \mat{C}_k = \pdv{h}{\vec{x}}\bigg|_{\hat{\vec{x}}_{k+1|k}} \]
+\end{itemize}
+This is the standard approach for state estimation in robotics (e.g., localization, SLAM).
+
+\subsection{Duality}
+
+There is a striking symmetry between the LQR regulator and the Kalman Filter estimator. The MMSE estimation problem is mathematically equivalent to a specific optimal control problem.
+
+Consider the dual variables:
+\begin{center}
+	\begin{tabular}{c c}
+		\toprule
+		\textbf{LQR (Regulator)}                                                & \textbf{Kalman Filter (Estimator)}                                      \\ \midrule
+		\(\mat{A}\)                                                             & \(\mat{A}^\top\)                                                        \\
+		\(\mat{B}\)                                                             & \(\mat{C}^\top\)                                                        \\
+		\(\mat{Q}\) (State Cost)                                                & \(\mat{W}\) (Process Noise Cov.)                                        \\
+		\(\mat{R}\) (Control Cost)                                              & \(\mat{V}\) (Sensor Noise Cov.)                                         \\
+		\(\mat{P}\) (Cost-to-Go Hessian)                                        & \(\mat{\Sigma}\) (Estimation Error Cov.)                                \\
+		\(\mat{K}\) (Feedback Gain)                                             & \(\mat{L}^\top\) (Kalman Gain Transposed)                               \\
+		Backward in Time (\(N \to 0\))                                          & Forward in Time (\(0 \to N\))                                           \\
+		\(\mat{P} = \mat{Q} + \mat{A}^\top\mat{P}\mat{A} - \dots\) (Riccati Eq) & \(\mat{\Sigma} = \mat{W} + \mat{A}\mat{\Sigma}\mat{A}^\top - \dots\) (Riccati Eq) \\ \bottomrule
+	\end{tabular}
+\end{center}
+
+\begin{theorem}[Duality]
+	Solving the Kalman Filter covariance update is mathematically identical to solving the LQR Riccati equation backward in time for the dual system.
+	If the pair \((\mat{A}, \mat{C})\) is observable, the Kalman Filter error covariance converges, just as LQR stabilizes if \((\mat{A}, \mat{B})\) is controllable.
+\end{theorem}
+
+\subsection{Code Analysis: \texttt{lqg.ipynb}}
+
+The notebook implements an LQG controller for a simple 2D system.
+
+\begin{code}[Julia Notebook: LQG Implementation]
+	\textbf{System Setup:}
+	A discretized double integrator (mass on a line) with time step \(h=0.1\).
+	\[
+		\mat{A} = \begin{bmatrix} 1 & h \\ 0 & 1 \end{bmatrix}, \quad \mat{B} = \begin{bmatrix} 0.5h^2 \\ h \end{bmatrix}, \quad \mat{C} = \begin{bmatrix} 1 & 0 \end{bmatrix}
+	\]
+	This models a system where we control acceleration (force) and measure position.
+
+	\textbf{Noise:}
+	\begin{itemize}
+		\item Process noise \(\mat{W}\) is injected into the dynamics, representing random force disturbances.
+		\item Measurement noise \(\mat{V}\) corrupts the position readings.
+	\end{itemize}
+
+	\textbf{Controller Design (Separation Principle):}
+	\begin{itemize}
+		\item \textbf{LQR:} Computes infinite-horizon gain \(\mat{K}\) using \texttt{dlqr} based on \(\mat{Q}, \mat{R}\).
+		\item \textbf{Kalman Filter:} The loop manually implements the KF steps derived above:
+		      \begin{itemize}
+			      \item \textbf{Innovation:} \texttt{z = y - C*x\_pred}
+			      \item \textbf{Gain:} \texttt{L = Sigma\_pred * C' * inv(S)}
+			      \item \textbf{Update:} \texttt{x\_est = x\_pred + L*z}
+		      \end{itemize}
+		\item \textbf{Control Application:} The control is calculated as \texttt{u = -K * x\_est}, using the estimated state instead of the hidden true state.
+	\end{itemize}
+
+	\textbf{Results:}
+	The plot shows the true state \(\vec{x}\) and the estimate \(\hat{\vec{x}}\) tracking each other closely. The estimator filters out the high-frequency measurement noise, providing a smooth signal for the LQR controller to stabilize the system.
+	Another plot shows the elements of the covariance matrix \(\mat{\Sigma}\) converging to steady-state values, confirming that for LTI systems, the estimator's uncertainty stabilizes (just like the LQR cost-to-go).
+\end{code}
+\newpage
