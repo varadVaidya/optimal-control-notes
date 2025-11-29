@@ -1,0 +1,139 @@
+\lecture{16}{}{Contact Dynamics and Hybrid Systems}
+
+We address systems that interact with the world through contact.
+This introduces discontinuities in the dynamics (impacts), rendering standard smooth ODE solvers and optimization techniques insufficient.
+We will explore two primary modeling approaches: \textbf{Hybrid Systems} (Event-based) and \textbf{Time-Stepping} (Contact-Implicit), and then apply the hybrid approach to trajectory optimization for a legged robot.
+
+\subsection{Contact Dynamics}
+
+In the air, the dynamics are described by a smooth ODE (e.g., \(\dot{v} = -g\)).
+However, when the ball hits the ground at time \(t_I\), the velocity changes instantaneously from \(v^-\) (downward) to \(v^+\) (upward).
+\[
+    v^+ = -e v^-
+\]
+where \(e \in [0, 1]\) is the coefficient of restitution.
+Because of these discontinuities, we cannot write down a single smooth ODE \(\dot{\vec{x}} = f(\vec{x})\) that is valid everywhere.
+
+\subsection{Simulation Approaches}
+
+There are two main paradigms for simulating such systems.
+
+\subsubsection{Event-Based / Hybrid Simulation}
+In this approach, we integrate the smooth dynamics until a specific event (contact) occurs.
+We define a \textbf{guard function} \(\phi(\vec{x})\) (e.g. in the case of the bouncing ball it will be the height of the ball from ground, or some sort of signed distance function.) such that \(\phi(\vec{x}) \ge 0\) implies no contact (feasible), and \(\phi(\vec{x}) = 0\) is the contact surface.
+
+\textbf{Algorithm:}
+\begin{enumerate}
+    \item Integrate \(\dot{\vec{x}} = f(\vec{x})\) while \(\phi(\vec{x}) > 0\).
+    \item Detect when \(\phi(\vec{x})\) crosses zero (event detection).
+    \item Use a root-finding algorithm to locate the precise impact time \(t_I\).
+    \item Apply a \textbf{Jump Map} (or Reset Map) to update the state discontinuously:
+    \[ \vec{x}^+ = \Delta(\vec{x}^-) \]
+    \item Resume integration with \(\vec{x}^+\) as the new initial condition.
+\end{enumerate}
+
+\begin{itemize}
+    \item \textbf{Pros:} Can use high-order, variable-step integrators (e.g., RK45) for high accuracy between impacts.
+    \item \textbf{Cons:} Requires explicit enumeration of modes and mode transitions. Scaling to many contacts is difficult (combinatorial explosion of mode sequences).
+\end{itemize}
+
+\subsubsection{Time-Stepping / Contact-Implicit}
+This method solves a constrained optimization problem at each time step to resolve forces and satisfy non-penetration constraints.
+Consider a brick sliding on a surface. The dynamics are:
+\[
+    m\dot{v} = -mg + \mat{J}(\vec{q})^\top \lambda
+\]
+where $\lambda$ is the contact force and $\mat{J}$ is the contact Jacobian.
+Discretizing with Backward Euler:
+\[
+    m \frac{v_{n+1} - v_n}{h} = -mg + \mat{J}^\top \lambda_{n+1}
+\]
+We must satisfy the Karush-Kuhn-Tucker (KKT) conditions for non-penetration, known as \textbf{Linear Complementarity Problems (LCP)} in this context:
+\begin{align*}
+    \phi(\vec{q}_{n+1}) &\ge 0 \quad \text{(Non-penetration)} \\
+    \lambda_{n+1} &\ge 0 \quad \text{(Pushing force only)} \\
+    \phi(\vec{q}_{n+1}) \cdot \lambda_{n+1} &= 0 \quad \text{(Complementarity: Force is zero if not touching)}
+\end{align*}
+
+This can be formulated as an optimization problem (QP):
+\[
+    \min_{v_{n+1}} \frac{1}{2} v_{n+1}^\top \mat{M} v_{n+1} + \dots \quad \text{s.t.} \quad \phi(\vec{q}_n + h v_{n+1}) \ge 0
+\]
+
+\begin{itemize}
+    \item \textbf{Pros:} Robust; handles simultaneous contacts and changing contact modes naturally without explicit logic. Widely used in simulators like PyBullet, Gazebo.
+    \item \textbf{Cons:} Usually limited to first-order integrators (Euler), so requires small time steps for accuracy. Impact times are not resolved precisely.
+\end{itemize}
+
+\subsection{Code Analysis: \texttt{hybrid-ball.ipynb}}
+
+The notebook provides a simple implementation of the Event-Based method.
+
+\begin{code}[Julia Notebook: Hybrid Bouncing Ball]
+    The code simulates a ball falling under gravity with a ground at \(y=0\).
+    \begin{itemize}
+        \item \textbf{Dynamics:} \(\dot{\vec{x}} = [v, -g]^\top\). Implemented as \texttt{dynamics\_rk4}.
+        \item \textbf{Guard Function:} \(\phi(\vec{x}) = y\) (vertical position).
+        \item \textbf{Jump Map:} Implemented in \texttt{jump(x)}. It reflects the vertical velocity:
+        \[ v_y^+ = -\gamma v_y^- \]
+        where \(\gamma = 0.9\) is the coefficient of restitution.
+        \item \textbf{Simulation Loop:}
+        It iterates through time steps. After each step, it checks `if guard(x) <= 0`.
+        If true, it applies the jump map immediately.
+        \emph{Note: The provided implementation is a simplified hybrid method; it applies the jump at the next discrete step rather than finding the precise root time, which is acceptable for small time steps.}
+    \end{itemize}
+\end{code}
+
+\subsection{Hybrid Trajectory Optimization for Legged Robots}
+
+For control, the Hybrid formulation is often easier to implement within standard trajectory optimization frameworks (like DIRCOL) if we \textbf{pre-specify the mode sequence}.
+
+Consider a one-legged hopper with state \(\vec{x} = [r_b, r_f, v_b, v_f]^\top\) (body and foot positions/velocities) and input \(\vec{u} = [F, \tau]^\top\).
+
+\paragraph{Modes:}
+\begin{enumerate}
+    \item \textbf{Flight:} Foot is in the air. Dynamics are ballistic.
+    \item \textbf{Stance:} Foot is on the ground. Dynamics involve ground reaction forces.
+\end{enumerate}
+
+\paragraph{Jump Map (Touchdown):}
+When transitioning from Flight to Stance, an inelastic collision occurs. The foot velocity is instantaneously zeroed out:
+\[
+    \vec{x}^+ = \Delta(\vec{x}^-) = \begin{bmatrix} r_b \\ r_f \\ v_b \\ 0 \end{bmatrix}
+\]
+
+\paragraph{Trajectory Optimization Formulation:}
+We assume a fixed sequence of modes (e.g., Flight \(\to\) Stance \(\to\) Flight).
+We partition the knot points \(1 \dots N\) into phases.
+\begin{itemize}
+    \item \textbf{Phase 1 (Flight):} For \(k = 1 \dots N_1-1\), enforce flight dynamics \(\vec{x}_{k+1} = f_{\text{flight}}(\vec{x}_k, \vec{u}_k)\).
+    \item \textbf{Transition:} At \(k = N_1\), enforce the jump map \(\vec{x}_{N_1+1} = \Delta(f_{\text{flight}}(\vec{x}_{N_1}, \vec{u}_{N_1}))\).
+    \item \textbf{Phase 2 (Stance):} For \(k = N_1+1 \dots N_2\), enforce stance dynamics \(\vec{x}_{k+1} = f_{\text{stance}}(\vec{x}_k, \vec{u}_k)\).
+\end{itemize}
+We also add phase-specific constraints:
+\begin{itemize}
+    \item During Flight: \(\phi(\vec{x}_k) > 0\) (Foot above ground).
+    \item During Stance: \(\phi(\vec{x}_k) = 0\) (Foot on ground).
+\end{itemize}
+
+\begin{code}[Julia Notebook: \texttt{hopper.ipynb}]
+    The notebook implements Multi-Mode Trajectory Optimization for a 2D hopper.
+    \begin{itemize}
+        \item \textbf{Setup:} Uses \texttt{Ipopt} to solve the NLP. The decision variables \texttt{z} include states and controls for all time steps.
+        \item \textbf{Dynamics Functions:} Separate functions \texttt{flight\_dynamics} and \texttt{stance\_dynamics} are defined.
+        \item \textbf{Constraints:}
+        \begin{itemize}
+            \item \texttt{dynamics\_constraint!}: This function explicitly loops through the pre-defined modes.
+            If the current segment is Flight, it applies flight dynamics.
+            If Stance, it applies stance dynamics.
+            At the interface indices (multiples of \texttt{Nm}), it applies the \texttt{jump\_map}.
+            \item \texttt{stance\_constraint!}: Enforces \(y_{\text{foot}} = 0\) during stance phases.
+            \item \texttt{length\_constraint!}: Enforces kinematic limits on the leg length.
+        \end{itemize}
+        \item \textbf{Result:} The optimizer finds a trajectory where the robot jumps, makes contact (handling the impact discontinuity via the jump map constraint), and jumps again, tracking the reference while respecting physics.
+    \end{itemize}
+\end{code}
+
+\begin{intuition}
+    By fixing the mode sequence, we convert a hard "decision" problem (when to make contact?) into a standard smooth NLP (where to place the foot given we \emph{must} make contact at step \(K\)). This is why Hybrid Traj Opt is powerful for gaits like walking or running where the sequence is known (Left-Right-Left...), but fails for complex manipulation where the contact sequence is the solution itself.
+\end{intuition}
