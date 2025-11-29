@@ -1,0 +1,153 @@
+% Lectures/lec_22.tex
+\lecture{20}{}{Rocket Soft Landing and Convexification}
+
+\begin{prev}
+	In previous lectures, we covered Stochastic Optimal Control (LQG) and State Estimation (Kalman Filter).
+	Today, we shift gears to a specific, high-impact application of optimal control: \textbf{Rocket Soft Landing}.
+	This problem motivated a major breakthrough in trajectory optimization known as "Lossless Convexification," which allows us to solve non-convex powered descent problems using convex solvers (SOCP) with global optimality guarantees.
+\end{prev}
+
+\subsection{The Rocket Soft-Landing Problem}
+
+The goal is to navigate a rocket from an initial state to a target landing site (usually at \(z=0\)) with zero terminal velocity, while minimizing fuel consumption and respecting physical constraints.
+
+\begin{itemize}
+	\item \textbf{Objective:} Minimize fuel consumption (maximize remaining mass) or landing error.
+	\item \textbf{Constraints:} Thrust limits (min/max), glide slope (pointing angle), safety zones.
+	\item \textbf{Real-world Examples:}
+	      \begin{itemize}
+		      \item NASA Curiosity "Sky Crane" (Mars, 2012).
+		      \item SpaceX Falcon 9 Boostback and Landing.
+		      \item NASA Perseverance with Terrain Relative Navigation (TRN) (Mars, 2021).
+		      \item SpaceX Starship.
+	      \end{itemize}
+\end{itemize}
+
+\subsection{The "Full Stack" Control Architecture}
+
+Landing a rocket requires a hierarchical control approach to handle different timescales and physics.
+
+
+\begin{enumerate}
+	\item \textbf{State Estimation:}
+	      \begin{itemize}
+		      \item \textbf{Earth (SpaceX):} GPS + IMU + Altimeter. Provides accurate position (\(\sim\) meters), velocity, and attitude.
+		      \item \textbf{Mars (NASA):} No GPS. Relies on IMU integration, Radar Altimeter, and Vision (Terrain Relative Navigation) to avoid boulders and achieve \(\sim 30\)m accuracy.
+	      \end{itemize}
+	\item \textbf{High-Level Position Controller (Guidance):}
+	      \begin{itemize}
+		      \item Solves the trajectory optimization problem.
+		      \item Reasons about safety, fuel, and thrust limits.
+		      \item Treats the rocket as a \textbf{point mass}.
+		      \item Runs at low frequency (\(\sim 1\)-\(10\) Hz).
+		      \item Outputs: Desired acceleration vector (which implies thrust magnitude and pointing direction).
+	      \end{itemize}
+	\item \textbf{Low-Level Attitude Controller:}
+	      \begin{itemize}
+		      \item Tracks the desired pointing direction commanded by the guidance layer.
+		      \item Deals with rigid body dynamics, aerodynamics, and disturbances.
+		      \item Handles \textbf{fluid slosh} (often modeled as a pendulum) and \textbf{flexible modes} (bending of the rocket body, handled via notch filters).
+		      \item Runs at high frequency (\(\sim 50\)-\(100\) Hz).
+	      \end{itemize}
+\end{enumerate}
+
+\subsection{Rocket Dynamics}
+
+For the guidance problem, we typically use a 3-DOF point mass model with variable mass.
+
+\begin{align}
+	\dot{\vec{r}}(t) &= \vec{v}(t) \\
+	\dot{\vec{v}}(t) &= \vec{g} + \frac{\vec{T}(t)}{m(t)} \\
+	\dot{m}(t) &= -\alpha \|\vec{T}(t)\|
+\end{align}
+where:
+\begin{itemize}
+	\item \(\vec{r}, \vec{v} \in \mathbb{R}^3\) are position and velocity.
+	\item \(\vec{g} = [0, 0, -g]^\top\) is gravity.
+	\item \(\vec{T}\) is the thrust vector in the world frame.
+	\item \(\alpha\) is the mass depletion rate coefficient (related to specific impulse \(I_{sp}\)).
+\end{itemize}
+
+\begin{note}
+	Fuel mass is significant (can be \(80\%\) of initial mass), so \(\dot{m}\) cannot be ignored.
+	Aerodynamic forces are often ignored in the final landing burn phase (Mars atmosphere is thin, or speeds are low).
+\end{note}
+
+\subsection{Convex Relaxation}
+
+The dynamics above are non-linear due to the \(\frac{\vec{T}}{m}\) term, and the thrust constraints can be non-convex.
+To solve this efficiently (online), we need to cast it as a convex problem.
+
+\begin{intuition}[Convex Relaxation]
+	Consider an optimization problem constrained to the boundary of a set, \(S_1 = \{ \vec{x} \mid \|\vec{x}\| = 1 \}\). This is non-convex (a spherical shell).
+	We can \textbf{relax} the constraint to the convex set \(S_2 = \{ \vec{x} \mid \|\vec{x}\| \le 1 \}\) (the solid ball).
+	\[
+		\min_{\vec{x}} \vec{c}^\top \vec{x} \quad \text{s.t.} \quad \|\vec{x}\| = 1 \implies \min_{\vec{x}} \vec{c}^\top \vec{x} \quad \text{s.t.} \quad \|\vec{x}\| \le 1
+	\]
+	If the cost function "pushes" the solution to the boundary (e.g., minimizing \(\vec{c}^\top \vec{x}\) pushes \(\vec{x}\) as far as possible in the direction \(-\vec{c}\)), the optimal solution to the relaxed problem will satisfy \(\|\vec{x}^*\| = 1\).
+	When this happens, we call the relaxation \textbf{tight} or \textbf{lossless}. We solved the easier convex problem but got the solution to the hard non-convex one.
+\end{intuition}
+
+\subsection{Convexification of Thrust Constraints}
+
+We need to constrain the thrust vector \(\vec{T}\).
+
+\subsubsection{1. Maximum Thrust (Convex)}
+We have an upper limit on engine power:
+\[ \|\vec{T}\| \le T_{\max} \]
+This describes a solid sphere (or ball), which is a \textbf{convex} set (specifically, a Second-Order Cone constraint).
+
+\subsubsection{2. Glide Slope / Pointing Angle (Convex)}
+The rocket engine cannot point too far away from the vertical (to avoid tipping or sensor occlusion).
+Let \(\hat{\vec{n}}\) be the vertical axis. We require the angle \(\theta\) between \(\vec{T}\) and \(\hat{\vec{n}}\) to be small:
+\[ \theta \le \theta_{\max} \implies \cos \theta \ge \cos \theta_{\max} \]
+Using the dot product \(\vec{T} \cdot \hat{\vec{n}} = \|\vec{T}\| \cos \theta\):
+\[ \hat{\vec{n}}^\top \vec{T} \ge \|\vec{T}\| \cos \theta_{\max} \]
+This is a \textbf{Second-Order Cone (SOC)} constraint, which is convex.
+
+\subsubsection{3. Minimum Thrust (Non-Convex)}
+Rocket engines cannot throttle down to zero continuously; they have a minimum stable thrust level (or they flame out).
+\[ \|\vec{T}\| \ge T_{\min} \]
+This removes a small ball from the center of the feasible thrust set.
+The resulting set (a hollow shell between \(T_{\min}\) and \(T_{\max}\)) is \textbf{non-convex}.
+\begin{center}
+	\input{Figures/inequality_constraints.tex} % Reusing a generic constraint figure placeholder or draw a donut
+\end{center}
+This non-convexity prevents the direct use of convex solvers like SOCP.
+
+\subsection{Lossless Convexification}
+
+Acikmese et al. (2007) introduced a "slack variable" trick to convexify the minimum thrust constraint.
+
+\paragraph{Step 1: Change of Variables.}
+Introduce a new scalar decision variable \(\Gamma(t)\) representing the thrust magnitude.
+We impose constraints on \(\vec{T}\) and \(\Gamma\):
+\begin{enumerate}
+	\item \(\|\vec{T}\| = \Gamma\) (Non-convex equality constraint: \(\vec{T}\) must lie \emph{on} the cone defined by \(\Gamma\)).
+	\item \(T_{\min} \le \Gamma \le T_{\max}\) (Linear/Convex box constraint).
+	\item \(\hat{\vec{n}}^\top \vec{T} \ge \Gamma \cos(\theta_{\max})\) (Linear/Convex cone constraint in \(\vec{T}, \Gamma\)).
+\end{enumerate}
+
+\paragraph{Step 2: Relaxation.}
+We relax the non-convex equality (1) to an inequality:
+\[
+	\|\vec{T}\| \le \Gamma
+\]
+This is a convex Second-Order Cone constraint.
+
+\paragraph{Step 3: The Result.}
+The final optimization problem is:
+\begin{align*}
+	\min & \quad \int_{0}^{t_f} \Gamma(t) \, dt \quad (\text{Minimize fuel/thrust magnitude}) \\
+	\text{s.t.} & \quad \text{Dynamics (linearized or discretized)} \\
+	& \quad \|\vec{T}(t)\| \le \Gamma(t) \\
+	& \quad T_{\min} \le \Gamma(t) \le T_{\max} \\
+	& \quad \hat{\vec{n}}^\top \vec{T}(t) \ge \Gamma(t) \cos(\theta_{\max})
+\end{align*}
+\textbf{Theorem (Lossless Convexification):} For the minimum fuel problem, the optimal solution to the relaxed problem \textbf{always} satisfies \(\|\vec{T}^*(t)\| = \Gamma^*(t)\).
+Therefore, the relaxation is tight, and we can solve the non-convex rocket landing problem using efficient convex solvers (like ECOS or OSQP) in real-time.
+
+\begin{note}
+	This works because minimizing \(\int \Gamma \, dt\) encourages \(\Gamma\) to be as small as possible. Since \(\Gamma\) is bounded from below by \(\|\vec{T}\|\), the optimizer squeezes \(\Gamma\) down until it hits the boundary \(\|\vec{T}\|\).
+\end{note}
+\newpage
