@@ -1,0 +1,180 @@
+% Lectures/lec_19.tex
+\lecture{18}{}{Stochastic Optimal Control}
+
+Today, we confront reality.
+\begin{prev}
+	In previous lectures, we have dealt exclusively with \textbf{deterministic} systems. We assumed we knew the system dynamics \(\vec{x}_{k+1} = f(\vec{x}_k, \vec{u}_k)\) perfectly and, more importantly, that we had perfect access to the full state \(\vec{x}_k\).
+\end{prev}
+
+\begin{itemize}
+	\item \textbf{Process Noise:} Dynamics are never perfect. There are always unmodeled disturbances (wind gusts, friction variations, thermal noise).
+	\item \textbf{Measurement Noise:} We rarely measure the full state directly. We have sensors that provide noisy, partial observations \(\vec{y}_k = h(\vec{x}_k) + \text{noise}\).
+\end{itemize}
+This moves us from Deterministic Control to \textbf{Stochastic Control}.
+
+\subsection{The Stochastic Optimal Control Problem}
+
+We aim to minimize the \textbf{expected} cost:
+\begin{align*}
+	\min_{\vec{u}} & \quad J = \mathbb{E}\left[ \sum_{k=0}^{N-1} l(\vec{x}_k, \vec{u}_k) + l_N(\vec{x}_N) \right] \\
+	\text{subject to} & \quad \vec{x}_{k+1} = f(\vec{x}_k, \vec{u}_k, \vec{w}_k) \\
+	& \quad \vec{y}_k = h(\vec{x}_k, \vec{v}_k)
+\end{align*}
+where \(\vec{w}_k\) is process noise and \(\vec{v}_k\) is measurement noise.
+\begin{intuition}
+	In the deterministic case, the state \(\vec{x}_k\) was a specific point in \(\mathbb{R}^n\).
+	In the stochastic case, the "state" of our knowledge is no longer a point, but a \textbf{probability density function (PDF)} of the state conditioned on all past measurements: \(p(\vec{x}_k | \vec{y}_{0:k}, \vec{u}_{0:k-1})\).
+
+	Solving the general stochastic optimal control problem is extremely hard because the "state" for Dynamic Programming becomes this PDF (an infinite-dimensional object). This leads to \textbf{Dual Control}, where actions must balance \emph{exploitation} (minimizing cost) and \emph{exploration} (reducing uncertainty).
+\end{intuition}
+\begin{note}
+  Often times, the dynamics inherigthly is stochastic, brownian motion, wind gusts, etc. Other times in practice the \(w_k\) term also accounts for model uncertanity, this is quite skectchy, but it is often done in practice. But there is a clear distinction between deterministic and badly modeled systems vs truly stochastic systems.
+\end{note}
+
+However, there is a special case where the problem separates beautifully and can be solved in closed form: \textbf{LQG}.
+
+\subsection{Linear Quadratic Gaussian (LQG)}
+
+The LQG problem combines three specific assumptions:
+\begin{enumerate}
+	\item \textbf{Linear} Dynamics and Measurements.
+	\item \textbf{Quadratic} Costs.
+	\item \textbf{Gaussian} Noise.
+\end{enumerate}
+
+\begin{definition}[LQG Problem Setup]
+	\textbf{Dynamics:}
+	\begin{equation}
+		\vec{x}_{k+1} = \mat{A}\vec{x}_k + \mat{B}\vec{u}_k + \vec{w}_k, \quad \vec{w}_k \sim \mathcal{N}(\vec{0}, \mat{W})
+	\end{equation}
+	\textbf{Measurements:}
+	\begin{equation}
+		\vec{y}_k = \mat{C}\vec{x}_k + \vec{v}_k, \quad \vec{v}_k \sim \mathcal{N}(\vec{0}, \mat{V})
+	\end{equation}
+	\textbf{Cost Function:}
+	\begin{equation}
+		J = \mathbb{E}\left[ \frac{1}{2}\vec{x}_N^\top \mat{Q}_N \vec{x}_N + \sum_{k=0}^{N-1} \frac{1}{2}\left( \vec{x}_k^\top \mat{Q} \vec{x}_k + \vec{u}_k^\top \mat{R} \vec{u}_k \right) \right]
+	\end{equation}
+	We assume the noise terms \(\vec{w}_k\) and \(\vec{v}_k\) are uncorrelated with each other and with the initial state.
+\end{definition}
+
+\subsection{Dynamic Programming for LQG}
+
+We can solve this using Dynamic Programming. We define the Value Function as the minimum expected cost-to-go.
+
+\paragraph{Base Case (\(k=N\)).}
+\[
+V_N(\vec{x}_N) = \mathbb{E}[ \frac{1}{2}\vec{x}_N^\top \mat{Q}_N \vec{x}_N ] = \frac{1}{2}\mathbb{E}[\vec{x}_N^\top \mat{P}_N \vec{x}_N] \quad (\text{with } \mat{P}_N = \mat{Q}_N)
+\]
+
+\paragraph{Recursive Step.}
+Let's analyze the value function at the previous time step, \(V_{N-1}(\vec{x}_{N-1})\).
+\[
+V_{N-1}(\vec{x}_{N-1}) = \min_{\vec{u}_{N-1}} \mathbb{E} \left[ \frac{1}{2}\vec{x}_{N-1}^\top \mat{Q} \vec{x}_{N-1} + \frac{1}{2}\vec{u}_{N-1}^\top \mat{R} \vec{u}_{N-1} + V_N(\vec{x}_{N}) \right]
+\]
+Substitute the dynamics \(\vec{x}_{N} = \mat{A}\vec{x}_{N-1} + \mat{B}\vec{u}_{N-1} + \vec{w}_{N-1}\) into the quadratic cost-to-go \(V_N\):
+\begin{align*}
+	V_N(\vec{x}_N) &= \frac{1}{2} (\mat{A}\vec{x}_{N-1} + \mat{B}\vec{u}_{N-1} + \vec{w}_{N-1})^\top \mat{P}_N (\mat{A}\vec{x}_{N-1} + \mat{B}\vec{u}_{N-1} + \vec{w}_{N-1})
+\end{align*}
+Expanding this quadratic term, we group the deterministic parts (terms involving \(\vec{x}_{N-1}\) and \(\vec{u}_{N-1}\)) separate from the stochastic parts (terms involving \(\vec{w}_{N-1}\)):
+\begin{align*}
+	2 V_N(\vec{x}_N) &= \underbrace{(\mat{A}\vec{x}_{N-1} + \mat{B}\vec{u}_{N-1})^\top \mat{P}_N (\mat{A}\vec{x}_{N-1} + \mat{B}\vec{u}_{N-1})}_{\text{Deterministic}} \\
+	&\quad + \underbrace{2(\mat{A}\vec{x}_{N-1} + \mat{B}\vec{u}_{N-1})^\top \mat{P}_N \vec{w}_{N-1}}_{\text{Cross-Correlation}} \\
+	&\quad + \underbrace{\vec{w}_{N-1}^\top \mat{P}_N \vec{w}_{N-1}}_{\text{Stochastic}}
+\end{align*}
+Now, we take the expectation \(\mathbb{E}[\cdot]\) with respect to the noise \(\vec{w}_{N-1}\).
+\begin{itemize}
+	\item \textbf{Deterministic Term:} Since \(\vec{x}_{N-1}\) is the current state (known) and \(\vec{u}_{N-1}\) is the control choice (fixed for the minimization), they act as constants inside the expectation. This term remains unchanged.
+	\item \textbf{Cross-Correlation Term:} This term vanishes.
+	      \[
+		      \mathbb{E}\left[ 2(\mat{A}\vec{x}_{N-1} + \mat{B}\vec{u}_{N-1})^\top \mat{P}_N \vec{w}_{N-1} \right] = 2(\mat{A}\vec{x}_{N-1} + \mat{B}\vec{u}_{N-1})^\top \mat{P}_N \underbrace{\mathbb{E}[\vec{w}_{N-1}]}_{\vec{0}} = 0
+	      \]
+	      \textbf{Why?} The noise \(\vec{w}_{N-1}\) is drawn \emph{independently} at time \(N-1\). It is uncorrelated with the current state \(\vec{x}_{N-1}\) (which depends only on past noise \(\vec{w}_{0:N-2}\)) and the control \(\vec{u}_{N-1}\). Since \(\vec{w}_{N-1}\) is zero-mean Gaussian, \(\mathbb{E}[\vec{w}_{N-1}] = \vec{0}\).
+	\item \textbf{Noise Term:} This becomes a constant bias.
+	      \[
+		      \mathbb{E}\left[ \vec{w}_{N-1}^\top \mat{P}_N \vec{w}_{N-1} \right] = \tr(\mat{P}_N \mathbb{E}[\vec{w}_{N-1}\vec{w}_{N-1}^\top]) = \tr(\mat{P}_N \mat{W})
+	      \]
+\end{itemize}
+
+The minimization problem for \(V_{N-1}\) thus simplifies to:
+\begin{align*}
+	\min_{\vec{u}_{N-1}} \; & \Bigg(
+	\underbrace{\frac{1}{2}\vec{x}_{N-1}^\top \mat{Q} \vec{x}_{N-1}
+	+ \frac{1}{2}\vec{u}_{N-1}^\top \mat{R} \vec{u}_{N-1} + \frac{1}{2}(\mat{A}\vec{x}_{N-1} + \mat{B}\vec{u}_{N-1})^\top \mat{P}_N (\mat{A}\vec{x}_{N-1} + \mat{B}\vec{u}_{N-1})}_{\text{Standard Deterministic LQR Cost}} \\[0.5em]
+	&\quad + \underbrace{\frac{1}{2}\tr(\mat{P}_N \mat{W})}_{\text{Constant noise cost}} \Bigg)
+\end{align*}
+
+\begin{theorem}[Certainty Equivalence]
+	The noise terms are constants (independent of \(\vec{u}\)) or vanish in expectation. Therefore, the minimization with respect to \(\vec{u}\) yields the \textbf{exact same optimal control law} as the deterministic case.
+	\[
+		\vec{u}_k^\star = -\mat{K}_k \hat{\vec{x}}_k
+	\]
+	where \(\mat{K}_k\) is the standard LQR gain and \(\hat{\vec{x}}_k = \mathbb{E}[\vec{x}_k | \vec{y}_{0:k}]\) is the best estimate of the state.
+\end{theorem}
+
+\begin{note}
+	The noise \textbf{does} affect the cost. The optimal cost is the deterministic LQR cost \emph{plus} a term that depends on the covariance of the noise. You cannot control the noise, you can only endure it.
+\end{note}
+
+\subsection{The Separation Principle}
+
+The result above implies a powerful architectural principle for linear systems.
+
+\begin{definition}[Separation Principle]
+	For an LQG problem, the optimal controller can be designed by:
+	\begin{enumerate}
+		\item \textbf{Estimation:} Designing an optimal state estimator (Kalman Filter) that ignores the control objective.
+		\item \textbf{Control:} Designing an optimal state feedback controller (LQR) that ignores the noise.
+		\item \textbf{Combination:} Hooking them together: \(\vec{u}_k = - \mat{K}_{\text{LQR}} \hat{\vec{x}}_{\text{KF}}\).
+	\end{enumerate}
+	This combination is globally optimal for the stochastic problem.
+\end{definition}
+
+\begin{intuition}
+	This does \textbf{not} hold for general nonlinear systems. In nonlinear systems, the quality of your estimation often depends on your actions (e.g., moving a robot to get a better view). LQG says "actions do not affect estimation quality" (the covariance \(\mat{P}\) in a Kalman filter depends on \(\mat{A}\) and \(\mat{C}\), not \(\vec{x}\) or \(\vec{u}\)).
+\end{intuition}
+
+\subsection{Optimal State Estimation}
+
+The "certainty equivalence" result requires us to use the conditional mean \(\hat{\vec{x}} = \mathbb{E}[\vec{x}]\). How do we find it?
+We need an estimator that optimizes a statistical criterion.
+\begin{itemize}
+	\item \textbf{Maximum A Posteriori (MAP):} Find the mode of the posterior PDF.
+	      \[ \hat{\vec{x}} = \argmax_{\vec{x}} p(\vec{x} | \vec{y}) \]
+	\item \textbf{Minimum Mean Squared Error (MMSE):} Find the mean of the posterior PDF.
+	      \[ \hat{\vec{x}} = \argmin_{\hat{\vec{x}}} \mathbb{E}[\|\vec{x} - \hat{\vec{x}}\|^2] \]
+\end{itemize}
+For a Gaussian distribution, the \textbf{mean and the mode are identical}. The Kalman Filter provides this optimal estimate.
+
+\subsection{Code Analysis: LQG}
+
+The class explored these concepts via computational notebooks. Since we plan to implement these in Python later, here is a summary of the expected results and behavior.
+
+\begin{code}[Analysis of LQG Concepts]
+	A standard LQG notebook typically demonstrates three key scenarios:
+
+	\textbf{1. LQR with Perfect Information (Baseline)}
+	\begin{itemize}
+		\item Simulation of \(\vec{x}_{k+1} = \mat{A}\vec{x}_k + \mat{B}\vec{u}_k\) (often without noise first).
+		\item Controller: \(\vec{u} = -\mat{K}\vec{x}\).
+		\item Result: Exponential convergence to zero. Cost is minimal.
+	\end{itemize}
+
+	\textbf{2. LQR with Noisy Measurements (Naive)}
+	\begin{itemize}
+		\item System has process noise \(\vec{w}\) and measurement noise \(\vec{v}\).
+		\item A naive controller might try to use the raw measurements directly: \(\vec{u} = -\mat{K}\vec{y}\).
+		\item \textbf{Result:} This fails catastrophically or performs very poorly. \(\vec{y}\) contains high-frequency noise \(\vec{v}\); feeding this back amplifies it (\(\vec{u} = -\mat{K}\mat{C}\vec{x} - \mat{K}\vec{v}\)), causing actuators to "chatter" and injecting more noise into the system.
+	\end{itemize}
+
+	\textbf{3. LQG (LQR + Kalman Filter)}
+	\begin{itemize}
+		\item \textbf{Estimator:} A Kalman Filter processes \(\vec{u}\) and \(\vec{y}\) to produce a state estimate \(\hat{\vec{x}}\) and a covariance \(\mat{\Sigma}\). The estimate \(\hat{\vec{x}}\) is smooth compared to \(\vec{y}\).
+		\item \textbf{Controller:} The optimal control \(\vec{u} = -\mat{K}\hat{\vec{x}}\) is applied.
+		\item \textbf{Result:}
+		      \begin{itemize}
+			      \item \textbf{Separation:} The system stabilizes. The performance is worse than Case 1 (due to inevitable noise) but far superior to Case 2.
+			      \item \textbf{Cost:} The cost stabilizes to a non-zero steady-state value determined by the trace of the process and measurement noise covariances.
+		      \end{itemize}
+	\end{itemize}
+\end{code}
