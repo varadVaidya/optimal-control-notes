@@ -110,9 +110,6 @@ Rocket engines cannot throttle down to zero continuously; they have a minimum st
 \[ \|\vec{T}\| \ge T_{\min} \]
 This removes a small ball from the center of the feasible thrust set.
 The resulting set (a hollow shell between \(T_{\min}\) and \(T_{\max}\)) is \textbf{non-convex}.
-\begin{center}
-	\input{Figures/inequality_constraints.tex} % Reusing a generic constraint figure placeholder or draw a donut
-\end{center}
 This non-convexity prevents the direct use of convex solvers like SOCP.
 
 \subsection{Lossless Convexification}
@@ -144,8 +141,12 @@ The final optimization problem is:
 	& \quad T_{\min} \le \Gamma(t) \le T_{\max} \\
 	& \quad \hat{\vec{n}}^\top \vec{T}(t) \ge \Gamma(t) \cos(\theta_{\max})
 \end{align*}
-\textbf{Theorem (Lossless Convexification):} For the minimum fuel problem, the optimal solution to the relaxed problem \textbf{always} satisfies \(\|\vec{T}^*(t)\| = \Gamma^*(t)\).
-Therefore, the relaxation is tight, and we can solve the non-convex rocket landing problem using efficient convex solvers (like ECOS or OSQP) in real-time.
+
+
+\begin{theorem}
+  \textbf{Theorem (Lossless Convexification):} For the minimum fuel problem, the optimal solution to the relaxed problem \textbf{always} satisfies \(\|\vec{T}^*(t)\| = \Gamma^*(t)\).
+  Therefore, the relaxation is tight, and we can solve the non-convex rocket landing problem using efficient convex solvers (like ECOS or OSQP) in real-time.
+\end{theorem}
 
 \begin{note}
 	This works because minimizing \(\int \Gamma \, dt\) encourages \(\Gamma\) to be as small as possible. Since \(\Gamma\) is bounded from below by \(\|\vec{T}\|\), the optimizer squeezes \(\Gamma\) down until it hits the boundary \(\|\vec{T}\|\).
