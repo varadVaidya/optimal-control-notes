@@ -1,0 +1,197 @@
+\lecture{17}{}{Iterative Learning Control (ILC)}
+
+We address a fundamental reality in robotics: \textbf{models are never perfect}.
+Even with the best physics engines and parameter identification, there will always be a "sim-to-real" gap due to unmodeled friction, aerodynamic effects, flexibility, or sensor noise.
+We will explore strategies to handle these errors, culminating in \textbf{Iterative Learning Control (ILC)}, a powerful technique for improving performance over repeated executions of a task.
+
+\subsection{Strategies for Model Mismatch}
+
+When our nominal model \(f_{\text{nom}}(\vec{x}, \vec{u})\) differs from the true system dynamics \(f_{\text{true}}(\vec{x}, \vec{u})\), the optimal policy computed for the model will be suboptimal or even unstable on the real system.
+Feedback control (like LQR or MPC) provides some robustness, but it reacts to errors rather than anticipating them.
+If we need high performance (e.g., tracking a trajectory very aggressively), feedback gains alone may not be sufficient.
+
+There are several standard approaches to close this gap:
+
+\begin{enumerate}
+    \item \textbf{Parameter Estimation (System ID):}
+    Assumes a "gray-box" model structure (e.g., a rigid body chain) and fits physical parameters (masses, lengths, friction coefficients) from data.
+    \begin{itemize}
+        \item \textbf{Pros:} Interpretable, generalizes well to new tasks.
+        \item \textbf{Cons:} Limited by the assumed model structure. If the physics model doesn't include a specific phenomenon (e.g., stiction), fitting parameters won't fix it.
+    \end{itemize}
+
+    \item \textbf{Learn a Model (Black-box / Residual):}
+    Fits a generic function approximator (like a Neural Network or Gaussian Process) to the dynamics \( \vec{x}_{k+1} = f(\vec{x}_k, \vec{u}_k) \) or the error residual \(\vec{e}_{k+1} = \vec{x}_{k+1}^{\text{true}} - f_{\text{nom}}(\vec{x}_k, \vec{u}_k)\).
+    \begin{itemize}
+        \item \textbf{Pros:} Flexible, can capture complex nonlinear effects.
+        \item \textbf{Cons:} Data-hungry, often fails to generalize outside the training distribution, "black-box" nature makes stability analysis hard.
+    \end{itemize}
+
+    \item \textbf{Learn a Policy (Model-Free RL):}
+    Optimizes the policy \(\pi(\vec{x})\) directly based on rewards, ignoring the dynamics model entirely.
+    \begin{itemize}
+        \item \textbf{Pros:} Requires very few assumptions.
+        \item \textbf{Cons:} Extremely sample inefficient (requires millions of trials), typically does not generalize to new tasks.
+    \end{itemize}
+
+    \item \textbf{Transfer / Iterative Learning Control (ILC):}
+    Assumes we have a decent nominal model and a specific reference trajectory we want to track.
+    We use data from the real system to iteratively refine the \textbf{feedforward control} for that specific task.
+    \begin{itemize}
+        \item \textbf{Pros:} Very sample efficient (often converges in <10 iterations), high precision.
+        \item \textbf{Cons:} Task-specific (doesn't generalize to new trajectories).
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Iterative Learning Control (ILC)}
+
+ILC is based on the idea that if we perform the same task repeatedly, the errors we see are likely consistent (systematic).
+Instead of just reacting to them with feedback, we should "learn" from the previous iteration's error to adjust our plan for the next iteration.
+
+We can view ILC as a specialized form of policy optimization.
+Consider a tracking controller of the form:
+\[
+    \vec{u}_k(\vec{x}) = \bar{\vec{u}}_k - \mat{K}_k (\vec{x} - \bar{\vec{x}}_k)
+\]
+Standard LQR/MPC keeps the feedforward term \(\bar{\vec{u}}_k\) constant (from the nominal plan).
+ILC updates \(\bar{\vec{u}}_k\) based on the error observed in the previous rollout.
+
+
+\subsubsection{Derivation via Sequential Quadratic Programming (SQP)}
+
+We can rigorously derive the ILC update by viewing the trajectory optimization problem as a constrained nonlinear program (NLP):
+\begin{align*}
+    \min_{\vec{z}} & \quad J(\vec{z}) = \sum_{k=1}^{N-1} \frac{1}{2}\|\vec{x}_k - \bar{\vec{x}}_k\|_{\mat{Q}}^2 + \frac{1}{2}\|\vec{u}_k - \bar{\vec{u}}_k\|_{\mat{R}}^2 + \frac{1}{2}\|\vec{x}_N - \bar{\vec{x}}_N\|_{\mat{Q}_N}^2 \\
+    \text{subject to} & \quad \vec{c}(\vec{z}) = \vec{0} \quad (\text{Dynamics: } \vec{x}_{k+1} - f(\vec{x}_k, \vec{u}_k) = \vec{0})
+\end{align*}
+where \(\vec{z} = [\vec{x}_1, \vec{u}_1, \dots, \vec{x}_N]^\top\) is the full decision vector.
+
+To solve this using SQP (which is equivalent to Newton's method on the KKT conditions), we look for a step \(\delta \vec{z}\) by solving the following linear system:
+\begin{equation}
+    \begin{bmatrix}
+        \mat{H} & \mat{C}^\top \\
+        \mat{C} & \mat{0}
+    \end{bmatrix}
+    \begin{bmatrix}
+        \delta \vec{z} \\
+        \delta \vec{\lambda}
+    \end{bmatrix}
+    =
+    \begin{bmatrix}
+        -\nabla J(\vec{z}) \\
+        -\vec{c}(\vec{z})
+    \end{bmatrix}
+    \label{eq:ilc_kkt}
+\end{equation}
+where:
+\begin{itemize}
+    \item \(\mat{H} \approx \nabla^2_{zz} \mathcal{L}\) is the Hessian of the Lagrangian (often approximated by the Gauss-Newton Hessian of the cost \(J\)).
+    \item \(\mat{C} = \pdv{\vec{c}}{\vec{z}}\) is the Jacobian of the constraints (dynamics).
+    \item \(\nabla J(\vec{z})\) is the gradient of the cost.
+    \item \(\vec{c}(\vec{z})\) is the constraint violation residual.
+\end{itemize}
+
+\paragraph{The ILC Strategy:}
+In ILC, we exploit the difference between the \textbf{nominal model} and the \textbf{real system} to populate the terms in \autoref{eq:ilc_kkt}:
+\begin{enumerate}
+    \item \textbf{RHS (Gradient/Residual):} We perform a rollout on the \emph{real} system.
+    \begin{itemize}
+        \item Since the rollout happens on the physical system, it is dynamically feasible with respect to the true dynamics, so \(\vec{c}_{\text{true}}(\vec{z}) = \vec{0}\).
+        \item We compute the gradient \(\nabla J(\vec{z})\) using the trajectory data \((\vec{X}, \vec{U})\) collected from the real system. This captures the true tracking error.
+    \end{itemize}
+    \item \textbf{LHS (Curvature/Jacobian):} We cannot compute the true system Hessians \(\mat{H}_{\text{true}}\) or Jacobians \(\mat{C}_{\text{true}}\).
+    \begin{itemize}
+        \item Instead, we approximate them using the \emph{nominal model}:
+        \[ \mat{H} \approx \mat{H}_{\text{nom}}, \quad \mat{C} \approx \mat{C}_{\text{nom}} \]
+        \item Since our nominal model is a reasonable approximation, and assuming the current trajectory is close to the reference, these matrices (which can be computed offline) are sufficient to determine a good search direction.
+    \end{itemize}
+\end{enumerate}
+
+Solving this KKT system for \(\delta \vec{z}\) (specifically the control part \(\delta \vec{u}\)) yields the feedforward update \(\vec{u}_{\text{new}} = \vec{u}_{\text{old}} + \delta \vec{u}\).
+This explains why ILC works: it uses the \textbf{true gradient} to drive the optimization, conditioned by the \textbf{model's curvature}.
+In the context of robotics with model mismatch:
+\begin{itemize}
+    \item \textbf{The Gradient \(\nabla J\):} Depends on the \emph{true} system behavior.
+    If we run a rollout on the real robot, we can compute the cost and its sensitivity to the controls around the actual trajectory.
+    This gives us the "true" gradient direction (or a very good approximation of it).
+    \item \textbf{The Hessian \(\nabla^2 J\):} Computing the true Hessian on a physical system is impossible.
+    However, we have a \emph{nominal model}.
+    We can approximate the curvature of the problem using our model: \(\mat{H}_{\text{nom}} \approx \nabla^2 J_{\text{true}}\).
+\end{itemize}
+
+Convergence theory tells us that as long as the nominal model is "close enough" (specifically, if \(\|\mat{I} - \mat{H}_{\text{nom}}^{-1}\mat{H}_{\text{true}}\| < 1\)), this iteration will converge to the local optimum of the \emph{true} system.
+
+\subsection{ILC as a Quadratic Program (QP)}
+
+We can implement this update step by solving a Linear-Quadratic problem (similar to the subproblem in SQP or iLQR), but mixing real data with model derivatives.
+
+\begin{algorithm}[H]
+    \caption{Model-Based ILC Algorithm}
+    \DontPrintSemicolon
+    \KwIn{Nominal model \(f_{\text{nom}}\), Initial guess \(\vec{U}^{(0)}\), Reference \(\vec{X}^{\text{ref}}\)}
+    \For{iteration \(i = 0, 1, \dots\)}{
+        \Comment{1. Rollout on Real System}
+        Run \(\vec{U}^{(i)}\) on the robot (possibly with feedback stabilization).\;
+        Record actual trajectory \(\vec{X}^{(i)}\).\;
+        Compute tracking error \(\vec{e}_k = \vec{x}_k^{(i)} - \vec{x}_k^{\text{ref}}\).\;
+
+        \Comment{2. Linearize Nominal Model}
+        Compute \(\mat{A}_k, \mat{B}_k\) from \(f_{\text{nom}}\) around \(\vec{x}_k^{(i)}, \vec{u}_k^{(i)}\).\;
+
+        \Comment{3. Formulate Optimization Step}
+        We want to find corrections \(\delta\vec{x}, \delta\vec{u}\) that reduce the error.
+        We minimize the approximate cost of the \emph{next} iteration:
+        \[
+            \min_{\delta\vec{X}, \delta\vec{U}} \sum \frac{1}{2} \| (\vec{x}_k^{(i)} + \delta\vec{x}_k) - \vec{x}_k^{\text{ref}} \|^2_{\mat{Q}} + \frac{1}{2} \| \delta\vec{u}_k \|^2_{\mat{R}}
+        \]
+        Expanding the quadratic term \(\| \vec{x} + \delta\vec{x} - \vec{x}^{\text{ref}} \|^2_{\mat{Q}}\) gives a linear term \(\delta\vec{x}^\top \mat{Q} (\vec{x}^{(i)} - \vec{x}^{\text{ref}})\).
+        The QP becomes:
+        \begin{align*}
+            \min_{\delta\vec{X}, \delta\vec{U}} & \quad \sum_{k=1}^{N-1} \left( \frac{1}{2}\delta\vec{x}_k^\top \mat{Q} \delta\vec{x}_k + \vec{q}_k^\top \delta\vec{x}_k + \frac{1}{2}\delta\vec{u}_k^\top \mat{R} \delta\vec{u}_k \right) \\
+            \text{subject to} & \quad \delta\vec{x}_{k+1} = \mat{A}_k \delta\vec{x}_k + \mat{B}_k \delta\vec{u}_k \\
+            & \quad \vec{u}_{\min} \le \vec{u}_k^{(i)} + \delta\vec{u}_k \le \vec{u}_{\max}
+        \end{align*}
+        where \(\vec{q}_k = \mat{Q}(\vec{x}_k^{(i)} - \vec{x}_k^{\text{ref}})\) is the gradient driving the update based on real errors.\;
+
+        \Comment{4. Update}
+        Solve QP for \(\delta\vec{U}\).\;
+        \(\vec{U}^{(i+1)} \leftarrow \vec{U}^{(i)} + \delta\vec{U}\).\;
+    }
+\end{algorithm}
+
+\begin{intuition}
+    The QP asks: "According to my \emph{nominal} model (\(\mat{A}, \mat{B}\)), how should I change my inputs \(\delta\vec{u}\) to eliminate the tracking error \(\vec{x}^{(i)} - \vec{x}^{\text{ref}}\) that I observed on the real system?"
+\end{intuition}
+
+\subsection{Code Analysis: \texttt{cartpole-ilc.ipynb}}
+
+The notebook simulates this process on a Cartpole system with parameter mismatch.
+
+\begin{code}[Julia Notebook: ILC for Cartpole Swing-up]
+    \textbf{Problem Setup:}
+    \begin{itemize}
+        \item \textbf{Nominal Model:} Standard Cartpole parameters.
+        \item \textbf{True Model:} Perturbed masses (\(m_c + 0.02\), \(m_p - 0.01\)), length (\(l + 0.005\)), and crucially, \textbf{nonlinear friction} (tanh damping) which is completely absent in the nominal model.
+    \end{itemize}
+
+    \textbf{Step 1: Nominal Plan (ALTRO)}
+    \begin{itemize}
+        \item Solves the swing-up problem using \texttt{Altro.jl} on the nominal model.
+        \item Produces a reference trajectory \(\vec{X}^{\text{ref}}, \vec{U}^{\text{nom}}\).
+    \end{itemize}
+
+    \textbf{Step 2: Baseline Performance}
+    \begin{itemize}
+        \item Runs the nominal feedforward \(\vec{U}^{\text{nom}}\) (plus LQR feedback) on the \textbf{True Model}.
+        \item Result: The cartpole fails to reach the top or drift significantly due to the unmodeled friction and mass errors.
+    \end{itemize}
+
+    \textbf{Step 3: ILC Update}
+    \begin{itemize}
+        \item \textbf{Linearization:} Computes \(\mat{A}_k, \mat{B}_k\) along the \emph{nominal} trajectory using the \emph{nominal} model.
+        \item \textbf{QP Formulation:} Uses \texttt{OSQP} to solve for \(\delta\vec{u}\).
+        \item \textbf{Cost Vector \(\vec{q}\):} The linear cost term in the QP is set to \texttt{Qilc * (xtraj - Xopt)}. This vector encodes the error between the rollout on the \textbf{true} physics (\texttt{xtraj}) and the \textbf{desired} plan (\texttt{Xopt}).
+        \item \textbf{Constraints:} Enforces nominal linearized dynamics and torque limits.
+        \item \textbf{Result:} The computed \(\delta\vec{u}\) effectively learns an inverse dynamics term to cancel out the unmodeled friction and gravity errors. After the update, the trajectory tracking on the true system improves dramatically.
+    \end{itemize}
+\end{code}
