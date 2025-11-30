@@ -1,0 +1,140 @@
+% Lectures/lec_24.tex
+\lecture{21}{}{Data-Driven Control}
+
+\begin{prev}
+	In previous lectures, we have focused on \textbf{Model-Based Control}. Whether it was LQR, MPC, or Trajectory Optimization, we always started by assuming (or identifying) a mathematical model of the dynamics:
+	\[ \vec{x}_{k+1} = f(\vec{x}_k, \vec{u}_k) \quad \text{or} \quad \vec{x}_{k+1} = \mat{A}\vec{x}_k + \mat{B}\vec{u}_k \]
+	We then designed controllers based on this model.
+\end{prev}
+
+Today, we ask: \textbf{What if we don't have a model?}
+Can we go directly from data to control, skipping the explicit modeling step?
+This leads us to the field of \textbf{Data-Driven Control} or "Behavioral" Systems Theory.
+
+\subsection{The Traditional vs. Data-Driven Approach}
+
+\subsubsection{Traditional Approach (System Identification)}
+Given input-output data pairs \(\{(\vec{u}_k, \vec{y}_k)\}\), the standard approach is:
+\begin{enumerate}
+	\item \textbf{System ID:} Fit matrices \(\mat{A}, \mat{B}, \mat{C}, \mat{D}\) to the data to minimize prediction error.
+	\item \textbf{Control Design:} Use these matrices to design a controller (e.g., LQR, MPC).
+\end{enumerate}
+However, the state \(\vec{x}\) is an artificial construct. For any invertible matrix \(\mat{T}\), the state \(\tilde{\vec{x}} = \mat{T}\vec{x}\) describes the same input-output behavior with different matrices \(\tilde{\mat{A}} = \mat{T}\mat{A}\mat{T}^{-1}\), etc.
+Since the state definition is arbitrary, can we skip it entirely and work directly with the input-output trajectories?
+
+\subsection{A Trajectory Perspective on Linear Systems}
+
+Recall the principle of \textbf{Superposition} for linear systems.
+\[ f(a\vec{x}_1 + b\vec{x}_2) = a f(\vec{x}_1) + b f(\vec{x}_2) \]
+This linearity holds not just for single vectors, but for entire \textbf{trajectories}.
+If \(\tau_1 = (\vec{U}_1, \vec{Y}_1)\) is a valid trajectory of a linear system, and \(\tau_2 = (\vec{U}_2, \vec{Y}_2)\) is another, then any linear combination \(\tau_{new} = \alpha \tau_1 + \beta \tau_2\) is also a valid trajectory.
+
+\begin{theorem}[Willems' Fundamental Lemma (Informal)]
+	Given a "sufficiently rich" (persistently exciting) historical trajectory of a linear time-invariant (LTI) system, \emph{any} possible trajectory of that system (of a fixed length) can be represented as a linear combination of pieces of the historical trajectory.
+\end{theorem}
+
+\subsubsection{The Data Matrix (Hankel Matrix)}
+Let's collect a large set of input-output data and arrange it into a \textbf{Data Matrix} (often a Hankel matrix structure is used, but here we visualize it as stacking independent trajectories).
+Let a trajectory segment of length \(T\) be denoted by \(\vec{z} = [\vec{u}_0, \vec{y}_0, \dots, \vec{u}_{T-1}, \vec{y}_{T-1}]^\top\).
+We construct a matrix \(\mat{H}\) where each column is a valid observed trajectory:
+\[
+	\mat{H} = \begin{bmatrix}
+		| & | & & | \\
+		\vec{z}^{(1)} & \vec{z}^{(2)} & \dots & \vec{z}^{(N)} \\
+		| & | & & |
+	\end{bmatrix}
+\]
+The subspace spanned by the columns of \(\mat{H}\) approximates the space of \emph{all possible behaviors} of the system.
+Any new valid trajectory \(\vec{z}_{new}\) can be written as:
+\begin{equation}
+	\vec{z}_{new} = \mat{H} \vec{w}
+\end{equation}
+for some weight vector \(\vec{w}\). We can use this \(\mat{H}\) directly as our "model".
+
+\subsection{Data-Driven Simulation and Prediction}
+
+\begin{code}[Julia Notebook: \texttt{oscillator.ipynb} (Data-Driven Simulation)]
+	The notebook demonstrates this concept using a simple harmonic oscillator.
+	\begin{itemize}
+		\item \textbf{Data Generation:} It generates \(N=10\) random trajectories of the oscillator and stacks them into a matrix \(\mat{H}\).
+		\item \textbf{Prediction Task:} Given a new initial condition \(\vec{x}_{init}\), we want to predict the future trajectory.
+		\item \textbf{Method:} We find a linear combination of the columns of \(\mat{H}\) that matches the initial condition:
+		      \[ \vec{w}^\star = \argmin_{\vec{w}} \| \mat{E}\mat{H}\vec{w} - \vec{x}_{init} \|_2^2 \]
+		      where \(\mat{E}\) is a selection matrix that picks out the first state.
+		\item \textbf{Result:} The predicted trajectory \(\vec{z} = \mat{H}\vec{w}^\star\) matches the true rollout \(\vec{x}_{k+1} = \mat{A}\vec{x}_k\) perfectly (up to numerical precision).
+		\item \textbf{De-noising:} The notebook also shows that if we generate a random, noisy vector and project it onto the range of \(\mat{H}\), we recover a dynamically feasible (smooth) trajectory.
+	\end{itemize}
+\end{code}
+
+\subsection{Behavior Cloning}
+
+We can apply this to control. Suppose we have data collected from a system controlled by an "expert" (e.g., an optimal LQR controller).
+\[
+	\mat{H}_{expert} = \begin{bmatrix}
+		\vec{u}_{0}^{(1)} & \vec{u}_{0}^{(2)} & \dots \\
+		\vec{y}_{0}^{(1)} & \vec{y}_{0}^{(2)} & \dots \\
+		\vdots & \vdots &
+	\end{bmatrix}
+\]
+Given a short history of measurements \(\vec{y}_{past}\), we want to predict what the expert would do next (\(\vec{u}_{next}\)).
+\begin{enumerate}
+	\item Find \(\vec{w}\) that fits the past observations:
+	      \[ \min_{\vec{w}} \| \mat{Y}_{past} \mat{H} \vec{w} - \vec{y}_{past} \|_2^2 \]
+	\item Compute the next control input from that linear combination:
+	      \[ \vec{u}_{next} = \mat{U}_{next} \mat{H} \vec{w} \]
+\end{enumerate}
+
+\begin{code}[Julia Notebook: \texttt{quadrotor-clone.ipynb}]
+	The notebook applies this to a planar quadrotor.
+	\begin{itemize}
+		\item \textbf{Expert:} An LQR controller is designed for the linearized dynamics.
+		\item \textbf{Data:} The LQR controller is run 20 times from random initial conditions to generate \(\mat{H}\).
+		\item \textbf{Cloning:} A \texttt{cloned\_controller} function implements the projection logic described above.
+		\item \textbf{Result:} The cloned controller reproduces the stabilizing behavior of the LQR controller perfectly, \textbf{without ever knowing the matrices \(\mat{A}, \mat{B}\) or the gains \(\mat{K}\)}. It implicitly learned the policy from data.
+	\end{itemize}
+\end{code}
+
+\subsection{Data-Driven MPC (DeePC)}
+
+Behavior cloning requires expert data. What if we want to solve an optimal control problem (minimize a cost) but we only have open-loop, noisy data?
+This is the domain of \textbf{Data-Enabled Predictive Control (DeePC)}.
+
+\textbf{Requirement:} The data \(\mat{H}\) must contain "sufficient excitation". We cannot just use closed-loop expert data because it lives on a lower-dimensional manifold (the control policy restricts the inputs). We typically inject white noise into the system to collect this data.
+
+\textbf{Formulation:}
+We replace the dynamics constraints in MPC with the data constraint.
+\[
+	\min_{\vec{z}, \vec{w}} \quad \|\vec{z}\|_{\mat{Q}}^2 + \lambda_g \|\vec{w}\|_2^2 + \lambda_y \|\mat{\sigma}_y\|_2^2
+\]
+subject to:
+\begin{align*}
+	\begin{bmatrix} \vec{u}_{past} \\ \vec{y}_{past} \\ \vec{u}_{future} \\ \vec{y}_{future} \end{bmatrix} &= \mat{H} \vec{w} + \begin{bmatrix} \vec{0} \\ \mat{\sigma}_y \\ \vec{0} \\ \vec{0} \end{bmatrix} \\
+	\vec{u}_{past} &= \vec{u}_{\text{measured}} \\
+	\vec{y}_{past} &= \vec{y}_{\text{measured}} \\
+	\vec{z} &= (\vec{y}_{future}, \vec{u}_{future})
+\end{align*}
+Here, \(\vec{w}\) is the decision variable that selects the trajectory from the data library. We regularize \(\vec{w}\) to avoid overfitting to noise.
+
+\begin{code}[Julia Notebook: \texttt{oscillator.ipynb} (DeePC)]
+	The notebook implements this for the harmonic oscillator.
+	\begin{itemize}
+		\item \textbf{Data:} The system is driven with random white noise inputs to generate a rich \(\mat{H}\).
+		\item \textbf{Optimization:} A large QP is constructed where the constraints are \(\vec{z} = \mat{H}\vec{w}\) and the cost minimizes the state deviation.
+		\item \textbf{Result:} The closed-loop simulation using this Data-Driven MPC matches the behavior of the ideal model-based LQR controller.
+	\end{itemize}
+\end{code}
+
+\begin{intuition}
+	Note that this is inherently an \textbf{output feedback} controller. It uses histories of \(\vec{y}\) and \(\vec{u}\) to predict the future. There is no explicit observer or state estimator; the "state" is implicitly captured by the trajectory history.
+\end{intuition}
+
+\subsection{Nonlinear Systems}
+For linear systems, the "data manifold" is a flat hyperplane (subspace), so linear projections work perfectly.
+For nonlinear systems, the data lies on a complex, curved manifold.
+\begin{itemize}
+	\item Superposition does not hold.
+	\item We can still define "projection" onto the manifold, but it becomes a nonlinear optimization problem.
+	\item Modern generative models (like Diffusion Models) are essentially learning to project noisy samples onto the complex data manifold of valid trajectories.
+\end{itemize}
+
+\newpage
