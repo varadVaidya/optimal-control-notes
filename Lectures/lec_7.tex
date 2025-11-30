@@ -52,7 +52,11 @@ To simplify notation, we introduce the \textbf{Hamiltonian}, which groups the te
 \end{equation}
 The Lagrangian can then be rewritten as:
 \begin{equation}
-    \mathcal{L}(\vec{X}, \vec{U}, \vec{\Lambda}) = H_1(\vec{x}_1, \vec{u}_1, \vec{\lambda}_2) + \sum_{k=2}^{N-1} H_k(\vec{x}_k, \vec{u}_k, \vec{\lambda}_{k+1}) + l_F(\vec{x}_N) - \lambda_N^{\top} \vec{x}_N
+    \mathcal{L}(\vec{X}, \vec{U}, \vec{\Lambda}) = H_1(\vec{x}_1, \vec{u}_1, \vec{\lambda}_2) + \sum_{k=2}^{N-1}
+    \left(
+    H_k(\vec{x}_k, \vec{u}_k, \vec{\lambda}_{k+1}) - \vec{\lambda}_k^{\top} \vec{x}_k
+    \right)
+    + l_F(\vec{x}_N) - \lambda_N^{\top} \vec{x}_N
 \end{equation}
 Now, we can find the stationary point of \(\mathcal{L}\) by taking its gradient with respect to all variables and setting them to zero.
 

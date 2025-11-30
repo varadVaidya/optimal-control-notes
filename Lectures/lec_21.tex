@@ -101,20 +101,6 @@ This is the domain of \textbf{Data-Enabled Predictive Control (DeePC)}.
 
 \textbf{Requirement:} The data \(\mat{H}\) must contain "sufficient excitation". We cannot just use closed-loop expert data because it lives on a lower-dimensional manifold (the control policy restricts the inputs). We typically inject white noise into the system to collect this data.
 
-\textbf{Formulation:}
-We replace the dynamics constraints in MPC with the data constraint.
-\[
-	\min_{\vec{z}, \vec{w}} \quad \|\vec{z}\|_{\mat{Q}}^2 + \lambda_g \|\vec{w}\|_2^2 + \lambda_y \|\mat{\sigma}_y\|_2^2
-\]
-subject to:
-\begin{align*}
-	\begin{bmatrix} \vec{u}_{past} \\ \vec{y}_{past} \\ \vec{u}_{future} \\ \vec{y}_{future} \end{bmatrix} &= \mat{H} \vec{w} + \begin{bmatrix} \vec{0} \\ \mat{\sigma}_y \\ \vec{0} \\ \vec{0} \end{bmatrix} \\
-	\vec{u}_{past} &= \vec{u}_{\text{measured}} \\
-	\vec{y}_{past} &= \vec{y}_{\text{measured}} \\
-	\vec{z} &= (\vec{y}_{future}, \vec{u}_{future})
-\end{align*}
-Here, \(\vec{w}\) is the decision variable that selects the trajectory from the data library. We regularize \(\vec{w}\) to avoid overfitting to noise.
-
 \begin{code}[Julia Notebook: \texttt{oscillator.ipynb} (DeePC)]
 	The notebook implements this for the harmonic oscillator.
 	\begin{itemize}
