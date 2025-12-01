@@ -153,6 +153,67 @@ A much better explicit integrator is the 4th-order Runge-Kutta (RK4) method. Ins
 	The notebook also includes a \textbf{Backward Euler} integrator. This is an \textit{implicit} method, meaning it solves an equation \(\vec{x}_{k+1} = \vec{x}_k + hf(\vec{x}_{k+1})\) at each step. Implicit methods are generally very stable, but often introduce "numerical damping," causing energy to decrease even in a conservative system. This can be useful for stiff systems or when stability is paramount, but it may not accurately reflect the physics.
 \end{note}
 
+\subsubsection{Exact Discretization (Zero-Order Hold)}
+
+While nonlinear systems require approximate integrators like Euler or RK4, Linear Time-Invariant (LTI) systems \(\dot{\vec{x}} = \mat{A}\vec{x} + \mat{B}\vec{u}\) can be discretized \textbf{exactly} assuming a constant control input over the time step \(T\) (Zero-Order Hold).
+
+\begin{theorem}[Exact LTI Discretization]
+    For an LTI system with constant input \(\vec{u}(t) = \vec{u}_k\) for \(t \in [t_k, t_{k+1})\), the state evolution is given by:
+    \begin{equation}
+        \vec{x}_{k+1} = \mat{A}_d \vec{x}_k + \mat{B}_d \vec{u}_k
+    \end{equation}
+    where the discrete matrices are derived using the matrix exponential:
+    \begin{equation}
+        \mat{A}_d = e^{\mat{A}T}, \qquad \mat{B}_d = \left( \int_{0}^{T} e^{\mat{A}\tau} \,d\tau \right) \mat{B}
+    \end{equation}
+\end{theorem}
+\begin{proof}
+    The general solution to the linear differential equation \(\dot{\vec{x}}(t) = \mat{A}\vec{x}(t) + \mat{B}\vec{u}(t)\) starting from time \(t_0\) is given by the variation of constants formula:
+    \[
+        \vec{x}(t) = e^{\mat{A}(t - t_0)} \vec{x}(t_0) + \int_{t_0}^{t} e^{\mat{A}(t - \tau)} \mat{B} \vec{u}(\tau) \, d\tau
+    \]
+    We discretize by setting \(t_0 = t_k = kT\) and \(t = t_{k+1} = (k+1)T\). We assume a \textbf{Zero-Order Hold (ZOH)} on the input, meaning \(\vec{u}(\tau)\) is constant over the interval \([t_k, t_{k+1})\):
+    \[
+        \vec{u}(\tau) = \vec{u}_k \quad \text{for } kT \le \tau < (k+1)T
+    \]
+    Substituting these into the general solution:
+    \[
+        \vec{x}_{k+1} = \underbrace{e^{\mat{A}((k+1)T - kT)}}_{\mat{A}_d} \vec{x}_k + \int_{kT}^{(k+1)T} e^{\mat{A}((k+1)T - \tau)} \mat{B} \vec{u}_k \, d\tau
+    \]
+    The first term simplifies to \(e^{\mat{A}T} \vec{x}_k\), giving us \(\mat{A}_d = e^{\mat{A}T}\).
+    For the integral term, we perform a change of variables. Let \(\sigma = (k+1)T - \tau\).
+    \begin{itemize}
+        \item When \(\tau = kT\), \(\sigma = T\).
+        \item When \(\tau = (k+1)T\), \(\sigma = 0\).
+        \item \(d\tau = -d\sigma\).
+    \end{itemize}
+    The integral becomes:
+    \[
+        \int_{T}^{0} e^{\mat{A}\sigma} \mat{B} \vec{u}_k (-d\sigma) = \left( \int_{0}^{T} e^{\mat{A}\sigma} \, d\sigma \right) \mat{B} \vec{u}_k
+    \]
+    Defining \(\mat{B}_d = \left( \int_{0}^{T} e^{\mat{A}\sigma} \, d\sigma \right) \mat{B}\), we arrive at the exact discrete-time dynamics:
+    \[
+        \vec{x}_{k+1} = \mat{A}_d \vec{x}_k + \mat{B}_d \vec{u}_k
+    \]
+\end{proof}
+\begin{eg}[Double Integrator]
+    Consider a unit mass controlled by force \(u\), such that \(\ddot{q} = u\). The state is \(\vec{x} = [q, \dot{q}]^\top\).
+    \[
+        \dot{\vec{x}} = \underbrace{\begin{bmatrix} 0 & 1 \\ 0 & 0 \end{bmatrix}}_{\mat{A}} \vec{x} + \underbrace{\begin{bmatrix} 0 \\ 1 \end{bmatrix}}_{\mat{B}} u
+    \]
+    Since \(\mat{A}\) is nilpotent (\(\mat{A}^2 = \mat{0}\)), the matrix exponential series truncates after the second term:
+    \[
+        e^{\mat{A}T} = \mat{I} + \mat{A}T = \begin{bmatrix} 1 & T \\ 0 & 1 \end{bmatrix} = \mat{A}_d
+    \]
+    For the input matrix \(\mat{B}_d\):
+    \[
+        \int_{0}^{T} e^{\mat{A}\tau} \,d\tau = \int_{0}^{T} \begin{bmatrix} 1 & \tau \\ 0 & 1 \end{bmatrix} \,d\tau = \begin{bmatrix} T & \frac{T^2}{2} \\ 0 & T \end{bmatrix}
+    \]
+    \[
+        \mat{B}_d = \begin{bmatrix} T & \frac{T^2}{2} \\ 0 & T \end{bmatrix} \begin{bmatrix} 0 \\ 1 \end{bmatrix} = \begin{bmatrix} \frac{T^2}{2} \\ T \end{bmatrix}
+    \]
+    Thus, the exact discrete dynamics are \(x_{k+1} = x_k + v_k T + \frac{1}{2}u_k T^2\) and \(v_{k+1} = v_k + u_k T\), which matches standard kinematic equations perfectly.
+\end{eg}
 \subsection{Key Takeaways on Simulation}
 \begin{itemize}
 	\item Choosing the right numerical integrator is crucial for obtaining meaningful simulation results.
