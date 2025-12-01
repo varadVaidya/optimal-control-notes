@@ -102,9 +102,48 @@ The necessary conditions for optimality (The Canonical Equations) are:
         \item \textbf{Transversality (Free State):} Since \(x(1)\) is free and \(t_f=1\) is fixed, we require \(\pdv{L}{\dot{x}}(1) = 0\).
         \[ \pdv{L}{\dot{x}} = 2\dot{x} \implies 2\dot{x}(1) = 0 \implies \dot{x}(1) = 0 \]
         Differentiating our solution: \(\dot{x}(t) = \frac{1}{2}t + c_1\). At \(t=1\), \(\frac{1}{2} + c_1 = 0 \implies c_1 = -\frac{1}{2}\).
+      \end{enumerate}
+      The optimal trajectory is \(x^\star(t) = \frac{1}{4}t^2 - \frac{1}{2}t + 2\).
+    \end{eg}
+    \subsection{The Continuous-Time Linear Quadratic Regulator (LQR)}
+
+    A fundamental application of the PMP is the Continuous-Time LQR problem. Consider a linear system with a quadratic cost functional:
+    \begin{align*}
+        J &= \frac{1}{2} \vec{x}(t_f)^\top \mat{Q}_f \vec{x}(t_f) + \int_{t_0}^{t_f} \frac{1}{2} \left( \vec{x}^\top \mat{Q} \vec{x} + \vec{u}^\top \mat{R} \vec{u} \right) dt \\
+        \text{subject to} \quad \dot{\vec{x}} &= \mat{A}\vec{x} + \mat{B}\vec{u}
+    \end{align*}
+    where \(\mat{Q} \succeq 0, \mat{Q}_f \succeq 0\) and \(\mat{R} \succ 0\).
+
+    \paragraph{Derivation via PMP.}
+    Form the Hamiltonian:
+    \[
+        H(\vec{x}, \vec{u}, \vec{\lambda}) = \frac{1}{2}\vec{x}^\top \mat{Q} \vec{x} + \frac{1}{2}\vec{u}^\top \mat{R} \vec{u} + \vec{\lambda}^\top (\mat{A}\vec{x} + \mat{B}\vec{u})
+    \]
+    Applying the canonical equations:
+    \begin{enumerate}
+        \item \textbf{Stationarity:} \(\nabla_{\vec{u}} H = \mat{R}\vec{u} + \mat{B}^\top \vec{\lambda} = 0 \implies \vec{u}^\star(t) = -\mat{R}^{-1}\mat{B}^\top \vec{\lambda}(t)\).
+        \item \textbf{Costate Dynamics:} \(-\dot{\vec{\lambda}} = \nabla_{\vec{x}} H = \mat{Q}\vec{x} + \mat{A}^\top \vec{\lambda}\).
+        \item \textbf{Transversality:} \(\vec{\lambda}(t_f) = \nabla_{\vec{x}} \phi = \mat{Q}_f \vec{x}(t_f)\).
     \end{enumerate}
-    The optimal trajectory is \(x^\star(t) = \frac{1}{4}t^2 - \frac{1}{2}t + 2\).
-\end{eg}
+
+    \paragraph{The Riccati Differential Equation.}
+    Because the relationship between costate and state is linear at \(t_f\) (\(\vec{\lambda}(t_f) = \mat{Q}_f \vec{x}(t_f)\)), we assume a linear relationship holds for all time:
+    \[
+        \vec{\lambda}(t) = \mat{P}(t) \vec{x}(t)
+    \]
+    Differentiating this with respect to time:
+    \[
+        \dot{\vec{\lambda}} = \dot{\mat{P}}\vec{x} + \mat{P}\dot{\vec{x}}
+    \]
+    Substituting the known expressions for \(\dot{\vec{\lambda}}\) (from costate dynamics) and \(\dot{\vec{x}}\) (from system dynamics with optimal control):
+    \[
+        -(\mat{Q}\vec{x} + \mat{A}^\top \mat{P}\vec{x}) = \dot{\mat{P}}\vec{x} + \mat{P}(\mat{A}\vec{x} - \mat{B}\mat{R}^{-1}\mat{B}^\top \mat{P}\vec{x})
+    \]
+    Since this must hold for any state \(\vec{x}(t)\), we can drop \(\vec{x}\) to obtain the \textbf{Riccati Differential Equation (RDE)}:
+    \begin{equation}
+        -\dot{\mat{P}}(t) = \mat{P}(t)\mat{A} + \mat{A}^\top \mat{P}(t) - \mat{P}(t)\mat{B}\mat{R}^{-1}\mat{B}^\top \mat{P}(t) + \mat{Q}
+    \end{equation}
+    with the boundary condition \(\mat{P}(t_f) = \mat{Q}_f\). This equation is solved \textbf{backward in time}.
 \subsection{Pontryagin's Minimum Principle (Discrete-Time)}
 These provide the first-order necessary conditions for optimality for deterministic optimal control problems. In discrete time, they can be seen as an extension of the KKT conditions to account for the dynamics constraints.
 
@@ -162,45 +201,6 @@ The discrete time PMP conditions can be converted into continuous time by taking
     \item \textbf{Terminal Condition:} \(\vec{\lambda}^\star(t_f) = \nabla_{\vec{x}} l_F(\vec{x}^\star(t_f))\)
     \item \textbf{Hamiltonian Stationarity:} \(\vec{u}^\star(t) = \argmin_{\vec{u} \in \mathcal{U}} H(\vec{x}^\star(t), \vec{u}, \vec{\lambda}^\star(t))\)
 \end{enumerate}
-\subsection{The Continuous-Time Linear Quadratic Regulator (LQR)}
-
-A fundamental application of the PMP is the Continuous-Time LQR problem. Consider a linear system with a quadratic cost functional:
-\begin{align*}
-    J &= \frac{1}{2} \vec{x}(t_f)^\top \mat{Q}_f \vec{x}(t_f) + \int_{t_0}^{t_f} \frac{1}{2} \left( \vec{x}^\top \mat{Q} \vec{x} + \vec{u}^\top \mat{R} \vec{u} \right) dt \\
-    \text{subject to} \quad \dot{\vec{x}} &= \mat{A}\vec{x} + \mat{B}\vec{u}
-\end{align*}
-where \(\mat{Q} \succeq 0, \mat{Q}_f \succeq 0\) and \(\mat{R} \succ 0\).
-
-\paragraph{Derivation via PMP.}
-Form the Hamiltonian:
-\[
-    H(\vec{x}, \vec{u}, \vec{\lambda}) = \frac{1}{2}\vec{x}^\top \mat{Q} \vec{x} + \frac{1}{2}\vec{u}^\top \mat{R} \vec{u} + \vec{\lambda}^\top (\mat{A}\vec{x} + \mat{B}\vec{u})
-\]
-Applying the canonical equations:
-\begin{enumerate}
-    \item \textbf{Stationarity:} \(\nabla_{\vec{u}} H = \mat{R}\vec{u} + \mat{B}^\top \vec{\lambda} = 0 \implies \vec{u}^\star(t) = -\mat{R}^{-1}\mat{B}^\top \vec{\lambda}(t)\).
-    \item \textbf{Costate Dynamics:} \(-\dot{\vec{\lambda}} = \nabla_{\vec{x}} H = \mat{Q}\vec{x} + \mat{A}^\top \vec{\lambda}\).
-    \item \textbf{Transversality:} \(\vec{\lambda}(t_f) = \nabla_{\vec{x}} \phi = \mat{Q}_f \vec{x}(t_f)\).
-\end{enumerate}
-
-\paragraph{The Riccati Differential Equation.}
-Because the relationship between costate and state is linear at \(t_f\) (\(\vec{\lambda}(t_f) = \mat{Q}_f \vec{x}(t_f)\)), we assume a linear relationship holds for all time:
-\[
-    \vec{\lambda}(t) = \mat{P}(t) \vec{x}(t)
-\]
-Differentiating this with respect to time:
-\[
-    \dot{\vec{\lambda}} = \dot{\mat{P}}\vec{x} + \mat{P}\dot{\vec{x}}
-\]
-Substituting the known expressions for \(\dot{\vec{\lambda}}\) (from costate dynamics) and \(\dot{\vec{x}}\) (from system dynamics with optimal control):
-\[
-    -(\mat{Q}\vec{x} + \mat{A}^\top \mat{P}\vec{x}) = \dot{\mat{P}}\vec{x} + \mat{P}(\mat{A}\vec{x} - \mat{B}\mat{R}^{-1}\mat{B}^\top \mat{P}\vec{x})
-\]
-Since this must hold for any state \(\vec{x}(t)\), we can drop \(\vec{x}\) to obtain the \textbf{Riccati Differential Equation (RDE)}:
-\begin{equation}
-    -\dot{\mat{P}}(t) = \mat{P}(t)\mat{A} + \mat{A}^\top \mat{P}(t) - \mat{P}(t)\mat{B}\mat{R}^{-1}\mat{B}^\top \mat{P}(t) + \mat{Q}
-\end{equation}
-with the boundary condition \(\mat{P}(t_f) = \mat{Q}_f\). This equation is solved \textbf{backward in time}.
 \subsection{The Linear Quadratic Regulator (LQR)}
 The LQR problem is a special case where the dynamics are linear and the cost is quadratic.
 \begin{definition}[Discrete-Time LQR]
