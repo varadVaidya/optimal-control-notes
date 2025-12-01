@@ -246,7 +246,7 @@ We can solve this with gradient descent. The PMP equations give us a highly effi
 
 The gradient of the total cost \(J\) with respect to a single control \(\vec{u}_k\) is exactly the gradient of the Hamiltonian:
 \[
-    \nabla_{\vec{u}_k} J = (\nabla_{\vec{u}_k} \mathcal{L})^{\top} = (\nabla_{\vec{u}} H_k)^{\top} = \mat{R}_k \vec{u}_k + \mat{B}_k^{\top} \vec{\lambda}_{k+1}
+    \nabla_{\vec{u}_k} J = \nabla_{\vec{u}} H_k = \mat{R}_k \vec{u}_k + \mat{B}_k^{\top} \vec{\lambda}_{k+1}
 \]
 This gives us a full algorithm.
 
