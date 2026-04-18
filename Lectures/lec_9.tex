@@ -1,0 +1,474 @@
+\lecture{9}{}{Model Predictive Control}
+
+\begin{intuition}
+	Model predictive control turns optimal control into an online feedback law. At every sampling instant, one solves a finite-horizon optimal-control problem using the current state as the initial condition, applies only the first control move, shifts the horizon forward, and repeats. This simple idea is what allows MPC to combine prediction, constraint handling, and feedback in one unified framework.
+\end{intuition}
+
+\subsection{The MPC Concept}
+
+\begin{definition}[Discrete-time MPC problem formulation]
+	A standard discrete-time MPC problem at time $t$ is
+	\begin{align*}
+		\min_{\{x_{k|t},u_{k|t}\}} \quad &
+		V_f(x_{N|t}) + \sum_{k=0}^{N-1}\ell(x_{k|t},u_{k|t}) \\
+		\text{subject to}\quad &
+		x_{0|t}=x(t), \\
+		&
+		x_{k+1|t}=f(x_{k|t},u_{k|t}), \qquad k=0,\dots,N-1, \\
+		&
+		x_{k|t}\in \mathcal{X},
+		\qquad
+		u_{k|t}\in \mathcal{U}, \\
+		&
+		x_{N|t}\in \mathcal{X}_f \quad \text{(optional terminal constraint)}.
+	\end{align*}
+	Here $x_{k|t}$ denotes the state predicted $k$ steps ahead from time $t$.
+\end{definition}
+
+\begin{remark}[Why MPC instead of LQR]
+	LQR gives an elegant closed-form law for linear-quadratic problems, but it does not natively handle hard state or input constraints. MPC does. This is one of its decisive practical advantages.
+\end{remark}
+
+\begin{definition}[Receding-horizon strategy]
+	After solving the finite-horizon problem at time $t$, MPC applies only the first input
+	\[
+		u(t)=u_{0|t}^\star,
+	\]
+	then measures the new state at time $t+1$, resolves the optimization problem with the horizon shifted forward, and repeats. This is the \emph{receding-horizon} or \emph{moving-horizon} strategy.
+\end{definition}
+
+\begin{algorithm}[H]
+	\DontPrintSemicolon
+	\caption{Receding-Horizon MPC}
+	\KwIn{Prediction model, stage cost $\ell$, terminal cost $V_f$, horizon $N$, constraints}
+	\For{$t=0,1,2,\dots$}{
+		Measure or estimate the current state $x(t)$\;
+		Solve the finite-horizon optimal-control problem with initial condition $x_{0|t}=x(t)$\;
+		Obtain the optimal sequence $\{u_{0|t}^\star,\dots,u_{N-1|t}^\star\}$\;
+		Apply only the first control move
+		\[
+			u(t)\gets u_{0|t}^\star
+		\]\;
+		Shift the horizon forward and repeat at the next sampling instant\;
+	}
+\end{algorithm}
+
+\begin{proposition}[MPC reduces to LQR in the unconstrained linear-quadratic case]
+	Consider the unconstrained linear system
+	\[
+		x_{k+1}=Ax_k+Bu_k
+	\]
+	with quadratic stage cost
+	\[
+		x_k^\top Q x_k + u_k^\top R u_k,
+	\]
+	and terminal cost
+	\[
+		V_f(x)=x^\top P x,
+	\]
+	where $P$ is the stabilizing DARE solution of Lecture 6. Then finite-horizon MPC produces the infinite-horizon LQR control law
+	\[
+		u_{0|t}^\star = -Kx(t)
+	\]
+	for every horizon length $N \ge 1$.
+\end{proposition}
+\begin{proof}
+	Since $P$ solves the DARE,
+	\[
+		P = Q + A^\top P A - A^\top P B(R+B^\top P B)^{-1}B^\top P A.
+	\]
+	So if the terminal Riccati matrix is initialized with $P_N=P$, the backward Riccati recursion leaves it unchanged:
+	\[
+		P_{N-1}=P.
+	\]
+	Repeating this argument shows
+	\[
+		P_k=P
+	\]
+	for all $k$. Hence every stage gain equals the infinite-horizon LQR gain
+	\[
+		K=(R+B^\top P B)^{-1}B^\top P A,
+	\]
+	and in particular the first MPC move is
+	\[
+		u_{0|t}^\star=-Kx(t).
+	\]
+\end{proof}
+
+\subsection{Linear MPC and QP Formulation}
+
+\begin{definition}[Linear MPC]
+	Linear MPC specializes the MPC problem to linear dynamics
+	\[
+		x_{k+1}=Ax_k+Bu_k,
+	\]
+	quadratic cost
+	\[
+		x_N^\top P x_N + \sum_{k=0}^{N-1}\left(x_k^\top Q x_k + u_k^\top R u_k\right),
+	\]
+	and typically polyhedral constraints
+	\[
+		x_k \in \mathcal{X},
+		\qquad
+		u_k \in \mathcal{U},
+		\qquad
+		x_N \in \mathcal{X}_f.
+	\]
+\end{definition}
+
+\begin{theorem}[Condensing linear MPC into a quadratic program]
+	For linear MPC, the predicted state sequence can be eliminated to produce a finite-dimensional quadratic program in the stacked input vector alone.
+\end{theorem}
+\begin{proof}
+	Define the stacked vectors
+	\[
+		X=
+		\begin{bmatrix}
+			x_1 \\ x_2 \\ \vdots \\ x_N
+		\end{bmatrix},
+		\qquad
+		U=
+		\begin{bmatrix}
+			u_0 \\ u_1 \\ \vdots \\ u_{N-1}
+		\end{bmatrix}.
+	\]
+	Repeated substitution of the dynamics yields
+	\[
+		x_1 = Ax_0 + Bu_0,
+	\]
+	\[
+		x_2 = A^2x_0 + ABu_0 + Bu_1,
+	\]
+	and in general
+	\[
+		X = \mathcal{A}x_0 + \mathcal{B}U,
+	\]
+	where
+	\[
+		\mathcal{A}
+		=
+		\begin{bmatrix}
+			A \\
+			A^2 \\
+			\vdots \\
+			A^N
+		\end{bmatrix},
+	\]
+	and
+	\[
+		\mathcal{B}
+		=
+		\begin{bmatrix}
+			B & 0 & \cdots & 0 \\
+			AB & B & \cdots & 0 \\
+			\vdots & \vdots & \ddots & \vdots \\
+			A^{N-1}B & A^{N-2}B & \cdots & B
+		\end{bmatrix}.
+	\]
+
+	Now define the block-diagonal weight matrices
+	\[
+		\bar Q = \operatorname{blkdiag}(Q,\dots,Q,P),
+		\qquad
+		\bar R = \operatorname{blkdiag}(R,\dots,R).
+	\]
+	The cost becomes
+	\[
+		J = X^\top \bar Q X + U^\top \bar R U.
+	\]
+	Substituting
+	\[
+		X = \mathcal{A}x_0 + \mathcal{B}U
+	\]
+	gives
+	\[
+		J
+		=
+		U^\top(\mathcal{B}^\top \bar Q \mathcal{B} + \bar R)U
+		+
+		2x_0^\top \mathcal{A}^\top \bar Q \mathcal{B}U
+		+
+		x_0^\top \mathcal{A}^\top \bar Q \mathcal{A}x_0.
+	\]
+	So, up to a constant independent of $U$, this is a quadratic function of $U$.
+
+	State and input constraints likewise become linear inequalities in $U$. For instance, if
+	\[
+		F_x x_k \le b_x,
+		\qquad
+		F_u u_k \le b_u,
+	\]
+	then stacking them yields a condensed form
+	\[
+		GU \le g + E x_0.
+	\]
+	Hence linear MPC can be written as the QP
+	\begin{align*}
+		\min_U \quad & \frac{1}{2}U^\top H U + h(x_0)^\top U \\
+		\text{subject to}\quad & GU \le g + E x_0,
+	\end{align*}
+	with
+	\[
+		H = 2(\mathcal{B}^\top \bar Q \mathcal{B}+\bar R).
+	\]
+\end{proof}
+
+\begin{eg}[Condensed QP for a two-step scalar MPC problem]
+	Consider the scalar integrator
+	\[
+		x_{k+1}=x_k+u_k
+	\]
+	with horizon $N=2$ and cost
+	\[
+		J = x_2^2 + \sum_{k=0}^{1}(x_k^2+u_k^2).
+	\]
+	Let
+	\[
+		U=
+		\begin{bmatrix}
+			u_0 \\ u_1
+		\end{bmatrix}.
+	\]
+	Then
+	\[
+		x_1=x_0+u_0,
+		\qquad
+		x_2=x_0+u_0+u_1.
+	\]
+	Substituting into the cost gives
+	\begin{align*}
+		J
+		&=
+		x_0^2 + u_0^2 + (x_0+u_0)^2 + u_1^2 + (x_0+u_0+u_1)^2 \\
+		&=
+		3x_0^2 + 3u_0^2 + 2u_0u_1 + 2u_1^2 + 4x_0u_0 + 2x_0u_1.
+	\end{align*}
+	So the condensed QP is
+	\[
+		\min_U \quad
+		\frac{1}{2}
+		U^\top
+		\begin{bmatrix}
+			6 & 2 \\
+			2 & 4
+		\end{bmatrix}
+		U
+		+
+		\begin{bmatrix}
+			4x_0 \\
+			2x_0
+		\end{bmatrix}^\top
+		U,
+	\]
+	up to the constant term $3x_0^2$.
+\end{eg}
+
+\begin{remark}[Dense versus sparse formulations]
+	Condensing produces a dense QP in the control variables only. This can be advantageous for short horizons and small input dimensions. The alternative is a sparse formulation retaining both states and controls as decision variables, which produces a larger but highly structured QP. Modern MPC solvers choose between these formulations based on horizon length, state dimension, and hardware constraints.
+\end{remark}
+
+\subsection{Stability of MPC}
+
+\begin{intuition}
+	Finite-horizon optimization alone does not automatically imply closed-loop stability. An optimizer with too short a horizon may postpone corrective action or exploit short-term benefits that are harmful in the long run. Stability must therefore be enforced through terminal ingredients or sufficiently long horizons under additional assumptions.
+\end{intuition}
+
+\begin{definition}[Terminal cost and terminal set]
+	A \emph{terminal cost} is a nonnegative function
+	\[
+		V_f:\mathbb{R}^n \to \mathbb{R}_{\ge 0}.
+	\]
+	A \emph{terminal set} is a set
+	\[
+		\mathcal{X}_f \subseteq \mathcal{X}
+	\]
+	with the property that there exists a local terminal controller
+	\[
+		\kappa_f:\mathcal{X}_f \to \mathcal{U}
+	\]
+	such that
+	\[
+		f(x,\kappa_f(x)) \in \mathcal{X}_f
+	\]
+	for all $x \in \mathcal{X}_f$.
+\end{definition}
+
+\begin{theorem}[Stability of MPC via a terminal Lyapunov condition]
+	Suppose the stage cost $\ell(x,u)$ is positive definite and there exists a terminal controller $\kappa_f$ on $\mathcal{X}_f$ such that for all $x \in \mathcal{X}_f$,
+	\[
+		\kappa_f(x)\in \mathcal{U},
+		\qquad
+		f(x,\kappa_f(x))\in \mathcal{X}_f,
+	\]
+	and
+	\[
+		V_f(f(x,\kappa_f(x))) - V_f(x) \le -\ell(x,\kappa_f(x)).
+	\]
+	Then the optimal MPC cost
+	\[
+		J_N^\star(x)
+	\]
+	is a Lyapunov function for the closed-loop system, and the MPC law asymptotically stabilizes the origin on the feasible set.
+\end{theorem}
+\begin{proof}[Proof sketch]
+	Let
+	\[
+		\{x_{k|t}^\star,u_{k|t}^\star\}_{k=0}^{N-1}
+	\]
+	be the optimal solution at time $t$. After applying
+	\[
+		u(t)=u_{0|t}^\star,
+	\]
+	the realized next state is
+	\[
+		x(t+1)=x_{1|t}^\star.
+	\]
+	Construct a candidate control sequence for the MPC problem at time $t+1$ by shifting the old optimal sequence:
+	\[
+		\tilde u_{k|t+1}=u_{k+1|t}^\star,
+		\qquad
+		k=0,\dots,N-2,
+	\]
+	and appending the terminal controller
+	\[
+		\tilde u_{N-1|t+1}=\kappa_f(x_{N|t}^\star).
+	\]
+	The terminal-set invariance makes this shifted sequence feasible.
+
+	Evaluating the cost of this feasible candidate at time $t+1$ and comparing it with the optimal cost at time $t$ yields
+	\[
+		J_N^\star(x(t+1)) - J_N^\star(x(t))
+		\le
+		-\ell(x(t),u(t)).
+	\]
+	So the optimal value decreases by at least the positive-definite stage cost. This makes $J_N^\star$ a Lyapunov function and implies asymptotic stability.
+\end{proof}
+
+\begin{remark}[Terminal ingredients as an unconstrained tail]
+	In linear MPC, a standard choice is:
+	\begin{itemize}
+		\item terminal cost
+		      \[
+			      V_f(x)=x^\top P x,
+		      \]
+		      where $P$ solves the LQR DARE,
+		\item terminal controller
+		      \[
+			      \kappa_f(x)=-Kx,
+		      \]
+		      where $K$ is the LQR gain,
+		\item terminal set $\mathcal{X}_f$ chosen as a positively invariant set for the constrained closed loop.
+	\end{itemize}
+	Then the tail of the MPC horizon is locally closed by the LQR law.
+\end{remark}
+
+\subsection{Feasibility and Recursive Feasibility}
+
+\begin{definition}[Recursive feasibility]
+	MPC is \emph{recursively feasible} if feasibility of the optimization problem at time $t$ implies feasibility at time $t+1$ under the applied MPC control law.
+\end{definition}
+
+\begin{proposition}[Terminal constraint ensures recursive feasibility]
+	Under the same assumptions as the stability theorem, if the MPC problem is feasible at time $t$, then it is feasible at time $t+1$.
+\end{proposition}
+\begin{proof}
+	Use the same shifted-sequence construction as in the stability proof. If
+	\[
+		\{u_{0|t}^\star,\dots,u_{N-1|t}^\star\}
+	\]
+	is feasible at time $t$, then after applying $u_{0|t}^\star$ the next state is $x_{1|t}^\star$. The shifted sequence
+	\[
+		\tilde u_{0|t+1}=u_{1|t}^\star,\dots,\tilde u_{N-2|t+1}=u_{N-1|t}^\star,
+	\]
+	augmented with
+	\[
+		\tilde u_{N-1|t+1}=\kappa_f(x_{N|t}^\star),
+	\]
+	satisfies all state, input, and terminal constraints because the original sequence was feasible and the terminal controller keeps the terminal state inside the terminal set. So the optimization problem at time $t+1$ admits at least one feasible point.
+\end{proof}
+
+\begin{remark}[Soft constraints]
+	Hard constraints may make the MPC problem infeasible under disturbances, modeling errors, or aggressive references. A common practical relaxation introduces slack variables
+	\[
+		s_k \ge 0
+	\]
+	and replaces hard inequalities by softened constraints such as
+	\[
+		F_x x_k \le b_x + s_k,
+	\]
+	while penalizing $\|s_k\|$ heavily in the cost. This preserves solvability at the expense of allowing controlled constraint violation when necessary.
+\end{remark}
+
+\subsection{Nonlinear MPC}
+
+\begin{definition}[Nonlinear MPC]
+	Nonlinear MPC (NMPC) uses the same receding-horizon strategy as linear MPC but solves at each step a nonlinear optimal-control problem:
+	\begin{align*}
+		\min_{\{x_{k|t},u_{k|t}\}} \quad &
+		V_f(x_{N|t}) + \sum_{k=0}^{N-1}\ell(x_{k|t},u_{k|t}) \\
+		\text{subject to}\quad &
+		x_{0|t}=x(t), \\
+		&
+		x_{k+1|t}=f(x_{k|t},u_{k|t}), \\
+		&
+		c(x_{k|t},u_{k|t})=0, \\
+		&
+		g(x_{k|t},u_{k|t})\le 0.
+	\end{align*}
+\end{definition}
+
+\begin{remark}[Computational challenge]
+	NMPC is powerful because it handles nonlinear dynamics and constraints directly, but it is computationally demanding: a nonlinear program must be solved at every sampling instant, often within milliseconds.
+\end{remark}
+
+\begin{remark}[Connection to iLQR]
+	iLQR can be viewed as a specialized local solver for unconstrained or lightly constrained nonlinear finite-horizon optimal-control problems. In that sense, iLQR is a building block one may use inside NMPC, especially when Riccati-structured local approximations are preferable to generic sparse NLP solves.
+\end{remark}
+
+\begin{algorithm}[H]
+	\DontPrintSemicolon
+	\caption{Real-Time Iteration Scheme for NMPC}
+	\KwIn{Current state estimate $x(t)$, previous trajectory and multipliers, prediction model}
+		Shift the previous solution forward in time to warm start the current problem\;
+		Linearize the dynamics and constraints, and quadratize the cost around the shifted trajectory\;
+		Solve one SQP-type QP subproblem or one local Riccati-structured approximation\;
+		Apply the first control move from the updated trajectory\;
+		At the next sampling instant, repeat rather than fully converging the NLP each time\;
+\end{algorithm}
+
+\begin{remark}[Real-time iteration]
+	The real-time iteration philosophy accepts that there may not be enough time to solve the nonlinear program to full convergence at each step. Instead, one performs one well-structured local optimization update per sample and relies on warm starts plus frequent feedback to keep the closed loop near the moving optimum.
+\end{remark}
+
+\subsection{MPC in Practice}
+
+\begin{remark}[QP solvers and timing constraints]
+	Linear MPC reduces to a quadratic program, so real-time performance depends heavily on the QP solver. Active-set methods, operator-splitting methods, interior-point methods, and Riccati-based sparse solvers each occupy different regions of the speed-versus-accuracy tradeoff. The choice is dictated by sampling rate, horizon length, and available compute.
+\end{remark}
+
+\begin{remark}[Warm starting]
+	Successive MPC problems differ only slightly when the sampling period is short. Warm starting from the shifted previous solution can substantially reduce the number of iterations required by the underlying QP or NLP solver.
+\end{remark}
+
+\begin{remark}[Explicit MPC]
+	For constrained linear systems with modest dimension, one can solve the parametric QP offline as a function of the current state. The result is an explicit control law
+	\[
+		u(x)=F_i x + g_i
+	\]
+	valid on polyhedral regions
+	\[
+		x \in \mathcal{R}_i.
+	\]
+	So explicit MPC realizes the optimizer as a piecewise-affine lookup law, trading online optimization for offline complexity and memory.
+\end{remark}
+
+\begin{remark}
+	MPC is where the main threads of these notes converge:
+	\begin{itemize}
+		\item Lecture 3 supplied constrained optimization and KKT structure,
+		\item Lecture 5 supplied transcription and numerical optimal-control machinery,
+		\item Lecture 6 supplied the linear-quadratic terminal ingredients,
+		\item Lecture 8 supplied local nonlinear solvers such as iLQR.
+	\end{itemize}
+	In that sense, MPC is not a separate island of theory. It is the operational synthesis of the entire subject.
+\end{remark}

@@ -1,0 +1,960 @@
+\lecture{6}{}{Linear Quadratic Regulator}
+
+\begin{intuition}
+	LQR is the canonical optimal-control problem because it is rich enough to produce a nontrivial feedback law and structured enough to solve exactly. The value function is quadratic, the optimal policy is linear, and both dynamic programming and Pontryagin's principle collapse to the same Riccati equation. This lecture develops that structure carefully and keeps the presentation strictly within the finite-horizon, infinite-horizon, and Riccati themes laid out in the plan.
+\end{intuition}
+
+\subsection{Problem Statement and Structure}
+
+\begin{definition}[Finite-horizon discrete-time LQR]
+	The finite-horizon discrete-time linear quadratic regulator problem is
+	\begin{align*}
+		\min_{\{u_k\}_{k=0}^{N-1}} \quad & x_N^\top Q_f x_N + \sum_{k=0}^{N-1}\left(x_k^\top Q x_k + u_k^\top R u_k\right) \\
+		\text{subject to}\quad & x_{k+1}=Ax_k+Bu_k, \qquad k=0,\dots,N-1, \\
+		                       & x_0 \text{ given}.
+	\end{align*}
+	Here
+	\[
+		A \in \mathbb{R}^{n \times n},
+		\qquad
+		B \in \mathbb{R}^{n \times m},
+	\]
+	and the weight matrices satisfy
+	\[
+		Q=Q^\top \succeq 0,
+		\qquad
+		R=R^\top \succ 0,
+		\qquad
+		Q_f=Q_f^\top \succeq 0.
+	\]
+\end{definition}
+
+\begin{remark}[Why the assumptions on $Q$, $R$, and $Q_f$ matter]
+	The conditions
+	\[
+		Q \succeq 0,
+		\qquad
+		Q_f \succeq 0
+	\]
+	ensure that state deviations are penalized but not rewarded. The condition
+	\[
+		R \succ 0
+	\]
+	ensures that the stage cost is strictly convex in the control input. This strict convexity is what makes the Bellman minimization produce a unique control law and guarantees that the matrix
+	\[
+		R+B^\top P B
+	\]
+	is invertible when $P \succeq 0$.
+\end{remark}
+
+\begin{remark}[Role of $Q$ versus $R$]
+	The matrix $Q$ prices state error, while $R$ prices control effort.
+	\begin{itemize}
+		\item Increasing $Q$ makes state deviations more expensive, so the controller becomes more aggressive.
+		\item Increasing $R$ makes actuation more expensive, so the controller becomes more conservative.
+	\end{itemize}
+	LQR therefore formalizes a precise tradeoff between regulation performance and control energy.
+\end{remark}
+
+\begin{remark}[What goes wrong if $R$ is only positive semidefinite]
+	If $R$ is merely positive semidefinite, then some control directions may have zero cost. In such directions, the Bellman stage minimization need not be strictly convex, the minimizing control may fail to be unique, and the matrix
+	\[
+		R+B^\top P B
+	\]
+	may become singular. Algebraically, the Riccati recursion may cease to be well defined in the standard inverse form. Intuitively, the problem is no longer penalizing all actuation channels.
+\end{remark}
+
+\begin{definition}[Linear regulator structure]
+	A feedback law is called a \emph{linear regulator} if it has the form
+	\[
+		u_k = -K_k x_k
+	\]
+	for matrices $K_k \in \mathbb{R}^{m \times n}$. In the infinite-horizon time-invariant case, the gain becomes constant:
+	\[
+		u_k = -Kx_k.
+	\]
+\end{definition}
+
+\subsection{Finite-Horizon LQR via Dynamic Programming}
+
+\begin{theorem}[Quadratic value function and linear optimal control]
+	For finite-horizon discrete-time LQR, the value function at stage $k$ has the quadratic form
+	\[
+		V_k(x)=x^\top P_k x,
+	\]
+	where the matrices $P_k$ satisfy the backward Riccati recursion
+	\[
+		P_N=Q_f,
+	\]
+	\[
+		P_k = Q + A^\top P_{k+1}A - A^\top P_{k+1}B\left(R+B^\top P_{k+1}B\right)^{-1}B^\top P_{k+1}A,
+	\qquad
+		k=N-1,\dots,0.
+	\]
+	The optimal control law is
+	\[
+		u_k^\star = -K_k x_k,
+	\]
+	with
+	\[
+		K_k = \left(R+B^\top P_{k+1}B\right)^{-1}B^\top P_{k+1}A.
+	\]
+\end{theorem}
+\begin{proof}
+	We prove the result by backward induction on $k$ using Bellman's equation.
+
+	At the terminal stage,
+	\[
+		V_N(x)=x^\top Q_f x,
+	\]
+	so the claim holds with
+	\[
+		P_N=Q_f.
+	\]
+
+	Now assume that for some $k+1 \le N$,
+	\[
+		V_{k+1}(x)=x^\top P_{k+1}x
+	\]
+	with $P_{k+1}=P_{k+1}^\top \succeq 0$. Bellman's equation gives
+	\begin{align*}
+		V_k(x)
+		&= \min_{u \in \mathbb{R}^m}
+		\left\{
+		x^\top Qx + u^\top Ru + V_{k+1}(Ax+Bu)
+		\right\} \\
+		&= \min_{u \in \mathbb{R}^m}
+		\left\{
+		x^\top Qx + u^\top Ru + (Ax+Bu)^\top P_{k+1}(Ax+Bu)
+		\right\}.
+	\end{align*}
+	Expanding the quadratic form in $u$ yields
+	\begin{align*}
+		V_k(x)
+		&= \min_{u}
+		\Bigl\{
+		x^\top(Q+A^\top P_{k+1}A)x
+		+ 2u^\top B^\top P_{k+1}Ax \\
+		&\qquad\qquad\qquad
+		+ u^\top(R+B^\top P_{k+1}B)u
+		\Bigr\}.
+	\end{align*}
+	Since
+	\[
+		R+B^\top P_{k+1}B \succ 0,
+	\]
+	the minimization is strictly convex, and the unique minimizer is obtained by setting the gradient with respect to $u$ equal to zero:
+	\[
+		2(R+B^\top P_{k+1}B)u + 2B^\top P_{k+1}Ax = 0.
+	\]
+	Hence
+	\[
+		u_k^\star = -\left(R+B^\top P_{k+1}B\right)^{-1}B^\top P_{k+1}Ax = -K_k x.
+	\]
+
+	Substituting this minimizing control back into the Bellman expression gives
+	\[
+		V_k(x)=x^\top P_k x,
+	\]
+	with
+	\[
+		P_k = Q + A^\top P_{k+1}A - A^\top P_{k+1}B\left(R+B^\top P_{k+1}B\right)^{-1}B^\top P_{k+1}A.
+	\]
+	This completes the induction.
+\end{proof}
+
+\begin{definition}[Riccati gain matrix]
+	The matrix
+	\[
+		K_k = \left(R+B^\top P_{k+1}B\right)^{-1}B^\top P_{k+1}A
+	\]
+	is called the \emph{finite-horizon LQR gain} at stage $k$. The optimal input is the state feedback
+	\[
+		u_k^\star = -K_k x_k.
+	\]
+\end{definition}
+
+\begin{proposition}[Equivalent completed-square form]
+	The Riccati recursion can be rewritten as
+	\[
+		x^\top P_k x
+		=
+		\min_u
+		\left\{
+		x^\top Qx + u^\top Ru + (Ax+Bu)^\top P_{k+1}(Ax+Bu)
+		\right\},
+	\]
+	and the minimizing expression admits the completed-square representation
+	\begin{align*}
+		&x^\top Qx + u^\top Ru + (Ax+Bu)^\top P_{k+1}(Ax+Bu) \\
+		&\qquad=
+		x^\top P_k x
+		+
+		(u+K_kx)^\top (R+B^\top P_{k+1}B)(u+K_kx).
+	\end{align*}
+\end{proposition}
+\begin{proof}
+	Expand the right-hand side:
+	\begin{align*}
+		&x^\top P_k x + u^\top(R+B^\top P_{k+1}B)u + 2u^\top(R+B^\top P_{k+1}B)K_kx \\
+		&\qquad + x^\top K_k^\top(R+B^\top P_{k+1}B)K_kx.
+	\end{align*}
+	By the definition of $K_k$,
+	\[
+		(R+B^\top P_{k+1}B)K_k = B^\top P_{k+1}A.
+	\]
+	Also,
+	\[
+		K_k^\top(R+B^\top P_{k+1}B)K_k
+		=
+		A^\top P_{k+1}B(R+B^\top P_{k+1}B)^{-1}B^\top P_{k+1}A.
+	\]
+	Combining these identities with the definition of $P_k$ reproduces the expanded Bellman expression.
+\end{proof}
+
+\begin{algorithm}[H]
+	\DontPrintSemicolon
+	\caption{Finite-Horizon Discrete-Time LQR}
+	\KwIn{$A$, $B$, $Q \succeq 0$, $R \succ 0$, terminal weight $Q_f \succeq 0$, horizon $N$, initial state $x_0$}
+	Set $P_N \gets Q_f$\;
+	\For{$k=N-1,N-2,\dots,0$}{
+		Compute
+		\[
+			K_k \gets \left(R+B^\top P_{k+1}B\right)^{-1}B^\top P_{k+1}A
+		\]
+		and
+		\[
+			P_k \gets Q + A^\top P_{k+1}A - A^\top P_{k+1}B K_k
+		\]\;
+	}
+	Set $x_0$ to the given initial state\;
+	\For{$k=0,1,\dots,N-1$}{
+		Apply the optimal input $u_k \gets -K_k x_k$\;
+		Propagate the state $x_{k+1} \gets Ax_k + Bu_k$\;
+	}
+	\KwOut{Gains $\{K_k\}_{k=0}^{N-1}$, Riccati matrices $\{P_k\}_{k=0}^{N}$, optimal state-control trajectory}
+\end{algorithm}
+
+\begin{eg}[Scalar finite-horizon LQR solved by hand]
+	Consider the scalar system
+	\[
+		x_{k+1}=x_k+u_k,
+	\]
+	with horizon $N=2$ and cost
+	\[
+		J=x_2^2+\sum_{k=0}^{1}(x_k^2+u_k^2).
+	\]
+	Here
+	\[
+		A=1,
+		\qquad
+		B=1,
+		\qquad
+		Q=1,
+		\qquad
+		R=1,
+		\qquad
+		Q_f=1.
+	\]
+	The Riccati recursion gives
+	\[
+		P_2=1,
+	\]
+	\[
+		P_1=1+1-\frac{1\cdot 1 \cdot 1}{1+1}=\frac{3}{2},
+	\]
+	\[
+		P_0=1+\frac{3}{2}-\frac{(\frac{3}{2})^2}{1+\frac{3}{2}}=\frac{8}{5}.
+	\]
+	The gains are
+	\[
+		K_1=\frac{1}{1+1}=\frac{1}{2},
+		\qquad
+		K_0=\frac{\frac{3}{2}}{1+\frac{3}{2}}=\frac{3}{5}.
+	\]
+	If
+	\[
+		x_0=1,
+	\]
+	then
+	\[
+		u_0^\star=-\frac{3}{5},
+		\qquad
+		x_1=\frac{2}{5},
+	\]
+	and
+	\[
+		u_1^\star=-\frac{1}{2}\cdot \frac{2}{5}=-\frac{1}{5},
+		\qquad
+		x_2=\frac{1}{5}.
+	\]
+	This example shows concretely how the backward Riccati sweep produces the forward optimal trajectory.
+\end{eg}
+
+\begin{remark}[Finite versus infinite horizon]
+	In finite-horizon LQR, the gain $K_k$ depends on time because the remaining horizon length changes with $k$. In infinite-horizon LQR, the problem is time invariant, the value function becomes stationary, and the gain converges to a constant matrix under the standard stabilizability and detectability assumptions.
+\end{remark}
+
+\subsection{Infinite-Horizon LQR and the Algebraic Riccati Equation}
+
+\begin{definition}[Infinite-horizon discrete-time LQR]
+	The infinite-horizon discrete-time LQR problem is
+	\begin{align*}
+		\min_{\{u_k\}_{k=0}^{\infty}} \quad & \sum_{k=0}^{\infty}\left(x_k^\top Q x_k + u_k^\top R u_k\right) \\
+		\text{subject to}\quad & x_{k+1}=Ax_k+Bu_k, \\
+		                       & x_0 \text{ given}.
+	\end{align*}
+\end{definition}
+
+\begin{remark}[Stabilizability and detectability]
+	The infinite-horizon problem is meaningful only if the system can be stabilized and the cost can detect unstable directions. The standard hypotheses are:
+	\begin{itemize}
+		\item $(A,B)$ is stabilizable,
+		\item $(Q^{1/2},A)$ is detectable.
+	\end{itemize}
+	The first prevents uncontrollable unstable modes from remaining in the closed loop. The second prevents unstable directions from carrying zero cost.
+\end{remark}
+
+\begin{theorem}[Discrete-time algebraic Riccati equation and optimal gain]
+	Assume $(A,B)$ is stabilizable, $(Q^{1/2},A)$ is detectable, and
+	\[
+		Q \succeq 0,
+		\qquad
+		R \succ 0.
+	\]
+	Then there exists a unique symmetric matrix $P \succeq 0$ such that
+	\[
+		P = Q + A^\top P A - A^\top P B\left(R+B^\top P B\right)^{-1}B^\top P A,
+	\]
+	and the feedback law
+	\[
+		u_k^\star = -Kx_k,
+		\qquad
+		K = \left(R+B^\top P B\right)^{-1}B^\top P A
+	\]
+	is optimal. The matrix $P$ is called the \emph{stabilizing solution} of the discrete-time algebraic Riccati equation (DARE).
+\end{theorem}
+
+\begin{proof}[Proof idea]
+	The finite-horizon Riccati matrices form a monotone sequence under the standard assumptions and converge to a limit $P$. Passing to the limit in the Riccati recursion shows that $P$ solves the fixed-point equation, namely the DARE. The stabilizability and detectability hypotheses rule out nonstabilizing or nonminimal fixed points and single out the unique stabilizing solution. Since the finite-horizon gains converge to the limiting gain
+	\[
+		K = \left(R+B^\top P B\right)^{-1}B^\top P A,
+	\]
+	the infinite-horizon optimal controller is stationary.
+\end{proof}
+
+\begin{theorem}[Closed-loop stability of infinite-horizon LQR]
+	Let $P \succeq 0$ be the stabilizing solution of the DARE, and define
+	\[
+		K = \left(R+B^\top P B\right)^{-1}B^\top P A,
+		\qquad
+		A_c = A-BK.
+	\]
+	Under the assumptions that $(A,B)$ is stabilizable and $(Q^{1/2},A)$ is detectable, the closed-loop matrix $A_c$ is Schur stable; equivalently, all eigenvalues of $A-BK$ lie strictly inside the unit disk.
+\end{theorem}
+\begin{proof}
+	Starting from the DARE and the definition of $K$, one verifies the identity
+	\[
+		P = Q + K^\top R K + A_c^\top P A_c.
+	\]
+	Let
+	\[
+		V(x)=x^\top P x.
+	\]
+	Then along the closed-loop dynamics $x_{k+1}=A_c x_k$,
+	\begin{align*}
+		V(x_{k+1})-V(x_k)
+		&= x_k^\top(A_c^\top P A_c - P)x_k \\
+		&= -x_k^\top(Q+K^\top R K)x_k \\
+		&\le 0.
+	\end{align*}
+	So $V$ is a Lyapunov function candidate.
+
+	Now suppose that $A_c$ had an eigenvalue $\lambda$ with $|\lambda| \ge 1$, with corresponding eigenvector $x \ne 0$. Substituting the closed-loop trajectory
+	\[
+		x_k = \lambda^k x
+	\]
+	into the decrease identity yields
+	\[
+		x^\top(Q+K^\top R K)x = 0.
+	\]
+	Since both summands are positive semidefinite and $R \succ 0$, we obtain
+	\[
+		Q^{1/2}x=0,
+		\qquad
+		Kx=0.
+	\]
+	The second identity implies
+	\[
+		A_c x = A x = \lambda x.
+	\]
+	So $x$ is an eigenvector of $A$ with $|\lambda| \ge 1$ that is unobservable through $Q^{1/2}$. This contradicts detectability of $(Q^{1/2},A)$. Hence no such eigenvalue exists, and $A_c$ is Schur stable.
+\end{proof}
+
+\begin{eg}[Setting up a $2 \times 2$ algebraic Riccati equation]
+	Consider
+	\[
+		A=\begin{bmatrix}1 & 1 \\ 0 & 1\end{bmatrix},
+		\qquad
+		B=\begin{bmatrix}0 \\ 1\end{bmatrix},
+		\qquad
+		Q=I,
+		\qquad
+		R=1.
+	\]
+	Write
+	\[
+		P=\begin{bmatrix}p_{11} & p_{12} \\ p_{12} & p_{22}\end{bmatrix}.
+	\]
+	Then
+	\[
+		B^\top P B = p_{22},
+		\qquad
+		B^\top P A = \begin{bmatrix}p_{12} & p_{12}+p_{22}\end{bmatrix}.
+	\]
+	Also,
+	\[
+		A^\top P A =
+		\begin{bmatrix}
+			p_{11} & p_{11}+p_{12} \\
+			p_{11}+p_{12} & p_{11}+2p_{12}+p_{22}
+		\end{bmatrix}.
+	\]
+	Therefore the DARE becomes
+	\[
+		P
+		=
+		I
+		+
+		\begin{bmatrix}
+			p_{11} & p_{11}+p_{12} \\
+			p_{11}+p_{12} & p_{11}+2p_{12}+p_{22}
+		\end{bmatrix}
+		-
+		\frac{1}{1+p_{22}}
+		\begin{bmatrix}
+			p_{12} \\
+			p_{12}+p_{22}
+		\end{bmatrix}
+		\begin{bmatrix}
+			p_{12} & p_{12}+p_{22}
+		\end{bmatrix}.
+	\]
+	Equating the entries yields a coupled nonlinear algebraic system for $(p_{11},p_{12},p_{22})$.
+\end{eg}
+
+\subsection{The Riccati Equation -- Properties and Structure}
+
+\begin{definition}[DARE versus CARE]
+	The \emph{discrete-time algebraic Riccati equation} (DARE) is
+	\[
+		P = Q + A^\top P A - A^\top P B\left(R+B^\top P B\right)^{-1}B^\top P A.
+	\]
+	The \emph{continuous-time algebraic Riccati equation} (CARE) is
+	\[
+		A^\top P + P A - P B R^{-1}B^\top P + Q = 0.
+	\]
+	Both equations characterize stationary quadratic value functions for linear-quadratic optimal control, but one comes from discrete-time dynamics and the other from continuous-time dynamics.
+\end{definition}
+
+\begin{definition}[Riccati operator]
+	For $P \succeq 0$, define the discrete Riccati operator
+	\[
+		\mathcal{T}(P)
+		=
+		Q + A^\top P A - A^\top P B\left(R+B^\top P B\right)^{-1}B^\top P A.
+	\]
+\end{definition}
+
+\begin{theorem}[Monotonicity and convergence of the Riccati iteration]
+	Assume
+	\[
+		Q \succeq 0,
+		\qquad
+		R \succ 0.
+	\]
+	Then the Riccati operator is order preserving:
+	\[
+		P \succeq S \succeq 0
+		\quad \Longrightarrow \quad
+		\mathcal{T}(P) \succeq \mathcal{T}(S).
+	\]
+	If one defines the sequence
+	\[
+		\Pi_0=0,
+		\qquad
+		\Pi_{j+1}=\mathcal{T}(\Pi_j),
+	\]
+	then $\{\Pi_j\}$ is monotone nondecreasing. If, in addition, the sequence is bounded above, then it converges to a fixed point of the DARE.
+\end{theorem}
+\begin{proof}
+	For any $P \succeq 0$,
+	\[
+		x^\top \mathcal{T}(P)x
+		=
+		\min_u
+		\left\{
+		x^\top Qx + u^\top Ru + (Ax+Bu)^\top P(Ax+Bu)
+		\right\}.
+	\]
+	If $P \succeq S$, then for every $(x,u)$,
+	\[
+		(Ax+Bu)^\top P(Ax+Bu)
+		\ge
+		(Ax+Bu)^\top S(Ax+Bu).
+	\]
+	Adding the common stage cost and minimizing over $u$ gives
+	\[
+		x^\top \mathcal{T}(P)x \ge x^\top \mathcal{T}(S)x
+	\]
+	for all $x$, hence
+	\[
+		\mathcal{T}(P) \succeq \mathcal{T}(S).
+	\]
+
+	Next, since
+	\[
+		\Pi_1=\mathcal{T}(0)=Q \succeq 0=\Pi_0,
+	\]
+	order preservation implies inductively that
+	\[
+		\Pi_{j+1}=\mathcal{T}(\Pi_j)\succeq \mathcal{T}(\Pi_{j-1})=\Pi_j.
+	\]
+	So the sequence is monotone nondecreasing.
+
+	If the sequence is bounded above by some $\bar P$, then each matrix entry converges monotonically, and the limit
+	\[
+		\Pi_\infty = \lim_{j \to \infty}\Pi_j
+	\]
+	exists in the cone of symmetric positive semidefinite matrices. Continuity of $\mathcal{T}$ on that cone implies
+	\[
+		\Pi_\infty = \mathcal{T}(\Pi_\infty),
+	\]
+	so $\Pi_\infty$ is a fixed point of the DARE.
+\end{proof}
+
+\begin{proposition}[Symmetry of the Riccati matrices]
+	If the terminal weight $Q_f$ is symmetric, then every finite-horizon Riccati matrix $P_k$ is symmetric.
+\end{proposition}
+\begin{proof}
+	We argue by backward induction. By assumption,
+	\[
+		P_N=Q_f=Q_f^\top.
+	\]
+	Assume $P_{k+1}=P_{k+1}^\top$. Then
+	\[
+		R+B^\top P_{k+1}B
+	\]
+	is symmetric, hence so is its inverse. Therefore
+	\[
+		A^\top P_{k+1}B\left(R+B^\top P_{k+1}B\right)^{-1}B^\top P_{k+1}A
+	\]
+	is symmetric because it has the form $M^\top S^{-1}M$ with $S=S^\top$. Since both
+	\[
+		Q
+		\qquad \text{and} \qquad
+		A^\top P_{k+1}A
+	\]
+	are symmetric, the recursion shows that $P_k$ is symmetric.
+\end{proof}
+
+\begin{proposition}[Invertibility of $R+B^\top P B$]
+	If
+	\[
+		R \succ 0
+		\qquad \text{and} \qquad
+		P \succeq 0,
+	\]
+	then
+	\[
+		R+B^\top P B \succ 0,
+	\]
+	hence it is invertible.
+\end{proposition}
+\begin{proof}
+	Let $z \ne 0$. Then
+	\begin{align*}
+		z^\top(R+B^\top P B)z
+		&= z^\top R z + z^\top B^\top P B z \\
+		&= z^\top R z + (Bz)^\top P(Bz).
+	\end{align*}
+	The first term is strictly positive because $R \succ 0$, and the second is nonnegative because $P \succeq 0$. Therefore
+	\[
+		z^\top(R+B^\top P B)z > 0
+	\]
+	for all $z \ne 0$.
+\end{proof}
+
+\begin{theorem}[Hamiltonian matrix connection for continuous-time LQR]
+	Consider the continuous-time Hamiltonian matrix
+	\[
+		\mathcal{H}
+		=
+		\begin{bmatrix}
+			A & -B R^{-1}B^\top \\
+			-Q & -A^\top
+		\end{bmatrix}.
+	\]
+	If $P$ solves the CARE
+	\[
+		A^\top P + P A - P B R^{-1}B^\top P + Q = 0,
+	\]
+	then the graph subspace
+	\[
+		\mathcal{G}(P)=\left\{
+		\begin{bmatrix}
+			x \\
+			Px
+		\end{bmatrix}
+		: x \in \mathbb{R}^n
+		\right\}
+	\]
+	is invariant under $\mathcal{H}$, and
+	\[
+		\mathcal{H}
+		\begin{bmatrix}
+			I \\
+			P
+		\end{bmatrix}
+		=
+		\begin{bmatrix}
+			I \\
+			P
+		\end{bmatrix}
+		(A-BR^{-1}B^\top P).
+	\]
+\end{theorem}
+\begin{proof}
+	Compute
+	\[
+		\mathcal{H}
+		\begin{bmatrix}
+			I \\
+			P
+		\end{bmatrix}
+		=
+		\begin{bmatrix}
+			A-BR^{-1}B^\top P \\
+			-Q-A^\top P
+		\end{bmatrix}.
+	\]
+	On the other hand,
+	\[
+		\begin{bmatrix}
+			I \\
+			P
+		\end{bmatrix}
+		(A-BR^{-1}B^\top P)
+		=
+		\begin{bmatrix}
+			A-BR^{-1}B^\top P \\
+			PA-PBR^{-1}B^\top P
+		\end{bmatrix}.
+	\]
+	These are equal precisely when
+	\[
+		-Q-A^\top P = PA-PBR^{-1}B^\top P,
+	\]
+	which is equivalent to the CARE.
+\end{proof}
+
+\begin{remark}[Schur-complement interpretation]
+	The discrete Riccati equation is equivalent to the statement that the Schur complement of the block matrix
+	\[
+		\begin{bmatrix}
+			R+B^\top P B & B^\top P A \\
+			A^\top P B & Q+A^\top P A-P
+		\end{bmatrix}
+	\]
+	with respect to the upper-left block vanishes. Indeed, because $R+B^\top P B$ is invertible, the Schur complement is
+	\[
+		Q+A^\top P A-P
+		-
+		A^\top P B(R+B^\top P B)^{-1}B^\top P A,
+	\]
+	which is exactly zero when $P$ satisfies the DARE.
+\end{remark}
+
+\begin{eg}[Scalar DARE]
+	For the scalar system
+	\[
+		x_{k+1}=ax_k+bu_k
+	\]
+	with cost weights
+	\[
+		q \ge 0,
+		\qquad
+		r>0,
+	\]
+	the DARE becomes
+	\[
+		P=q+a^2P-\frac{a^2b^2P^2}{r+b^2P}.
+	\]
+	Multiplying through by $r+b^2P$ gives the quadratic equation
+	\[
+		b^2P^2 + \bigl(r(1-a^2)-qb^2\bigr)P - qr = 0.
+	\]
+	The relevant LQR solution is the nonnegative root that yields a stabilizing gain
+	\[
+		K=\frac{baP}{r+b^2P}.
+	\]
+\end{eg}
+
+\begin{remark}[Cheap control and expensive control limits]
+	As
+	\[
+		R \to 0^+,
+	\]
+	control becomes cheap, so the optimal gain typically grows and the controller acts more aggressively. In controllable directions, the closed loop tends to regulate the state rapidly, and the value matrix $P$ decreases because state error can be removed at lower relative cost.
+
+	As
+	\[
+		R \to \infty,
+	\]
+	control becomes expensive, so the optimal gain tends to zero. The controller then approaches open-loop behavior. If the open-loop matrix $A$ is already stable, the limiting value matrix approaches the uncontrolled cost. If $A$ has unstable modes, the infinite-horizon cost may diverge because the controller is no longer willing to spend enough effort to stabilize the system.
+\end{remark}
+
+\subsection{Continuous-Time LQR}
+
+\begin{definition}[Continuous-time LQR]
+	The finite-horizon continuous-time LQR problem is
+	\begin{align*}
+		\min_{u(\cdot)} \quad & x(t_f)^\top S_f x(t_f) + \int_{t_0}^{t_f}\left(x(t)^\top Q x(t) + u(t)^\top R u(t)\right)\,dt \\
+		\text{subject to}\quad & \dot x(t)=Ax(t)+Bu(t), \\
+		                       & x(t_0)=x_0,
+	\end{align*}
+	where
+	\[
+		Q=Q^\top \succeq 0,
+		\qquad
+		R=R^\top \succ 0,
+		\qquad
+		S_f=S_f^\top \succeq 0.
+	\]
+\end{definition}
+
+\begin{theorem}[Differential Riccati equation]
+	For continuous-time finite-horizon LQR, the value function has the form
+	\[
+		V(t,x)=x^\top P(t)x,
+	\]
+	where $P(t)$ satisfies the backward differential Riccati equation
+	\[
+		-\dot P
+		=
+		Q + A^\top P + P A - P B R^{-1}B^\top P,
+		\qquad
+		P(t_f)=S_f.
+	\]
+	The optimal control law is
+	\[
+		u^\star(t)=-R^{-1}B^\top P(t)x(t).
+	\]
+\end{theorem}
+\begin{proof}
+	The proof is the continuous-time analogue of the discrete Bellman derivation. One substitutes the ansatz
+	\[
+		V(t,x)=x^\top P(t)x
+	\]
+	into the Hamilton-Jacobi-Bellman equation
+	\[
+		-\partial_t V(t,x)
+		=
+		\min_u
+		\left\{
+		x^\top Q x + u^\top R u + \nabla_x V(t,x)^\top(Ax+Bu)
+		\right\},
+	\]
+	with terminal condition
+	\[
+		V(t_f,x)=x^\top S_f x.
+	\]
+	Since
+	\[
+		\nabla_x V(t,x)=2P(t)x,
+	\]
+	the minimization problem becomes
+	\[
+		\min_u
+		\left\{
+		x^\top Qx + u^\top Ru + 2x^\top P A x + 2u^\top B^\top P x
+		\right\}.
+	\]
+	The unique minimizer satisfies
+	\[
+		2Ru + 2B^\top Px = 0,
+	\]
+	hence
+	\[
+		u^\star=-R^{-1}B^\top Px.
+	\]
+	Substituting this control into the HJB equation and identifying coefficients of the quadratic form in $x$ yields the differential Riccati equation.
+\end{proof}
+
+\begin{definition}[Continuous-time algebraic Riccati equation]
+	In the infinite-horizon continuous-time case, stationarity of the value matrix leads to the CARE
+	\[
+		A^\top P + P A - P B R^{-1}B^\top P + Q = 0.
+	\]
+	The optimal constant gain is
+	\[
+		K=R^{-1}B^\top P,
+		\qquad
+		u^\star(t)=-Kx(t).
+	\]
+\end{definition}
+
+\begin{eg}[Scalar continuous-time LQR]
+	Consider
+	\[
+		\dot x = ax + bu,
+	\]
+	with infinite-horizon cost
+	\[
+		J=\int_0^\infty \left(qx(t)^2 + ru(t)^2\right)\,dt,
+		\qquad
+		q \ge 0,
+		\quad
+		r>0.
+	\]
+	The CARE is
+	\[
+		2aP - \frac{b^2}{r}P^2 + q = 0,
+	\]
+	or equivalently
+	\[
+		b^2P^2 - 2arP - qr = 0.
+	\]
+	The two roots are
+	\[
+		P=\frac{r}{b^2}\left(a \pm \sqrt{a^2+\frac{b^2 q}{r}}\right).
+	\]
+	The stabilizing solution is the root with the plus sign:
+	\[
+		P=\frac{r}{b^2}\left(a + \sqrt{a^2+\frac{b^2 q}{r}}\right),
+	\]
+	because then the closed-loop coefficient becomes
+	\[
+		a-bK
+		=
+		a-\frac{b^2}{r}P
+		=
+		-\sqrt{a^2+\frac{b^2 q}{r}} < 0.
+	\]
+\end{eg}
+
+\begin{theorem}[Classical robustness margins of continuous-time LQR]
+	For the continuous-time full-state-feedback LQR law
+	\[
+		u=-Kx,
+	\]
+	the loop enjoys guaranteed robustness margins: gain margin at least $6$ dB and phase margin at least $60^\circ$.
+\end{theorem}
+\begin{proof}[Proof sketch]
+	The key fact is that the return-difference matrix of the LQR loop satisfies a strict positive-real identity implied by the CARE. From this one shows that the Nyquist plot of the loop transfer function stays a controlled distance away from the critical point $-1$. Geometrically, the positive-real property places the Nyquist image in a sector that excludes destabilizing perturbations smaller than a factor of $2$ in gain and $\pm 60^\circ$ in phase. The full proof is classical but substantially more involved than the Riccati derivations above.
+\end{proof}
+
+\subsection{LQR and Pontryagin's Minimum Principle}
+
+\begin{remark}
+	LQR is one of the cleanest demonstrations that dynamic programming and Pontryagin's principle are complementary rather than competing theories. Dynamic programming produces the Riccati equation from the value function. PMP produces the same Riccati equation from the adjoint dynamics.
+\end{remark}
+
+\begin{theorem}[PMP derivation of the continuous-time Riccati equation]
+	Consider the finite-horizon continuous-time LQR problem
+	\begin{align*}
+		\min_{u(\cdot)} \quad & x(t_f)^\top S_f x(t_f) + \int_{t_0}^{t_f}\left(x^\top Q x + u^\top R u\right)\,dt \\
+		\text{subject to}\quad & \dot x = A x + B u.
+	\end{align*}
+	Pontryagin's minimum principle yields the same control law and Riccati equation as dynamic programming:
+	\[
+		u^\star(t)=-R^{-1}B^\top P(t)x(t),
+	\]
+	where $P(t)$ satisfies
+	\[
+		-\dot P
+		=
+		Q + A^\top P + P A - P B R^{-1}B^\top P,
+		\qquad
+		P(t_f)=S_f.
+	\]
+\end{theorem}
+\begin{proof}
+	The Hamiltonian is
+	\[
+		H(x,u,p)=x^\top Q x + u^\top R u + p^\top(Ax+Bu).
+	\]
+	PMP gives
+	\[
+		\dot x = A x + B u,
+	\]
+	\[
+		-\dot p = 2Qx + A^\top p,
+	\]
+	and the stationarity condition
+	\[
+		0 = \partial_u H = 2Ru + B^\top p.
+	\]
+	Hence
+	\[
+		u^\star = -\frac{1}{2}R^{-1}B^\top p.
+	\]
+
+	Now make the ansatz
+	\[
+		p(t)=2P(t)x(t),
+	\]
+	where $P(t)$ is a matrix to be determined. Then
+	\[
+		u^\star(t)=-R^{-1}B^\top P(t)x(t).
+	\]
+	Differentiate the costate ansatz:
+	\[
+		\dot p = 2\dot P\,x + 2P\dot x.
+	\]
+	Using the state equation under the optimal control,
+	\[
+		\dot x = \left(A-BR^{-1}B^\top P\right)x,
+	\]
+	we obtain
+	\[
+		\dot p
+		=
+		2\dot P\,x + 2P\left(A-BR^{-1}B^\top P\right)x.
+	\]
+	On the other hand, the costate equation gives
+	\[
+		\dot p = -2Qx - 2A^\top P x.
+	\]
+	Since this must hold for every trajectory state $x$, we conclude that
+	\[
+		\dot P + P A - P B R^{-1}B^\top P = -Q - A^\top P,
+	\]
+	or equivalently
+	\[
+		-\dot P
+		=
+		Q + A^\top P + P A - P B R^{-1}B^\top P.
+	\]
+	The transversality condition for the terminal cost is
+	\[
+		p(t_f)=2S_f x(t_f),
+	\]
+	which implies
+	\[
+		P(t_f)=S_f.
+	\]
+\end{proof}
+
+\begin{remark}[Two roads to the same destination]
+	In LQR,
+	\begin{itemize}
+		\item HJB starts from a quadratic value-function ansatz and produces the Riccati equation,
+		\item PMP starts from a linear costate ansatz and produces the same Riccati equation.
+	\end{itemize}
+	This coincidence is not accidental. It reflects the deep relation
+	\[
+		p(t)=2\nabla_x V(t,x(t))
+	\]
+	when the value function is smooth.
+\end{remark}

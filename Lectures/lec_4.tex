@@ -1,0 +1,473 @@
+\lecture{4}{}{Dynamic Programming and the Calculus of Optimal Control}
+
+\begin{intuition}
+	Static optimization chooses a point. Optimal control chooses an entire signal or trajectory. That single change transforms the problem fundamentally: decisions are now coupled through dynamics, information flows over time, and optimality can be analyzed either by backward induction on value functions or by forward-backward necessary conditions. Bellman and Pontryagin are therefore not competing viewpoints but complementary ones:
+	\begin{itemize}
+		\item dynamic programming gives a sufficient characterization through the value function,
+		\item Pontryagin's minimum principle gives necessary conditions through a Hamiltonian system.
+	\end{itemize}
+	This lecture introduces both viewpoints at the conceptual level required for the later computational lectures.
+\end{intuition}
+
+\subsection{Optimal Control Problem Formulation}
+
+\begin{definition}[Continuous-time optimal control problem in Bolza form]
+	A continuous-time optimal control problem (OCP) in Bolza form is
+	\begin{align*}
+		\min_{u(\cdot)} \quad & \phi(x(t_f),t_f) + \int_{t_0}^{t_f} L(t,x(t),u(t))\,dt \\
+		\text{subject to}\quad & \dot x(t)=f(t,x(t),u(t)), \qquad t \in [t_0,t_f], \\
+		                       & x(t_0)=x_0, \\
+		                       & u(t)\in \mathcal{U}.
+	\end{align*}
+	Here
+	\[
+		x(t)\in \mathbb{R}^n
+		\qquad \text{and} \qquad
+		u(t)\in \mathbb{R}^m
+	\]
+	are the state and control, $L$ is the running cost, and $\phi$ is the terminal cost.
+\end{definition}
+
+\begin{definition}[Discrete-time optimal control problem]
+	A finite-horizon discrete-time OCP is
+	\begin{align*}
+		\min_{\{u_k\}_{k=0}^{N-1}} \quad & \phi_N(x_N) + \sum_{k=0}^{N-1} \ell_k(x_k,u_k) \\
+		\text{subject to}\quad & x_{k+1}=f_k(x_k,u_k), \qquad k=0,\dots,N-1, \\
+		                       & x_0 \text{ given}, \\
+		                       & u_k \in \mathcal{U}_k.
+	\end{align*}
+\end{definition}
+
+\begin{notation}[Bolza, Mayer, and Lagrange forms]
+	The three standard objective forms are:
+	\begin{itemize}
+		\item \emph{Bolza:}
+		      \[
+			      \phi(x(t_f),t_f)+\int_{t_0}^{t_f}L(t,x,u)\,dt,
+		      \]
+		\item \emph{Mayer:}
+		      terminal-cost only, i.e. $L \equiv 0$,
+		\item \emph{Lagrange:}
+		      running-cost only, i.e. $\phi \equiv 0$.
+	\end{itemize}
+	These forms are equivalent up to state augmentation. For example, Bolza can be converted into Mayer form by introducing an auxiliary state
+	\[
+		\dot z(t)=L(t,x(t),u(t)),
+		\qquad
+		z(t_0)=0,
+	\]
+	and then minimizing
+	\[
+		\phi(x(t_f),t_f)+z(t_f).
+	\]
+\end{notation}
+
+\begin{remark}
+	In robotics, the running cost typically encodes tracking error, control effort, collision penalties, or smoothness, while the dynamics encode rigid-body motion, actuator dynamics, or learned models. The terminal cost enforces the quality of the final state or approximates the tail cost beyond the planning horizon.
+\end{remark}
+
+\subsection{Dynamic Programming in Discrete Time}
+
+\begin{intuition}
+	Dynamic programming is based on a brutally simple observation: if a trajectory is optimal from time $k$ onward, then its suffix from time $k+1$ onward must already be optimal for the state reached at time $k+1$. Otherwise one could replace that suffix by a cheaper one and improve the whole trajectory. This recursive structure is what makes backward solution possible.
+\end{intuition}
+
+\begin{theorem}[Bellman's principle of optimality]
+	Consider a finite-horizon discrete-time OCP. Let
+	\[
+		\{x_k^\star,u_k^\star\}_{k=0}^{N-1}
+	\]
+	be an optimal state-control sequence for the initial condition $x_0$. Then for every intermediate index $j \in \{0,\dots,N-1\}$, the truncated sequence
+	\[
+		\{x_k^\star,u_k^\star\}_{k=j}^{N-1}
+	\]
+	is optimal for the subproblem starting from the state $x_j^\star$ at time $j$.
+\end{theorem}
+\begin{proof}[Proof sketch]
+	Assume the tail from time $j$ onward were not optimal for the state $x_j^\star$. Then there would exist another admissible tail with smaller cost and the same initial state $x_j^\star$. Replacing the original tail by this cheaper one would preserve feasibility of the whole trajectory and strictly reduce the total cost, contradicting optimality of the original solution. Therefore every optimal trajectory has optimal tails.
+\end{proof}
+
+\begin{definition}[Value function]
+	The \emph{value function} at stage $k$ is
+	\[
+		V_k(x)=
+		\inf_{\{u_i\}_{i=k}^{N-1}}
+		\left[
+		\phi_N(x_N)+\sum_{i=k}^{N-1}\ell_i(x_i,u_i)
+		\right],
+	\]
+	where the infimum is taken over all admissible control sequences satisfying
+	\[
+		x_{i+1}=f_i(x_i,u_i),
+		\qquad
+		x_k=x.
+	\]
+	The terminal value is
+	\[
+		V_N(x)=\phi_N(x).
+	\]
+\end{definition}
+
+\begin{theorem}[Bellman equation]
+	For the finite-horizon discrete-time OCP,
+	\[
+		V_N(x)=\phi_N(x),
+	\]
+	and for $k=N-1,\dots,0$,
+	\[
+		V_k(x)=\min_{u \in \mathcal{U}_k}\Bigl\{\ell_k(x,u)+V_{k+1}(f_k(x,u))\Bigr\}.
+	\]
+\end{theorem}
+\begin{proof}[Proof sketch]
+	Fix the state $x$ at time $k$. Any admissible control choice first incurs the immediate stage cost $\ell_k(x,u)$, after which the system moves to the next state
+	\[
+		x^+=f_k(x,u).
+	\]
+	From that state onward, the optimal remaining cost is by definition $V_{k+1}(x^+)$. Therefore the total cost generated by choosing $u$ now and behaving optimally afterward is
+	\[
+		\ell_k(x,u)+V_{k+1}(f_k(x,u)).
+	\]
+	Minimizing over the current control produces the Bellman recursion.
+\end{proof}
+
+\begin{eg}[A scalar dynamic-programming calculation]
+	Consider the discrete-time system
+	\[
+		x_{k+1}=x_k+u_k
+	\]
+	with horizon $N=2$ and cost
+	\[
+		J=x_2^2+u_0^2+u_1^2.
+	\]
+	Then
+	\[
+		V_2(x)=x^2.
+	\]
+	At stage $k=1$,
+	\[
+		V_1(x)=\min_u \left\{u^2+(x+u)^2\right\}.
+	\]
+	Differentiating with respect to $u$,
+	\[
+		2u+2(x+u)=0
+		\qquad \Longrightarrow \qquad
+		u_1^\star(x)=-\frac{x}{2}.
+	\]
+	Substituting back gives
+	\[
+		V_1(x)=\frac{x^2}{2}.
+	\]
+	At stage $k=0$,
+	\[
+		V_0(x)=\min_u \left\{u^2+\frac{1}{2}(x+u)^2\right\}.
+	\]
+	Differentiating,
+	\[
+		2u+(x+u)=0
+		\qquad \Longrightarrow \qquad
+		u_0^\star(x)=-\frac{x}{3}.
+	\]
+	Hence
+	\[
+		V_0(x)=\frac{x^2}{3}.
+	\]
+	This example shows the characteristic backward structure of dynamic programming: first solve the last stage, then substitute that solution into the previous stage.
+\end{eg}
+
+\begin{remark}[Curse of dimensionality]
+	If the state dimension is $n$ and one discretizes each state coordinate using $M$ grid points, then storing the value function requires on the order of $M^n$ entries. This exponential dependence on dimension is Bellman’s curse of dimensionality. Dynamic programming is exact in principle, but rapidly becomes intractable for high-dimensional nonlinear systems.
+\end{remark}
+
+\subsection{The Hamilton--Jacobi--Bellman Equation}
+
+\begin{definition}[Continuous-time value function]
+	For the continuous-time Bolza problem, the value function is
+	\[
+		V(t,x)
+		=
+		\inf_{u(\cdot)}
+		\left[
+		\phi(x(t_f),t_f)+\int_t^{t_f} L(\tau,x(\tau),u(\tau))\,d\tau
+		\right],
+	\]
+	where the infimum is over admissible controls starting from the initial condition
+	\[
+		x(t)=x.
+	\]
+\end{definition}
+
+\begin{theorem}[Hamilton--Jacobi--Bellman equation]
+	Assume the value function is sufficiently smooth. Then it satisfies
+	\[
+		\partial_t V(t,x)
+		+
+		\min_{u \in \mathcal{U}}
+		\left\{
+			L(t,x,u)+\nabla_x V(t,x)^\top f(t,x,u)
+		\right\}
+		=0
+	\]
+	with terminal condition
+	\[
+		V(t_f,x)=\phi(x,t_f).
+	\]
+\end{theorem}
+\begin{proof}[Proof sketch]
+	Apply the dynamic-programming principle over a short interval $[t,t+\Delta t]$:
+	\[
+		V(t,x)=\min_u
+		\left\{
+			\int_t^{t+\Delta t}L(\tau,x(\tau),u(\tau))\,d\tau
+			+
+			V(t+\Delta t,x(t+\Delta t))
+		\right\}.
+	\]
+	For small $\Delta t$, approximate
+	\[
+		\int_t^{t+\Delta t}L(\tau,x(\tau),u(\tau))\,d\tau
+		\approx
+		L(t,x,u)\Delta t
+	\]
+	and
+	\[
+		x(t+\Delta t)\approx x+f(t,x,u)\Delta t.
+	\]
+	Expand $V(t+\Delta t,x(t+\Delta t))$ to first order:
+	\[
+		V(t+\Delta t,x+f\Delta t)
+		\approx
+		V(t,x)+\partial_t V\,\Delta t+\nabla_x V^\top f\,\Delta t.
+	\]
+	Subtract $V(t,x)$ from both sides, divide by $\Delta t$, and let $\Delta t \to 0$. The result is the HJB equation.
+\end{proof}
+
+\begin{theorem}[Verification theorem]
+	Suppose a smooth function $W(t,x)$ satisfies the HJB equation with the correct terminal condition, and suppose there exists a feedback law
+	\[
+		u^\star(t,x)\in \argmin_{u \in \mathcal{U}}
+		\left\{
+			L(t,x,u)+\nabla_x W(t,x)^\top f(t,x,u)
+		\right\}.
+	\]
+	Then
+	\[
+		W(t,x)=V(t,x),
+	\]
+	and the feedback law $u^\star$ is optimal.
+\end{theorem}
+\begin{proof}[Proof sketch]
+	Let $x(\cdot)$ be any admissible trajectory. Along that trajectory,
+	\[
+		\frac{d}{dt}W(t,x(t))
+		=
+		\partial_t W(t,x(t))+\nabla_x W(t,x(t))^\top f(t,x(t),u(t)).
+	\]
+	By the HJB equation, the right-hand side is bounded below by $-L(t,x(t),u(t))$, with equality for the minimizing control $u^\star$. Integrate from $t$ to $t_f$, use the terminal condition, and rearrange. This shows that every admissible control has cost at least $W(t,x)$, while the minimizing feedback attains exactly that value. Therefore $W=V$ and $u^\star$ is optimal.
+\end{proof}
+
+\begin{remark}[HJB is a sufficient theory]
+	HJB does more than characterize candidate minimizers: if one can solve the PDE and identify the minimizer in the Hamiltonian minimization, then one has already solved the optimal control problem globally. This is much stronger than first-order necessary conditions. The cost is that solving the PDE is usually impossible in high dimensions.
+\end{remark}
+
+\begin{remark}[Preview: HJB and LQR]
+	For linear dynamics
+	\[
+		\dot x=Ax+Bu
+	\]
+	and quadratic cost, the ansatz
+	\[
+		V(t,x)=x^\top P(t)x
+	\]
+	reduces HJB to a matrix differential equation for $P(t)$, namely the Riccati equation. This is the origin of LQR.
+\end{remark}
+
+\subsection{Pontryagin's Minimum Principle}
+
+\begin{definition}[Hamiltonian]
+	For the continuous-time OCP
+	\[
+		J=\phi(x(t_f),t_f)+\int_{t_0}^{t_f}L(t,x(t),u(t))\,dt,
+	\]
+	the \emph{Hamiltonian} is
+	\[
+		H(t,x,u,p)=L(t,x,u)+p^\top f(t,x,u),
+	\]
+	where
+	\[
+		p(t)\in \mathbb{R}^n
+	\]
+	is the \emph{costate} or \emph{adjoint} variable.
+\end{definition}
+
+\begin{intuition}
+	The costate plays exactly the role that Lagrange multipliers played in Lecture 3. There the constraint was algebraic, such as $Ax=b$ or $g(x)\le 0$. Here the constraint is differential:
+	\[
+		\dot x-f(t,x,u)=0.
+	\]
+	The multiplier for this infinite family of constraints is no longer a vector but a time-varying function $p(t)$.
+\end{intuition}
+
+\begin{theorem}[Pontryagin's Minimum Principle]
+	Consider the fixed-final-time problem
+	\begin{align*}
+		\min_{u(\cdot)} \quad & \phi(x(t_f))+\int_{t_0}^{t_f}L(t,x(t),u(t))\,dt \\
+		\text{subject to}\quad & \dot x(t)=f(t,x(t),u(t)), \\
+		                       & x(t_0)=x_0.
+	\end{align*}
+	If $u^\star(\cdot)$ is optimal with corresponding state $x^\star(\cdot)$, then there exists a costate $p(\cdot)$ such that:
+	\begin{align*}
+		\dot x^\star(t) & = \partial_p H(t,x^\star(t),u^\star(t),p(t)), \\
+		\dot p(t) & = -\partial_x H(t,x^\star(t),u^\star(t),p(t)), \\
+		u^\star(t) & \in \argmin_{u \in \mathcal{U}} H(t,x^\star(t),u,p(t)), \\
+		p(t_f) & = \nabla_x \phi(x^\star(t_f)).
+	\end{align*}
+	Additional transversality conditions appear when the terminal state or terminal time is free.
+\end{theorem}
+\begin{proof}[Proof outline]
+	One writes an augmented functional by appending the dynamics constraint with a multiplier $p(t)$:
+	\[
+		\phi(x(t_f))+\int_{t_0}^{t_f}\Bigl[L(t,x,u)+p^\top(f(t,x,u)-\dot x)\Bigr]\,dt.
+	\]
+	Then one computes the first variation with respect to $x$, $u$, and the multiplier. Integration by parts moves the derivative off the state variation, which produces the adjoint equation and the terminal transversality term. Stationarity with respect to the control gives the Hamiltonian minimization condition. A fully rigorous proof is usually carried out using needle variations or an infinite-dimensional multiplier theorem.
+\end{proof}
+
+\begin{remark}[PMP is necessary, not sufficient]
+	Pontryagin's principle characterizes optimal trajectories by first-order conditions. Like KKT conditions, these may also be satisfied at nonoptimal extremals or saddle-type solutions. Additional convexity or verification arguments are required for sufficiency.
+\end{remark}
+
+\begin{eg}[Minimum-energy control of an integrator]
+	Consider
+	\begin{align*}
+		\min_{u(\cdot)} \quad & \frac{1}{2}\int_0^T u(t)^2\,dt \\
+		\text{subject to}\quad & \dot x(t)=u(t), \\
+		                       & x(0)=x_0,\quad x(T)=0.
+	\end{align*}
+	The Hamiltonian is
+	\[
+		H(x,u,p)=\frac{1}{2}u^2+pu.
+	\]
+	The optimality condition gives
+	\[
+		\partial_u H=u+p=0
+		\qquad \Longrightarrow \qquad
+		u^\star(t)=-p(t).
+	\]
+	The costate equation is
+	\[
+		\dot p(t)=-\partial_x H=0,
+	\]
+	so $p(t)\equiv c$ is constant and therefore
+	\[
+		u^\star(t)\equiv -c.
+	\]
+	The state then evolves according to
+	\[
+		x(t)=x_0-ct.
+	\]
+	Imposing the terminal condition $x(T)=0$ gives
+	\[
+		c=\frac{x_0}{T},
+	\]
+	so
+	\[
+		u^\star(t)=-\frac{x_0}{T}.
+	\]
+	The minimum-energy solution is thus constant control.
+\end{eg}
+
+\begin{eg}[A bang-bang minimum-time problem]
+	Consider
+	\begin{align*}
+		\min_{u(\cdot),T} \quad & T \\
+		\text{subject to}\quad & \dot x(t)=u(t), \\
+		                       & |u(t)|\le 1, \\
+		                       & x(0)=x_0>0,\quad x(T)=0.
+	\end{align*}
+	The running cost is $L \equiv 1$, so the Hamiltonian is
+	\[
+		H(x,u,p)=1+pu.
+	\]
+	The costate equation gives
+	\[
+		\dot p(t)=0,
+	\]
+	so $p$ is constant. Minimizing $1+pu$ over $u \in [-1,1]$ yields
+	\[
+		u^\star(t)=
+		\begin{cases}
+			-1, & p>0, \\
+			+1, & p<0.
+		\end{cases}
+	\]
+	To drive a positive initial state to the origin in minimum time, the optimal control is
+	\[
+		u^\star(t)\equiv -1,
+	\]
+	which lies on the boundary of the control set at all times. This is the defining bang-bang phenomenon.
+\end{eg}
+
+\begin{remark}[Connection between HJB and PMP]
+	If the value function is smooth and the optimal feedback is regular, then along an optimal trajectory
+	\[
+		p(t)=\nabla_x V(t,x^\star(t)).
+	\]
+	Substituting this relation into the HJB equation recovers the Hamiltonian minimization in PMP. Thus HJB and PMP are not unrelated theories; the costate is the gradient of the value function when enough smoothness is present.
+\end{remark}
+
+\subsection{Calculus of Variations}
+
+\begin{definition}[Variational problem]
+	A basic problem in the calculus of variations seeks a function $x(\cdot)$ minimizing
+	\[
+		J[x]=\int_{t_0}^{t_1} F(t,x(t),\dot x(t))\,dt
+	\]
+	subject to fixed endpoint conditions
+	\[
+		x(t_0)=x_0,
+		\qquad
+		x(t_1)=x_1.
+	\]
+\end{definition}
+
+\begin{definition}[Admissible variation]
+	An \emph{admissible variation} is a smooth perturbation
+	\[
+		x_\varepsilon(t)=x(t)+\varepsilon \eta(t)
+	\]
+	where the variation function satisfies
+	\[
+		\eta(t_0)=\eta(t_1)=0.
+	\]
+\end{definition}
+
+\begin{theorem}[Euler--Lagrange equation]
+	If $x^\star(\cdot)$ is a smooth minimizer of the variational problem, then it satisfies
+	\[
+		\frac{d}{dt}\left(\partial_{\dot x} F(t,x^\star(t),\dot x^\star(t))\right)
+		=
+		\partial_x F(t,x^\star(t),\dot x^\star(t)).
+	\]
+\end{theorem}
+\begin{proof}[Proof sketch]
+	Insert the varied path $x_\varepsilon=x^\star+\varepsilon \eta$ into the functional and differentiate with respect to $\varepsilon$ at $\varepsilon=0$:
+	\[
+		0=\frac{d}{d\varepsilon}\Big|_{\varepsilon=0}J[x_\varepsilon]
+		=
+		\int_{t_0}^{t_1}
+		\left(
+			\partial_x F \,\eta + \partial_{\dot x} F\, \dot \eta
+		\right)dt.
+	\]
+	Integrate the second term by parts. The boundary term vanishes because $\eta$ vanishes at both endpoints. This leaves
+		\[
+			\int_{t_0}^{t_1}
+			\left(
+				\partial_x F - \frac{d}{dt}\partial_{\dot x} F
+			\right)\eta(t)\,dt=0.
+		\]
+	Since this holds for every admissible variation $\eta$, the fundamental lemma of the calculus of variations implies the Euler--Lagrange equation.
+\end{proof}
+
+\begin{remark}
+	The Euler--Lagrange equation is the special case of PMP obtained when the control enters only as the velocity variable and no explicit control constraints are present. Pontryagin's principle is therefore a true generalization of classical variational calculus.
+\end{remark}

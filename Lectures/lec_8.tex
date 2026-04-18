@@ -1,0 +1,680 @@
+\lecture{8}{}{LQG Control, Trajectory Optimization, and iLQR}
+
+\begin{intuition}
+	Lecture 6 solved the fully observed linear-quadratic control problem. Lecture 7 solved the linear-Gaussian state-estimation problem. The first half of this lecture shows how these pieces combine into the linear quadratic Gaussian controller. The second half leaves the linear world: once the dynamics or costs become nonlinear, exact Riccati theory is lost, and one instead repeatedly linearizes the dynamics, quadratizes the cost, solves a local LQR problem, and updates the nominal trajectory. That is the basic idea behind iLQR and DDP.
+\end{intuition}
+
+\subsection{Linear Quadratic Gaussian Control}
+
+\begin{definition}[Discrete-time LQG problem]
+	The discrete-time linear quadratic Gaussian (LQG) problem is
+	\begin{align*}
+		x_{k+1} &= A x_k + B u_k + w_k, \\
+		y_k &= C x_k + v_k,
+	\end{align*}
+	with zero-mean white noises
+	\[
+		\mathbb{E}[w_k w_k^\top]=Q_w \succeq 0,
+		\qquad
+		\mathbb{E}[v_k v_k^\top]=R_v \succ 0,
+	\]
+	and quadratic cost
+	\[
+		J
+		=
+		\mathbb{E}\left[
+		x_N^\top Q_f x_N
+		+
+		\sum_{k=0}^{N-1}\left(x_k^\top Q x_k + u_k^\top R u_k\right)
+		\right],
+	\]
+	where
+	\[
+		Q \succeq 0,
+		\qquad
+		R \succ 0,
+		\qquad
+		Q_f \succeq 0.
+	\]
+	The information structure is \emph{output feedback}: at time $k$, the control $u_k$ must be measurable with respect to
+	\[
+		\mathcal{I}_k = \sigma(y_0,\dots,y_k,u_0,\dots,u_{k-1}).
+	\]
+\end{definition}
+
+\begin{theorem}[Separation principle]
+	For the linear-Gaussian-quadratic problem above, the optimal controller has the certainty-equivalent structure
+	\[
+		u_k^\star = -K_k \hat x_{k|k},
+	\]
+	where:
+	\begin{itemize}
+		\item $\hat x_{k|k}$ is the Kalman-filter estimate of the state given $\mathcal{I}_k$,
+		\item $K_k$ is the finite-horizon LQR gain obtained from the Riccati recursion of Lecture 6.
+	\end{itemize}
+	In particular, optimal estimation and optimal control can be designed independently and then interconnected.
+\end{theorem}
+\begin{proof}[Proof outline]
+	Write the state as
+	\[
+		x_k = \hat x_{k|k} + e_k,
+	\]
+	where
+	\[
+		\hat x_{k|k} = \mathbb{E}[x_k \mid \mathcal{I}_k]
+	\]
+	and $e_k$ is the estimation error. Since $\hat x_{k|k}$ is the conditional mean, it is orthogonal to the error:
+	\[
+		\mathbb{E}[e_k \mid \mathcal{I}_k]=0.
+	\]
+	Substituting $x_k=\hat x_{k|k}+e_k$ into the stage cost and taking conditional expectations gives
+	\begin{align*}
+		\mathbb{E}[x_k^\top Q x_k + u_k^\top R u_k \mid \mathcal{I}_k]
+		&=
+		\hat x_{k|k}^\top Q \hat x_{k|k} + u_k^\top R u_k \\
+		&\qquad + \mathbb{E}[e_k^\top Q e_k \mid \mathcal{I}_k].
+	\end{align*}
+	The last term does not depend on the control. So, conditioned on the information state, the controllable part of the cost is exactly the same quadratic form as in the fully observed LQR problem, but with the true state replaced by the estimate.
+
+	Meanwhile, the Kalman filter is the minimum-variance estimator and its covariance recursion is independent of the control law in the standard additive-noise LQG setup. Therefore the estimator design can be solved independently by Lecture 7, and the control design can be solved independently by Lecture 6.
+
+	The resulting optimal controller is certainty equivalent:
+	\[
+		u_k^\star = -K_k \hat x_{k|k}.
+	\]
+	This separation is special to the linear-Gaussian-quadratic setting and does not hold in general for nonlinear systems or non-Gaussian noise.
+\end{proof}
+
+\begin{remark}[Block diagram]
+	The LQG architecture is the interconnection of a Kalman filter and an LQR state-feedback law:
+	\begin{center}
+	\begin{tikzpicture}[>=latex, node distance=2.2cm, auto]
+		\node[draw, rectangle, minimum width=2.8cm, minimum height=1cm] (plant) {Plant};
+		\node[draw, rectangle, minimum width=2.8cm, minimum height=1cm, left=of plant] (lqr) {LQR Gain $-K$};
+		\node[draw, rectangle, minimum width=3.2cm, minimum height=1cm, below=of lqr] (kf) {Kalman Filter};
+		\draw[->] (lqr) -- node {$u_k$} (plant);
+		\draw[->] (plant.west) -- ++(-1.0,0) |- node[pos=0.25,left] {$x_k$ estimate loop} (kf.east);
+		\draw[->] (kf.north) -- node[left] {$\hat x_{k|k}$} (lqr.south);
+		\draw[->] (plant.south) -- ++(0,-0.7) -| node[pos=0.25,right] {$y_k$} (kf.east);
+		\draw[->] (plant.north) -- ++(0,0.8) node[right] {$w_k$};
+		\draw[->] ($(plant.east)+(0.0,-0.1)$) -- ++(1.0,0) node[right] {$y_k=Cx_k+v_k$};
+		\draw[->] ($(plant.east)+(0.0,0.3)$) -- ++(0.8,0.8) node[right] {$v_k$};
+	\end{tikzpicture}
+	\end{center}
+	The plant is driven by the feedback input computed from the estimated state, not the true state.
+\end{remark}
+
+\begin{eg}[Scalar LQG design]
+	Consider
+	\[
+		x_{k+1}=0.8x_k+u_k+w_k,
+		\qquad
+		y_k=x_k+v_k,
+	\]
+	with
+	\[
+		Q=1,
+		\qquad
+		R=1,
+		\qquad
+		Q_w=0.5,
+		\qquad
+		R_v=2.
+	\]
+
+	For the control design, the scalar DARE is
+	\[
+		P = 1 + 0.64P - \frac{0.64P^2}{1+P},
+	\]
+	which simplifies to
+	\[
+		P^2 - 0.64P - 1 = 0.
+	\]
+	The stabilizing root is
+	\[
+		P = \frac{0.64+\sqrt{4.4096}}{2} \approx 1.370.
+	\]
+	Hence the steady-state LQR gain is
+	\[
+		K
+		=
+		\frac{0.8P}{1+P}
+		\approx 0.462.
+	\]
+
+	For the estimation design, using the prior-covariance DARE of Lecture 7 gives
+	\[
+		\bar P
+		=
+		0.64\bar P + 0.5 - \frac{0.64\bar P^2}{\bar P+2},
+	\]
+	or equivalently
+	\[
+		\bar P^2 + 0.22\bar P - 1 = 0.
+	\]
+	The positive root is
+	\[
+		\bar P = \frac{-0.22+\sqrt{4.0484}}{2} \approx 0.896.
+	\]
+	The steady-state Kalman gain is therefore
+	\[
+		L = \frac{\bar P}{\bar P+2} \approx 0.309.
+	\]
+
+	The complete steady-state LQG controller is
+	\[
+		\hat x_{k|k} = \hat x_{k|k-1} + 0.309\,(y_k-\hat x_{k|k-1}),
+	\]
+	\[
+		\hat x_{k+1|k} = 0.8\hat x_{k|k} + u_k,
+	\]
+	\[
+		u_k = -0.462\,\hat x_{k|k}.
+	\]
+\end{eg}
+
+\subsection{Robustness of LQG}
+
+\begin{theorem}[Doyle's counterexample]
+	LQG does not inherit the guaranteed gain and phase margins of full-state-feedback LQR. In fact, there exist plants for which the LQG controller has arbitrarily poor robustness margins.
+\end{theorem}
+\begin{proof}[Explanation]
+	The LQR robustness theorem of Lecture 6 is a property of the full-state-feedback loop and the return-difference identity induced by the Riccati equation. Once the true state is replaced by an observer state, the controller becomes a dynamic output-feedback compensator. The added estimator dynamics introduce new poles and zeros into the loop and destroy the return-difference structure responsible for the LQR margins. Doyle's counterexample shows that even though the LQR part and the Kalman-filter part are each individually optimal, their interconnection can have extremely weak robustness margins.
+\end{proof}
+
+\begin{remark}[Why the observer can destroy robustness]
+	The Kalman filter is tuned for estimation performance under the assumed stochastic model, not for worst-case loop shaping. If the plant model is slightly wrong, if hidden nonminimum-phase behavior appears, or if the estimator bandwidth interacts badly with the controller bandwidth, then the output-feedback loop can amplify uncertainty much more strongly than the full-state-feedback loop would.
+\end{remark}
+
+\begin{definition}[Loop transfer recovery]
+	Loop transfer recovery (LTR) is a design methodology that modifies the Kalman-filter design, usually by artificially inflating the process-noise covariance, so that the open-loop transfer of the resulting LQG compensator approaches the loop transfer of the underlying LQR design over a desired frequency range.
+\end{definition}
+
+\begin{remark}[Tradeoff in LTR]
+	LTR can recover much of the lost robustness, but this comes at a price: the estimator becomes high gain, measurement noise is amplified more strongly, and the ideal recovery may fail when plant nonminimum-phase zeros or modeling limitations intervene.
+\end{remark}
+
+\begin{remark}[LQG as $\mathcal{H}_2$ optimal control]
+	LQG is a special case of $\mathcal{H}_2$ optimal control. The quadratic cost and Gaussian-noise covariance interpretation lead to minimization of the mean output energy of a generalized closed-loop system driven by white noise. In this setting, the Riccati equations of control and estimation are precisely the two Riccati equations that appear in the standard $\mathcal{H}_2$ synthesis formulas.
+\end{remark}
+
+\begin{remark}[Limitations and common extensions]
+	Standard LQG has four structural limitations:
+	\begin{itemize}
+		\item linear dynamics: addressed by gain scheduling, EKF-based output feedback, iLQR/DDP, or NMPC,
+		\item Gaussian noise: addressed by robust filtering, particle filtering, or risk-sensitive control,
+		\item quadratic cost: addressed by $\mathcal{H}_\infty$ or more general optimal-control formulations,
+		\item no constraints: addressed by MPC and constrained trajectory optimization.
+	\end{itemize}
+	So LQG is powerful but narrow.
+\end{remark}
+
+\subsection{Nonlinear Trajectory Optimization}
+
+\begin{definition}[General nonlinear trajectory optimization problem]
+	A discrete-time nonlinear trajectory-optimization problem has the form
+	\begin{align*}
+		\min_{\{x_k,u_k\}} \quad & \phi(x_N) + \sum_{k=0}^{N-1}\ell_k(x_k,u_k) \\
+		\text{subject to}\quad & x_{k+1}=f_k(x_k,u_k), \qquad k=0,\dots,N-1, \\
+		                       & x_0 \text{ given}.
+	\end{align*}
+	The dynamics $f_k$ and costs $\ell_k$ may be nonlinear and time varying.
+\end{definition}
+
+\begin{remark}[Why LQR and LQG are insufficient]
+	LQR and LQG solve linear systems with quadratic objectives. Real robotic systems are often nonlinear, may operate around highly nonstationary trajectories, and can have objectives that are only locally quadratic. In such settings, exact Riccati theory does not apply globally.
+\end{remark}
+
+\begin{intuition}
+	The central idea behind local trajectory methods is:
+	\begin{enumerate}[label=(\alph*)]
+		\item choose a nominal state-control trajectory,
+		\item linearize the dynamics and quadratize the cost around that nominal trajectory,
+		\item solve the resulting local LQR problem,
+		\item update the nominal trajectory and repeat.
+	\end{enumerate}
+	The local Riccati solve is cheap; the iteration handles the nonlinearity.
+\end{intuition}
+
+\subsection{Iterative LQR}
+
+\begin{definition}[What iLQR solves]
+	Iterative LQR (iLQR) solves nonlinear finite-horizon trajectory-optimization problems by repeatedly approximating them with time-varying linear-quadratic subproblems. Standard LQR computes the optimal controller for a \emph{given} linear-quadratic model. iLQR handles nonlinear dynamics and, more generally, smooth nonlinear costs by solving a sequence of local LQR problems.
+\end{definition}
+
+\begin{definition}[Linearization and quadratization about a nominal trajectory]
+	Given a nominal trajectory
+	\[
+		\{(\bar x_k,\bar u_k)\}_{k=0}^{N-1},
+	\]
+	define perturbations
+	\[
+		\delta x_k = x_k-\bar x_k,
+		\qquad
+		\delta u_k = u_k-\bar u_k.
+	\]
+	The dynamics are linearized as
+	\[
+		\delta x_{k+1}=A_k \delta x_k + B_k \delta u_k,
+	\]
+	where
+	\[
+		A_k = \left.\frac{\partial f_k}{\partial x}\right|_{(\bar x_k,\bar u_k)},
+		\qquad
+		B_k = \left.\frac{\partial f_k}{\partial u}\right|_{(\bar x_k,\bar u_k)}.
+	\]
+	A smooth stage cost is quadratized as
+	\begin{align*}
+		\ell_k(x_k,u_k)
+		&\approx
+		\ell_k(\bar x_k,\bar u_k)
+		+
+		\ell_{x,k}^\top \delta x_k
+		+
+		\ell_{u,k}^\top \delta u_k \\
+		&\quad
+		+
+		\frac{1}{2}\delta x_k^\top \ell_{xx,k}\delta x_k
+		+
+		\delta u_k^\top \ell_{ux,k}\delta x_k
+		+
+		\frac{1}{2}\delta u_k^\top \ell_{uu,k}\delta u_k,
+	\end{align*}
+	with all derivatives evaluated at the nominal pair.
+\end{definition}
+
+\begin{remark}
+	The cost must be quadratized because the backward Riccati pass requires a local quadratic model of the objective. A purely first-order model would identify only descent directions, not a curvature-based local feedback law.
+\end{remark}
+
+\begin{definition}[Local $Q$-function derivatives in iLQR]
+	Let the quadratic local value approximation at stage $k+1$ be
+	\[
+		\delta V_{k+1}(\delta x)
+		=
+		V_{x,k+1}^\top \delta x + \frac{1}{2}\delta x^\top V_{xx,k+1}\delta x.
+	\]
+	Then the one-step local action-value derivatives are
+	\[
+		Q_{x,k} = \ell_{x,k} + A_k^\top V_{x,k+1},
+		\qquad
+		Q_{u,k} = \ell_{u,k} + B_k^\top V_{x,k+1},
+	\]
+	\[
+		Q_{xx,k} = \ell_{xx,k} + A_k^\top V_{xx,k+1}A_k,
+	\]
+	\[
+		Q_{ux,k} = \ell_{ux,k} + B_k^\top V_{xx,k+1}A_k,
+		\qquad
+		Q_{uu,k} = \ell_{uu,k} + B_k^\top V_{xx,k+1}B_k.
+	\]
+\end{definition}
+
+\begin{proposition}[Backward-pass gains]
+	If $Q_{uu,k} \succ 0$, then the minimizer of the local quadratic model at stage $k$ is
+	\[
+		\delta u_k^\star = k_k + K_k \delta x_k,
+	\]
+	with
+	\[
+		k_k = -Q_{uu,k}^{-1}Q_{u,k},
+		\qquad
+		K_k = -Q_{uu,k}^{-1}Q_{ux,k}.
+	\]
+\end{proposition}
+\begin{proof}
+	The local quadratic model in $(\delta x_k,\delta u_k)$ is
+	\[
+		\delta Q_k
+		=
+		c_k
+		+
+		Q_{x,k}^\top \delta x_k
+		+
+		Q_{u,k}^\top \delta u_k
+		+
+		\frac{1}{2}\delta x_k^\top Q_{xx,k}\delta x_k
+		+
+		\delta u_k^\top Q_{ux,k}\delta x_k
+		+
+		\frac{1}{2}\delta u_k^\top Q_{uu,k}\delta u_k.
+	\]
+	For fixed $\delta x_k$, differentiating with respect to $\delta u_k$ gives
+	\[
+		0 = Q_{u,k} + Q_{ux,k}\delta x_k + Q_{uu,k}\delta u_k.
+	\]
+	Solving for $\delta u_k$ yields
+	\[
+		\delta u_k^\star = -Q_{uu,k}^{-1}Q_{u,k} - Q_{uu,k}^{-1}Q_{ux,k}\delta x_k.
+	\]
+\end{proof}
+
+\begin{algorithm}[H]
+	\DontPrintSemicolon
+	\caption{iLQR}
+	\KwIn{Nominal controls $\{\bar u_k\}_{k=0}^{N-1}$, initial state $x_0$, tolerance $\varepsilon$}
+	Simulate the dynamics forward to obtain the nominal trajectory $\{\bar x_k\}$\;
+	\For{$r=0,1,2,\dots$}{
+		Linearize the dynamics and quadratize the stage and terminal costs along the current nominal trajectory\;
+		Run the backward Riccati-style sweep to compute feedforward terms $k_k$ and feedback gains $K_k$\;
+		Perform a forward rollout with line search using
+		\[
+			u_k^{\text{new}} = \bar u_k + \alpha k_k + K_k(x_k^{\text{new}}-\bar x_k)
+		\]
+		for a step size $\alpha \in (0,1]$\;
+		Accept the new trajectory if the cost decreases sufficiently\;
+		Stop if the decrease and gain corrections are below tolerance\;
+	}
+\end{algorithm}
+
+\begin{proposition}[iLQR as approximate Newton on trajectory space]
+	iLQR can be interpreted as an approximate Newton method for the nonlinear trajectory-optimization problem. The approximation is that iLQR keeps second-order cost terms but neglects second-order derivatives of the dynamics in the local quadratic model.
+\end{proposition}
+\begin{proof}
+	Let
+	\[
+		z = (x_1,\dots,x_N,u_0,\dots,u_{N-1})
+	\]
+	denote the stacked trajectory variables, and write the dynamics defects as
+	\[
+		c_k(z)=x_{k+1}-f_k(x_k,u_k)=0.
+	\]
+	A Newton or SQP step for the trajectory problem constructs a second-order model of the Lagrangian
+	\[
+		\mathcal{L}(z,\lambda)=J(z)+\sum_{k=0}^{N-1}\lambda_{k+1}^\top c_k(z)
+	\]
+	together with linearized constraints. The exact Hessian of the Lagrangian includes not only the Hessian of the cost but also terms of the form
+	\[
+		\sum_i \lambda_{k+1,i}\,\nabla^2 f_{k,i}(x_k,u_k),
+	\]
+	coming from the second derivatives of the dynamics.
+
+	In DDP, these second-order dynamics terms appear explicitly in the local Bellman expansion. In iLQR, one linearizes the dynamics and therefore discards those second-order contributions, while retaining the second-order cost terms and the curvature induced by the propagated value Hessian. The resulting local subproblem is exactly a time-varying LQR problem on the linearized system.
+
+	Thus iLQR is Newton-like because it uses local second-order curvature information, but it is only an \emph{approximate} Newton method because it replaces the full second-order constrained model by a Gauss-Newton-type approximation that ignores the dynamics Hessians.
+\end{proof}
+
+\begin{remark}[No global optimality guarantee]
+	iLQR is a local method. The trajectory-optimization problem is generally nonconvex, so the algorithm may converge to a local minimum, a saddle-adjacent stationary point, or may fail if the local quadratic model is poor. Initialization matters.
+\end{remark}
+
+\subsection{iLQR: Practical Considerations}
+
+\begin{definition}[Regularization]
+	Regularization modifies the backward pass to keep
+	\[
+		Q_{uu,k}
+	\]
+	positive definite and the local model numerically well conditioned. A common strategy is Levenberg--Marquardt regularization:
+	\[
+		Q_{uu,k} \leftarrow Q_{uu,k} + \rho I,
+		\qquad
+		\rho > 0.
+	\]
+\end{definition}
+
+\begin{remark}[Why regularization is needed]
+	Without regularization, the local curvature matrix $Q_{uu,k}$ may become indefinite or nearly singular. Then the local subproblem can fail to define a descent direction, the gains can explode, and the forward rollout can become unstable.
+\end{remark}
+
+\begin{remark}[Line search]
+	The forward pass can increase the true nonlinear cost even when the local model predicts improvement. So iLQR typically uses a backtracking line search on a scalar step size $\alpha$ multiplying the feedforward term:
+	\[
+		u_k^{\text{trial}} = \bar u_k + \alpha k_k + K_k(x_k^{\text{trial}}-\bar x_k).
+	\]
+	If the trial rollout fails to decrease the true cost sufficiently, $\alpha$ is reduced and the rollout is repeated.
+\end{remark}
+
+\begin{remark}[Computational complexity]
+	For state dimension $n$, control dimension $m$, and horizon length $N$, one backward-forward sweep of iLQR costs roughly
+	\[
+		O\!\left(N(n^3+n^2m+nm^2+m^3)\right).
+	\]
+	The key point is linear scaling in the horizon $N$ because the method uses dynamic-programming structure rather than solving one giant dense optimization problem. This is much cheaper than generic direct-transcription methods when the horizon is long and the control dimension is moderate.
+\end{remark}
+
+\subsection{Differential Dynamic Programming}
+
+\begin{definition}[DDP versus iLQR]
+	Differential dynamic programming (DDP) is the full second-order version of local dynamic-programming trajectory optimization. It expands both the cost and the dynamics to second order. iLQR is the simplified variant that retains only first-order dynamics and therefore ignores the second-order dynamics tensors.
+\end{definition}
+
+\begin{remark}
+	In DDP, the quadratic terms include tensor contractions such as
+	\[
+		\sum_i V_{x,k+1,i}\,f_{xx,k}^{(i)},
+		\qquad
+		\sum_i V_{x,k+1,i}\,f_{ux,k}^{(i)},
+		\qquad
+		\sum_i V_{x,k+1,i}\,f_{uu,k}^{(i)},
+	\]
+	which are absent in iLQR. These terms matter when the dynamics are strongly nonlinear and second-order dynamics curvature materially changes the local model.
+\end{remark}
+
+\begin{remark}
+	iLQR can therefore be viewed as the Gauss--Newton approximation to DDP's full Newton step. The gain is simplicity and numerical robustness; the cost is that the local model can be less accurate on strongly nonlinear problems.
+\end{remark}
+
+\subsection{Handling Constraints in Trajectory Optimization}
+
+\begin{remark}
+	Standard iLQR and DDP do not natively handle general inequality constraints such as actuator saturation, state bounds, or obstacle avoidance. Their native formulation is essentially unconstrained.
+\end{remark}
+
+\begin{definition}[Augmented-Lagrangian iLQR]
+	Let the nonlinear trajectory optimization problem include constraints
+	\[
+		c_k(x_k,u_k)=0,
+		\qquad
+		g_k(x_k,u_k)\le 0.
+	\]
+	Augmented-Lagrangian iLQR (AL-iLQR) forms a penalized local objective
+	\[
+		\mathcal{L}_{\rho}
+		=
+		J
+		+
+		\sum_k \lambda_k^\top c_k
+		+
+		\frac{\rho}{2}\sum_k \|c_k\|^2
+		+
+		\text{(analogous penalty/barrier terms for inequalities)}.
+	\]
+	One then applies iLQR to the augmented objective while updating multipliers and penalty parameters across outer iterations.
+\end{definition}
+
+\begin{remark}[Other approaches]
+	Common alternatives include:
+	\begin{itemize}
+		\item barrier penalties for state or control limits,
+		\item projected or clamped forward passes for box-constrained controls,
+		\item hybrid schemes that solve local QPs inside the backward pass,
+		\item switching to direct transcription or MPC when constraints dominate the problem geometry.
+	\end{itemize}
+\end{remark}
+
+\subsection{Worked iLQR Example}
+
+\begin{eg}[One iLQR iteration for a scalar nonlinear system]
+	Consider
+	\[
+		x_{k+1}=x_k+u_k+0.1x_k^2,
+	\]
+	with horizon $N=2$, initial state
+	\[
+		x_0=1,
+	\]
+	and cost
+	\[
+		J = x_2^2 + \sum_{k=0}^{1}(x_k^2+u_k^2).
+	\]
+	Choose the nominal controls
+	\[
+		\bar u_0=\bar u_1=0.
+	\]
+
+	The forward rollout gives
+	\[
+		\bar x_0=1,
+		\qquad
+		\bar x_1=1+0+0.1(1)^2=1.1,
+	\]
+	\[
+		\bar x_2=1.1+0+0.1(1.1)^2=1.221.
+	\]
+
+	The dynamics Jacobians are
+	\[
+		A_k = 1+0.2\bar x_k,
+		\qquad
+		B_k = 1.
+	\]
+	So
+	\[
+		A_0=1.2,
+		\qquad
+		A_1=1.22,
+		\qquad
+		B_0=B_1=1.
+	\]
+	The stage cost
+	\[
+		\ell(x,u)=x^2+u^2
+	\]
+	is already quadratic, so
+	\[
+		\ell_x=2\bar x,
+		\qquad
+		\ell_u=2\bar u,
+		\qquad
+		\ell_{xx}=2,
+		\qquad
+		\ell_{uu}=2,
+		\qquad
+		\ell_{ux}=0.
+	\]
+	The terminal cost
+	\[
+		\phi(x_2)=x_2^2
+	\]
+	has derivatives
+	\[
+		V_{x,2}=2\bar x_2 = 2.442,
+		\qquad
+		V_{xx,2}=2.
+	\]
+
+	At stage $k=1$, the local derivatives are
+	\[
+		Q_{x,1}=2.2 + 1.22(2.442)=5.17924,
+	\]
+	\[
+		Q_{u,1}=2.442,
+		\qquad
+		Q_{xx,1}=2 + 1.22^2(2)=4.9768,
+	\]
+	\[
+		Q_{ux,1}=2.44,
+		\qquad
+		Q_{uu,1}=4.
+	\]
+	Hence
+	\[
+		k_1=-\frac{2.442}{4}=-0.6105,
+		\qquad
+		K_1=-\frac{2.44}{4}=-0.61.
+	\]
+	The propagated value derivatives are
+	\[
+		V_{x,1}
+		=
+		Q_{x,1}-Q_{ux,1}Q_{uu,1}^{-1}Q_{u,1}
+		=
+		3.68962,
+	\]
+	\[
+		V_{xx,1}
+		=
+		Q_{xx,1}-Q_{ux,1}Q_{uu,1}^{-1}Q_{ux,1}
+		=
+		3.4884.
+	\]
+
+	At stage $k=0$, this gives
+	\[
+		Q_{x,0}=2 + 1.2(3.68962)=6.427544,
+	\]
+	\[
+		Q_{u,0}=3.68962,
+		\qquad
+		Q_{xx,0}=2 + 1.2^2(3.4884)=7.023296,
+	\]
+	\[
+		Q_{ux,0}=1.2(3.4884)=4.18608,
+		\qquad
+		Q_{uu,0}=2+3.4884=5.4884.
+	\]
+	So
+	\[
+		k_0=-\frac{3.68962}{5.4884}\approx -0.6723,
+		\qquad
+		K_0=-\frac{4.18608}{5.4884}\approx -0.7627.
+	\]
+
+	Now perform a full forward update with step size $\alpha=1$. Since
+	\[
+		\delta x_0=0,
+	\]
+	we obtain
+	\[
+		u_0^{\text{new}} = \bar u_0 + k_0 \approx -0.6723.
+	\]
+	The new state is
+	\[
+		x_1^{\text{new}}
+		=
+		1 - 0.6723 + 0.1(1)^2
+		=
+		0.4277.
+	\]
+	Thus
+	\[
+		\delta x_1 = x_1^{\text{new}}-\bar x_1 \approx -0.6723.
+	\]
+	At stage $k=1$,
+	\[
+		u_1^{\text{new}}
+		=
+		\bar u_1 + k_1 + K_1 \delta x_1
+		\approx
+		-0.6105 + (-0.61)(-0.6723)
+		\approx
+		-0.2003.
+	\]
+	The terminal state becomes
+	\[
+		x_2^{\text{new}}
+		=
+		0.4277 - 0.2003 + 0.1(0.4277)^2
+		\approx
+		0.2457.
+	\]
+
+	The nominal cost was
+	\[
+		J_{\text{nom}}
+		=
+		1^2 + 1.1^2 + 1.221^2
+		\approx
+		3.7008.
+	\]
+	The updated cost is approximately
+	\[
+		J_{\text{new}}
+		=
+		1^2 + (-0.6723)^2 + 0.4277^2 + (-0.2003)^2 + 0.2457^2
+		\approx
+		1.736.
+	\]
+	So one iLQR iteration produces a substantial cost decrease.
+\end{eg}

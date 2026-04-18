@@ -1,0 +1,840 @@
+\lecture{3}{}{Constrained Optimization}
+
+\begin{intuition}
+	Unconstrained optimization is the exception, not the rule. In optimal control, dynamics, actuator bounds, state limits, terminal conditions, and collision-avoidance requirements all appear as constraints. Once constraints are present, the gradient of the objective need no longer vanish at an optimum; instead, it must be balanced against the gradients of the active constraints. This lecture builds the static constrained-optimization theory that later reappears in infinite-dimensional form inside Pontryagin's principle, trajectory transcription, and model predictive control.
+\end{intuition}
+
+\subsection{Problem Formulation}
+
+\begin{definition}[General constrained optimization problem]
+	A finite-dimensional constrained optimization problem has the form
+	\begin{align*}
+		\min_{x \in \mathbb{R}^n} \quad & f(x) \\
+		\text{subject to} \quad & h(x)=0, \\
+		                        & g(x)\le 0,
+	\end{align*}
+	where
+	\[
+		f:\mathbb{R}^n \to \mathbb{R},
+		\qquad
+		h:\mathbb{R}^n \to \mathbb{R}^m,
+		\qquad
+		g:\mathbb{R}^n \to \mathbb{R}^p.
+	\]
+	Here the equality constraints are written componentwise as
+	\[
+		h_i(x)=0, \qquad i=1,\dots,m,
+	\]
+	and the inequality constraints as
+	\[
+		g_j(x)\le 0, \qquad j=1,\dots,p.
+	\]
+\end{definition}
+
+\begin{definition}[Feasible set, active set, inactive set]
+	The \emph{feasible set} is
+	\[
+		\mathcal{F} = \{x \in \mathbb{R}^n : h(x)=0,\; g(x)\le 0\}.
+	\]
+	A feasible point $x \in \mathcal{F}$ is:
+	\begin{itemize}
+		\item \emph{active} for inequality constraint $j$ if
+		      \[
+			      g_j(x)=0,
+		      \]
+		\item \emph{inactive} for inequality constraint $j$ if
+		      \[
+			      g_j(x)<0.
+		      \]
+	\end{itemize}
+	The active-set index set is
+	\[
+		\mathcal{A}(x)=\{j \in \{1,\dots,p\}: g_j(x)=0\}.
+	\]
+\end{definition}
+
+\begin{remark}
+	Only active constraints can influence first-order optimality conditions. Inactive constraints are locally irrelevant because a sufficiently small perturbation remains feasible with respect to them.
+\end{remark}
+
+\begin{eg}[Two-dimensional geometry]
+	\begin{enumerate}[label=(\alph*)]
+		\item The set
+		      \[
+			      \{x \in \mathbb{R}^2 : x_1^2+x_2^2\le 1\}
+		      \]
+		      is the closed unit disk. At an interior point, no inequality constraint is active. At a boundary point with $x_1^2+x_2^2=1$, the boundary inequality is active.
+
+		\item The set
+		      \[
+			      \{x \in \mathbb{R}^2 : x_1+x_2=1\}
+		      \]
+		      is an affine line. Every feasible perturbation must stay tangent to that line.
+
+		\item The set
+		      \[
+			      \{x \in \mathbb{R}^2 : x_1\ge 0,\; x_2\ge 0,\; x_1+x_2\le 1\}
+		      \]
+		      is a triangle. At an interior point no inequalities are active; at a point on an edge exactly one is active; at a vertex, two constraints may be active simultaneously.
+	\end{enumerate}
+\end{eg}
+
+\begin{definition}[Feasible direction]
+	Let $x \in \mathcal{F}$. A vector $d \in \mathbb{R}^n$ is a \emph{feasible direction} at $x$ if there exists $\bar t>0$ and a curve $\gamma:[0,\bar t)\to \mathcal{F}$ such that
+	\[
+		\gamma(0)=x,
+		\qquad
+		\gamma'(0)=d.
+	\]
+\end{definition}
+
+\begin{remark}
+	For equality constraints, feasible directions are tangent to the constraint manifold. For inequality constraints, feasible directions must point into the feasible region or stay tangent to the active boundary.
+\end{remark}
+
+\subsection{Equality-Constrained Optimization and Lagrange Multipliers}
+
+\begin{intuition}
+	In unconstrained optimization, stationarity means that the objective cannot decrease along any direction, so the gradient must vanish. Under equality constraints, only \emph{feasible} directions are allowed. The gradient need not vanish; it must only vanish on the tangent space of the feasible manifold. That forces the gradient of the objective to lie in the span of the gradients of the constraints.
+\end{intuition}
+
+\begin{definition}[Lagrangian for equality constraints]
+	For the problem
+	\begin{align*}
+		\min_{x \in \mathbb{R}^n}\quad & f(x) \\
+		\text{subject to}\quad & h(x)=0,
+	\end{align*}
+	the \emph{Lagrangian} is
+	\[
+		\mathcal{L}(x,\lambda)=f(x)+\lambda^\top h(x),
+		\qquad
+		\lambda \in \mathbb{R}^m.
+	\]
+\end{definition}
+
+\begin{definition}[LICQ for equality constraints]
+	The \emph{linear independence constraint qualification} (LICQ) at a feasible point $x$ means that the gradients
+	\[
+		\nabla h_1(x),\dots,\nabla h_m(x)
+	\]
+	are linearly independent. Equivalently, the Jacobian
+	\[
+		J_h(x) \in \mathbb{R}^{m \times n}
+	\]
+	has full row rank $m$.
+\end{definition}
+
+\begin{theorem}[Lagrange multiplier theorem]
+	Assume $f,h_1,\dots,h_m$ are continuously differentiable, and let $x^\star$ be a local minimizer of
+	\begin{align*}
+		\min_x \quad & f(x) \\
+		\text{subject to} \quad & h(x)=0.
+	\end{align*}
+	If LICQ holds at $x^\star$, then there exists a multiplier $\lambda^\star \in \mathbb{R}^m$ such that
+	\[
+		\nabla_x \mathcal{L}(x^\star,\lambda^\star)
+		=
+		\nabla f(x^\star)+J_h(x^\star)^\top \lambda^\star
+		=
+		0.
+	\]
+\end{theorem}
+\begin{proof}
+	Because LICQ holds, the implicit function theorem implies that near $x^\star$ the feasible set
+	\[
+		\{x : h(x)=0\}
+	\]
+	is a smooth manifold whose tangent space at $x^\star$ is
+	\[
+		T_{x^\star}\mathcal{F}
+		=
+		\{d \in \mathbb{R}^n : J_h(x^\star)d=0\}.
+	\]
+	Since $x^\star$ is a local minimizer restricted to this manifold, the directional derivative of $f$ must vanish along every tangent direction:
+	\[
+		\nabla f(x^\star)^\top d = 0
+		\qquad \text{for all } d \in T_{x^\star}\mathcal{F}.
+	\]
+	In other words,
+	\[
+		\nabla f(x^\star) \in \bigl(T_{x^\star}\mathcal{F}\bigr)^\perp.
+	\]
+		But
+		\[
+			T_{x^\star}\mathcal{F}
+			=
+			\operatorname{null}(J_h(x^\star)),
+		\]
+		and for every matrix $A$,
+		\[
+			\operatorname{null}(A)^\perp = \operatorname{range}(A^\top).
+		\]
+	Hence
+	\[
+		\nabla f(x^\star) \in \operatorname{range}(J_h(x^\star)^\top).
+	\]
+	Therefore there exists $\lambda^\star$ such that
+	\[
+		\nabla f(x^\star)+J_h(x^\star)^\top \lambda^\star = 0.
+	\]
+\end{proof}
+
+\begin{remark}[Geometric interpretation]
+	When there is a single equality constraint $h(x)=0$, the condition becomes
+	\[
+		\nabla f(x^\star) = -\lambda^\star \nabla h(x^\star).
+	\]
+	Thus the gradient of the objective is parallel to the gradient of the constraint. Since $\nabla h(x^\star)$ is normal to the feasible surface, the objective gradient has no component along the tangent space. This is the constrained analogue of stationarity.
+\end{remark}
+
+\begin{eg}[Minimizing distance to the origin on a line]
+	Consider
+	\begin{align*}
+		\min_{x_1,x_2} \quad & x_1^2+x_2^2 \\
+		\text{subject to}\quad & x_1+x_2=1.
+	\end{align*}
+	The Lagrangian is
+	\[
+		\mathcal{L}(x_1,x_2,\lambda)=x_1^2+x_2^2+\lambda(x_1+x_2-1).
+	\]
+	The stationarity equations are
+	\[
+		2x_1+\lambda=0,
+		\qquad
+		2x_2+\lambda=0,
+	\]
+	so
+	\[
+		x_1=x_2.
+	\]
+	Using the constraint, we get
+	\[
+		x_1^\star=x_2^\star=\frac{1}{2}.
+	\]
+	The multiplier is
+	\[
+		\lambda^\star=-1.
+	\]
+	Geometrically, this is the orthogonal projection of the origin onto the affine line $x_1+x_2=1$.
+\end{eg}
+
+\begin{remark}[What can go wrong without a constraint qualification]
+	Constraint qualifications are not technical decoration; they prevent degenerate constraint geometry. Consider
+	\begin{align*}
+		\min_{x \in \mathbb{R}} \quad & x \\
+		\text{subject to}\quad & x^2=0.
+	\end{align*}
+	The only feasible point is $x^\star=0$, so it is trivially a global minimizer. But the gradient of the constraint is
+	\[
+		\nabla h(0)=0,
+	\]
+	so there is no multiplier $\lambda$ satisfying
+	\[
+		\nabla f(0)+\lambda \nabla h(0)=1+0=0.
+	\]
+	LICQ fails, and the Lagrange multiplier theorem correspondingly fails.
+\end{remark}
+
+\subsection{Inequality Constraints and KKT Conditions}
+
+\begin{definition}[Lagrangian for mixed equality and inequality constraints]
+	For the problem
+	\begin{align*}
+		\min_x \quad & f(x) \\
+		\text{subject to}\quad & h(x)=0, \\
+		                       & g(x)\le 0,
+	\end{align*}
+	the Lagrangian is
+	\[
+		\mathcal{L}(x,\lambda,\mu)=f(x)+\lambda^\top h(x)+\mu^\top g(x),
+	\]
+	where
+	\[
+		\lambda \in \mathbb{R}^m,
+		\qquad
+		\mu \in \mathbb{R}^p.
+	\]
+\end{definition}
+
+\begin{definition}[LICQ for mixed constraints]
+	LICQ holds at a feasible point $x$ if the vectors
+	\[
+		\nabla h_1(x),\dots,\nabla h_m(x),
+		\qquad
+		\nabla g_j(x)\;\; \text{for } j \in \mathcal{A}(x),
+	\]
+	are linearly independent.
+\end{definition}
+
+\begin{lemma}[Linearized alternative for constrained stationarity]
+	Let
+	\[
+		a_1,\dots,a_m,b_1,\dots,b_q,c \in \mathbb{R}^n.
+	\]
+	The following are equivalent:
+	\begin{enumerate}[label=(\roman*)]
+		\item $c^\top d \ge 0$ for every $d$ satisfying
+		      \[
+			      a_i^\top d = 0,\quad i=1,\dots,m,
+			      \qquad
+			      b_j^\top d \le 0,\quad j=1,\dots,q.
+		      \]
+		\item There exist multipliers $\lambda_1,\dots,\lambda_m \in \mathbb{R}$ and $\mu_1,\dots,\mu_q \ge 0$ such that
+		      \[
+			      c+\sum_{i=1}^m \lambda_i a_i + \sum_{j=1}^q \mu_j b_j = 0.
+		      \]
+	\end{enumerate}
+\end{lemma}
+
+\begin{remark}
+	This is a standard consequence of Farkas' lemma. It is the linear-algebraic mechanism behind the Karush--Kuhn--Tucker theorem.
+\end{remark}
+
+\begin{theorem}[KKT necessary conditions]
+	Assume $f,h,g$ are continuously differentiable. Let $x^\star$ be a local minimizer of
+	\begin{align*}
+		\min_x \quad & f(x) \\
+		\text{subject to}\quad & h(x)=0, \\
+		                       & g(x)\le 0,
+	\end{align*}
+	and assume LICQ holds at $x^\star$. Then there exist multipliers $\lambda^\star \in \mathbb{R}^m$ and $\mu^\star \in \mathbb{R}^p$ such that:
+	\begin{align*}
+		\nabla_x \mathcal{L}(x^\star,\lambda^\star,\mu^\star) & = 0
+		&& \text{(stationarity)}, \\
+		h(x^\star) & = 0,\quad g(x^\star)\le 0
+		&& \text{(primal feasibility)}, \\
+		\mu^\star & \ge 0
+		&& \text{(dual feasibility)}, \\
+		\mu_j^\star g_j(x^\star) & = 0,\quad j=1,\dots,p
+		&& \text{(complementary slackness)}.
+	\end{align*}
+\end{theorem}
+\begin{proof}
+	Let
+	\[
+		\mathcal{A}^\star = \mathcal{A}(x^\star)
+	\]
+	denote the active set at the minimizer. Any feasible direction $d$ at $x^\star$ must satisfy the linearized constraints
+	\[
+		J_h(x^\star)d=0,
+		\qquad
+		\nabla g_j(x^\star)^\top d \le 0
+		\quad \text{for } j \in \mathcal{A}^\star.
+	\]
+	Since $x^\star$ is a local minimizer, the objective cannot decrease in any feasible direction, so
+	\[
+		\nabla f(x^\star)^\top d \ge 0
+	\]
+	for every such $d$.
+
+	Apply the linearized alternative lemma with
+	\[
+		c=\nabla f(x^\star),
+		\qquad
+		a_i=\nabla h_i(x^\star),
+		\qquad
+		b_j=\nabla g_j(x^\star), \;\; j \in \mathcal{A}^\star.
+	\]
+	We obtain multipliers $\lambda^\star$ and $\mu_j^\star \ge 0$ for $j \in \mathcal{A}^\star$ such that
+	\[
+		\nabla f(x^\star)+J_h(x^\star)^\top \lambda^\star
+		+\sum_{j \in \mathcal{A}^\star}\mu_j^\star \nabla g_j(x^\star)=0.
+	\]
+	Define
+	\[
+		\mu_j^\star=0
+		\qquad \text{for } j \notin \mathcal{A}^\star.
+	\]
+	Then stationarity becomes
+	\[
+		\nabla f(x^\star)+J_h(x^\star)^\top \lambda^\star+J_g(x^\star)^\top \mu^\star=0.
+	\]
+	Primal feasibility holds because $x^\star$ is feasible. Dual feasibility holds because the multipliers of active inequalities are nonnegative and the inactive ones were set to zero. Finally, if $j$ is inactive then $g_j(x^\star)<0$ and $\mu_j^\star=0$, while if $j$ is active then $g_j(x^\star)=0$. In both cases
+	\[
+		\mu_j^\star g_j(x^\star)=0.
+	\]
+\end{proof}
+
+\begin{remark}[Complementary slackness]
+	The identity
+	\[
+		\mu_j^\star g_j(x^\star)=0
+	\]
+	means that each inequality constraint falls into one of two categories:
+	\begin{itemize}
+		\item either the constraint is inactive, so it does not influence stationarity and its multiplier vanishes,
+		\item or the constraint is active, in which case it may carry a positive multiplier.
+	\end{itemize}
+	There is no third possibility.
+\end{remark}
+
+\begin{eg}[KKT analysis in a simplex]
+	Consider
+	\begin{align*}
+		\min_{x_1,x_2}\quad & (x_1-2)^2+(x_2-1)^2 \\
+		\text{subject to}\quad & x_1+x_2-1 \le 0, \\
+		                       & -x_1 \le 0, \\
+		                       & -x_2 \le 0.
+	\end{align*}
+	The feasible set is the triangle
+	\[
+		x_1\ge 0,\quad x_2\ge 0,\quad x_1+x_2\le 1.
+	\]
+	Since the objective is the squared distance to $(2,1)$, the minimizer should be the closest feasible point, namely
+	\[
+		x^\star=(1,0).
+	\]
+	Let
+	\[
+		g_1(x)=x_1+x_2-1,
+		\quad
+		g_2(x)=-x_1,
+		\quad
+		g_3(x)=-x_2.
+	\]
+	Then
+	\[
+		\nabla f(x)=
+		\begin{bmatrix}
+			2(x_1-2) \\
+			2(x_2-1)
+		\end{bmatrix},
+	\]
+	so
+	\[
+		\nabla f(1,0)=
+		\begin{bmatrix}
+			-2 \\
+			-2
+		\end{bmatrix}.
+	\]
+	The active constraints at $(1,0)$ are $g_1$ and $g_3$. Stationarity becomes
+	\[
+		\begin{bmatrix}
+			-2 \\
+			-2
+		\end{bmatrix}
+		+\mu_1
+		\begin{bmatrix}
+			1 \\
+			1
+		\end{bmatrix}
+		+\mu_2
+		\begin{bmatrix}
+			-1 \\
+			0
+		\end{bmatrix}
+		+\mu_3
+		\begin{bmatrix}
+			0 \\
+			-1
+		\end{bmatrix}
+		=0.
+	\]
+	Complementary slackness forces $\mu_2=0$ because $g_2(1,0)=-1<0$. Hence
+	\[
+		-2+\mu_1=0,
+		\qquad
+		-2+\mu_1-\mu_3=0.
+	\]
+	So
+	\[
+		\mu_1=2,
+		\qquad
+		\mu_3=0.
+	\]
+	All KKT conditions are satisfied, and because the problem is convex, this point is globally optimal.
+\end{eg}
+
+\begin{theorem}[KKT sufficient conditions for convex problems]
+	Assume:
+	\begin{itemize}
+		\item $f$ is convex,
+		\item each equality constraint is affine,
+		\item each inequality function $g_j$ is convex.
+	\end{itemize}
+	If a feasible point $x^\star$ admits multipliers $(\lambda^\star,\mu^\star)$ satisfying the KKT conditions, then $x^\star$ is a global minimizer.
+\end{theorem}
+\begin{proof}
+	By convexity of $f$,
+	\[
+		f(x)\ge f(x^\star)+\nabla f(x^\star)^\top(x-x^\star)
+		\qquad \text{for all } x.
+	\]
+	Use stationarity:
+	\[
+		\nabla f(x^\star)
+		=
+		-J_h(x^\star)^\top \lambda^\star
+		-J_g(x^\star)^\top \mu^\star.
+	\]
+	Thus
+	\[
+		f(x)\ge f(x^\star)-\lambda^{\star\top}J_h(x^\star)(x-x^\star)-\mu^{\star\top}J_g(x^\star)(x-x^\star).
+	\]
+	Since the equality constraints are affine,
+	\[
+		h(x)=h(x^\star)+J_h(x^\star)(x-x^\star)=J_h(x^\star)(x-x^\star)
+	\]
+	because $h(x^\star)=0$. Therefore, for every feasible $x$,
+	\[
+		J_h(x^\star)(x-x^\star)=0.
+	\]
+	By convexity of each $g_j$,
+	\[
+		g_j(x)\ge g_j(x^\star)+\nabla g_j(x^\star)^\top(x-x^\star),
+	\]
+	so
+	\[
+		\nabla g_j(x^\star)^\top(x-x^\star)\le g_j(x)-g_j(x^\star).
+	\]
+	Multiply by $\mu_j^\star \ge 0$ and sum:
+	\[
+		\mu^{\star\top}J_g(x^\star)(x-x^\star)
+		\le
+		\mu^{\star\top}g(x)-\mu^{\star\top}g(x^\star).
+	\]
+	If $x$ is feasible, then $g(x)\le 0$. Complementary slackness gives
+	\[
+		\mu^{\star\top}g(x^\star)=0.
+	\]
+	Hence
+	\[
+		\mu^{\star\top}J_g(x^\star)(x-x^\star)\le 0.
+	\]
+	Substituting into the lower bound for $f(x)$ yields
+	\[
+		f(x)\ge f(x^\star)
+	\]
+	for every feasible $x$. Therefore $x^\star$ is a global minimizer.
+\end{proof}
+
+\subsection{Second-Order Conditions for Constrained Problems}
+
+\begin{definition}[Critical cone]
+	Let $(x^\star,\lambda^\star,\mu^\star)$ be a KKT point, and let
+	\[
+		\mathcal{A}^\star=\mathcal{A}(x^\star).
+	\]
+	The \emph{critical cone} at $x^\star$ is
+	\[
+		\mathcal{C}(x^\star,\lambda^\star,\mu^\star)
+		=
+		\left\{
+		d \in \mathbb{R}^n :
+		\begin{array}{l}
+			J_h(x^\star)d=0, \\
+			\nabla g_j(x^\star)^\top d = 0 \quad \text{if } j \in \mathcal{A}^\star \text{ and } \mu_j^\star>0, \\
+			\nabla g_j(x^\star)^\top d \le 0 \quad \text{if } j \in \mathcal{A}^\star \text{ and } \mu_j^\star=0, \\
+			\nabla f(x^\star)^\top d = 0
+		\end{array}
+		\right\}.
+	\]
+\end{definition}
+
+\begin{remark}
+	The critical cone consists of first-order feasible directions along which the objective has zero first-order change. These are precisely the directions in which second-order information matters.
+\end{remark}
+
+\begin{theorem}[Second-order necessary condition]
+	Assume $f,h,g$ are twice continuously differentiable, and let $(x^\star,\lambda^\star,\mu^\star)$ satisfy the KKT conditions. If $x^\star$ is a local minimizer, then
+	\[
+		d^\top \nabla^2_{xx}\mathcal{L}(x^\star,\lambda^\star,\mu^\star)d \ge 0
+		\qquad \text{for all } d \in \mathcal{C}(x^\star,\lambda^\star,\mu^\star).
+	\]
+\end{theorem}
+\begin{proof}
+	Fix a direction $d$ in the critical cone. Under LICQ one may construct a feasible curve
+	\[
+		x(t)=x^\star+td+o(t)
+	\]
+	that respects the active constraints to first order. Because $x^\star$ is a local minimizer and because $d$ lies in the critical cone, the first-order term in the Taylor expansion of the Lagrangian vanishes. Hence the second-order term must be nonnegative:
+	\[
+		0 \le \frac{d^2}{dt^2}\Big|_{t=0} \mathcal{L}(x(t),\lambda^\star,\mu^\star)
+		=
+		d^\top \nabla^2_{xx}\mathcal{L}(x^\star,\lambda^\star,\mu^\star)d.
+	\]
+	This is the constrained analogue of the unconstrained positive-semidefinite Hessian test.
+\end{proof}
+
+\begin{theorem}[Second-order sufficient condition]
+	Assume $f,h,g$ are twice continuously differentiable, and let $(x^\star,\lambda^\star,\mu^\star)$ satisfy the KKT conditions. If
+	\[
+		d^\top \nabla^2_{xx}\mathcal{L}(x^\star,\lambda^\star,\mu^\star)d > 0
+		\qquad \text{for every nonzero } d \in \mathcal{C}(x^\star,\lambda^\star,\mu^\star),
+	\]
+	then $x^\star$ is a strict local minimizer.
+\end{theorem}
+\begin{proof}
+	Assume by contradiction that $x^\star$ is not a strict local minimizer. Then there exists a sequence of distinct feasible points $x_k \to x^\star$ with
+	\[
+		f(x_k)\le f(x^\star).
+	\]
+	Normalize the directions
+	\[
+		d_k=\frac{x_k-x^\star}{\norm{x_k-x^\star}}
+	\]
+	and extract a convergent subsequence $d_k \to d$. Standard first-order feasibility arguments show that $d$ belongs to the critical cone. Expanding the Lagrangian along the sequence and using the KKT conditions shows that the second-order term must be nonpositive along $d$, contradicting the assumed positive definiteness on the critical cone. Therefore $x^\star$ is a strict local minimizer.
+\end{proof}
+
+\subsection{Lagrangian Duality}
+
+\begin{definition}[Dual function]
+	The \emph{Lagrange dual function} is
+	\[
+		q(\lambda,\mu)
+		=
+		\inf_{x \in \mathbb{R}^n} \mathcal{L}(x,\lambda,\mu)
+		=
+		\inf_x \bigl(f(x)+\lambda^\top h(x)+\mu^\top g(x)\bigr),
+	\]
+	with the convention that the dual variables must satisfy
+	\[
+		\mu \ge 0.
+	\]
+\end{definition}
+
+\begin{proposition}[The dual function is concave]
+	The function $q(\lambda,\mu)$ is concave in $(\lambda,\mu)$, even if the primal problem is not convex.
+\end{proposition}
+\begin{proof}
+	For each fixed $x$, the map
+	\[
+		(\lambda,\mu)\mapsto f(x)+\lambda^\top h(x)+\mu^\top g(x)
+	\]
+	is affine in $(\lambda,\mu)$. The dual function is the pointwise infimum of this family of affine functions. A pointwise infimum of affine functions is concave. Explicitly, for any two dual points $(\lambda_1,\mu_1)$ and $(\lambda_2,\mu_2)$ and any $\theta \in [0,1]$,
+	\begin{align*}
+		q(\theta(\lambda_1,\mu_1)+(1-\theta)(\lambda_2,\mu_2))
+		 & = \inf_x \Bigl[\theta \mathcal{L}(x,\lambda_1,\mu_1)+(1-\theta)\mathcal{L}(x,\lambda_2,\mu_2)\Bigr] \\
+		 & \ge \theta \inf_x \mathcal{L}(x,\lambda_1,\mu_1)+(1-\theta)\inf_x \mathcal{L}(x,\lambda_2,\mu_2) \\
+		 & = \theta q(\lambda_1,\mu_1)+(1-\theta)q(\lambda_2,\mu_2).
+	\end{align*}
+\end{proof}
+
+\begin{definition}[Dual problem]
+	The \emph{dual optimization problem} is
+	\begin{align*}
+		\max_{\lambda,\mu}\quad & q(\lambda,\mu) \\
+		\text{subject to}\quad & \mu \ge 0.
+	\end{align*}
+\end{definition}
+
+\begin{theorem}[Weak duality]
+	Let $x$ be any primal-feasible point and $(\lambda,\mu)$ any dual-feasible point. Then
+	\[
+		q(\lambda,\mu)\le f(x).
+	\]
+	In particular,
+	\[
+		\sup_{\mu \ge 0,\lambda} q(\lambda,\mu)
+		\le
+		\inf_{x \in \mathcal{F}} f(x).
+	\]
+\end{theorem}
+\begin{proof}
+	If $x$ is primal feasible, then
+	\[
+		h(x)=0,
+		\qquad
+		g(x)\le 0.
+	\]
+	If $(\lambda,\mu)$ is dual feasible, then $\mu \ge 0$, so
+	\[
+		\mu^\top g(x)\le 0.
+	\]
+	Hence
+	\[
+		\mathcal{L}(x,\lambda,\mu)
+		=
+		f(x)+\lambda^\top h(x)+\mu^\top g(x)
+		\le
+		f(x).
+	\]
+	By definition of the infimum,
+	\[
+		q(\lambda,\mu)=\inf_z \mathcal{L}(z,\lambda,\mu)\le \mathcal{L}(x,\lambda,\mu)\le f(x).
+	\]
+	This proves weak duality.
+\end{proof}
+
+\begin{definition}[Duality gap]
+	The \emph{duality gap} is the difference
+	\[
+		p^\star-d^\star,
+	\]
+	where
+	\[
+		p^\star=\inf_{x \in \mathcal{F}} f(x),
+		\qquad
+		d^\star=\sup_{\mu \ge 0,\lambda} q(\lambda,\mu).
+	\]
+	By weak duality, the duality gap is always nonnegative.
+\end{definition}
+
+\begin{theorem}[Strong duality under Slater's condition]
+	Consider the convex problem
+	\begin{align*}
+		\min_x \quad & f(x) \\
+		\text{subject to}\quad & h(x)=0, \\
+		                       & g(x)\le 0,
+	\end{align*}
+	where $f$ and each $g_j$ are convex and the equality constraints are affine. Assume there exists a strictly feasible point $\bar x$ such that
+	\[
+		h(\bar x)=0,
+		\qquad
+		g_j(\bar x)<0 \quad \text{for all } j.
+	\]
+	Then
+	\[
+		p^\star=d^\star.
+	\]
+\end{theorem}
+\begin{proof}[Proof sketch]
+	The strict feasibility assumption is Slater's condition. It implies that the convex feasible set has nonempty relative interior, which rules out pathological boundary degeneracies. One then applies a supporting-hyperplane theorem to the convex set of achievable pairs
+	\[
+		\{(g(x),f(x)) : h(x)=0\}.
+	\]
+	The supporting hyperplane separating the primal optimum from the strictly infeasible region produces nonnegative multipliers $\mu^\star$ and equality multipliers $\lambda^\star$, yielding a saddle point of the Lagrangian and hence equality of primal and dual optimal values.
+\end{proof}
+
+\begin{remark}
+	Strong duality is one of the central reasons convex optimization is tractable. When it holds, solving the dual is not merely a lower-bounding exercise; it recovers the exact primal optimum.
+\end{remark}
+
+\newpage
+
+\subsection{Quadratic Programming}
+
+\begin{definition}[Quadratic program]
+	A \emph{quadratic program} (QP) has the form
+	\begin{align*}
+		\min_x \quad & \frac{1}{2}x^\top Hx+c^\top x \\
+		\text{subject to}\quad & Ax=b, \\
+		                       & Gx\le h,
+	\end{align*}
+	where $H=H^\top$. If $H \succeq 0$, then the objective is convex.
+\end{definition}
+
+\begin{remark}
+	QPs are the workhorse subproblems of modern optimal control. Linear MPC is a QP solved online at every time step, and SQP methods for nonlinear optimal control repeatedly solve structured QPs.
+\end{remark}
+
+\begin{proposition}[Equality-constrained QP KKT system]
+	Consider the equality-constrained QP
+	\begin{align*}
+		\min_x \quad & \frac{1}{2}x^\top Hx+c^\top x \\
+		\text{subject to}\quad & Ax=b,
+	\end{align*}
+	where $H=H^\top$. Any KKT point $(x^\star,\lambda^\star)$ satisfies the linear system
+	\[
+		\begin{bmatrix}
+			H   & A^\top \\
+			A   & 0
+		\end{bmatrix}
+		\begin{bmatrix}
+			x^\star \\
+			\lambda^\star
+		\end{bmatrix}
+		=
+		\begin{bmatrix}
+			-c \\
+			b
+		\end{bmatrix}.
+	\]
+\end{proposition}
+\begin{proof}
+	The Lagrangian is
+	\[
+		\mathcal{L}(x,\lambda)=\frac{1}{2}x^\top Hx+c^\top x+\lambda^\top(Ax-b).
+	\]
+	Stationarity gives
+	\[
+		Hx+c+A^\top \lambda=0.
+	\]
+	Primal feasibility gives
+	\[
+		Ax=b.
+	\]
+	Writing these equations together yields the stated block linear system.
+\end{proof}
+
+\begin{eg}[A small QP solved by hand]
+	Consider
+	\begin{align*}
+		\min_{x_1,x_2}\quad & \frac{1}{2}(x_1^2+2x_2^2)-x_1-2x_2 \\
+		\text{subject to}\quad & x_1+x_2=1.
+	\end{align*}
+	Here
+	\[
+		H=
+		\begin{bmatrix}
+			1 & 0 \\
+			0 & 2
+		\end{bmatrix},
+		\qquad
+		c=
+		\begin{bmatrix}
+			-1 \\
+			-2
+		\end{bmatrix},
+		\qquad
+		A=
+		\begin{bmatrix}
+			1 & 1
+		\end{bmatrix}.
+	\]
+	The KKT system is
+	\[
+		\begin{bmatrix}
+			1 & 0 & 1 \\
+			0 & 2 & 1 \\
+			1 & 1 & 0
+		\end{bmatrix}
+		\begin{bmatrix}
+			x_1 \\
+			x_2 \\
+			\lambda
+		\end{bmatrix}
+		=
+		\begin{bmatrix}
+			1 \\
+			2 \\
+			1
+		\end{bmatrix}.
+	\]
+	From stationarity,
+	\[
+		x_1+\lambda=1,
+		\qquad
+		2x_2+\lambda=2.
+	\]
+	So
+	\[
+		x_1=1-\lambda,
+		\qquad
+		x_2=1-\frac{\lambda}{2}.
+	\]
+	Using $x_1+x_2=1$,
+	\[
+		1-\lambda + 1-\frac{\lambda}{2}=1
+		\qquad \Longrightarrow \qquad
+		\lambda=\frac{2}{3}.
+	\]
+	Hence
+	\[
+		x_1^\star=\frac{1}{3},
+		\qquad
+		x_2^\star=\frac{2}{3}.
+	\]
+	Since $H\succ 0$, the problem is strictly convex, so this feasible KKT point is the unique global minimizer.
+\end{eg}
+
+\begin{remark}
+	Lecture 3 gives the static constrained-optimization language used repeatedly later:
+	\begin{itemize}
+		\item Lagrange multipliers become costates in optimal control,
+		\item KKT systems become the algebraic core of QP and NLP solvers,
+		\item duality becomes the conceptual bridge between primal trajectory optimization and multiplier-based methods.
+	\end{itemize}
+	In that sense, constrained optimization is not a side topic; it is the algebraic backbone of modern optimal control computation.
+\end{remark}

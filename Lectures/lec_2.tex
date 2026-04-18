@@ -1,0 +1,1419 @@
+\lecture{2}{}{Numerical Methods for Unconstrained Optimization}
+
+\begin{intuition}
+	Lecture 1 answered the question ``what does optimality look like?'' Lecture 2 addresses the harder computational question: ``how do we actually get there?'' The answer is not a single algorithm but a hierarchy:
+	\begin{itemize}
+		\item line search supplies a generic descent framework,
+		\item gradient methods give robust but often slow progress,
+		\item Newton methods use curvature for rapid local convergence,
+		\item quasi-Newton methods aim for most of Newton's speed without explicit Hessians.
+	\end{itemize}
+	The theoretical thread running through all of them is simple: obtain a provable decrease at each step, then convert that decrease into a convergence statement.
+\end{intuition}
+
+\subsection{Descent Directions and the Line Search Framework}
+
+\begin{definition}[Descent direction]
+	Let $f:U \to \mathbb{R}$ be differentiable on an open set $U \subseteq \mathbb{R}^n$, and let $x \in U$. A vector $d \in \mathbb{R}^n$ is called a \emph{descent direction} for $f$ at $x$ if there exists $\bar\alpha>0$ such that
+	\[
+		f(x+\alpha d) < f(x)
+		\qquad \text{for all } \alpha \in (0,\bar\alpha].
+	\]
+\end{definition}
+
+\begin{proposition}[Characterization of descent directions]
+	Let $f$ be differentiable at $x$. A vector $d$ is a descent direction at $x$ if and only if
+	\[
+		\nabla f(x)^\top d < 0.
+	\]
+\end{proposition}
+\begin{proof}
+	Define the one-dimensional restriction
+	\[
+		\phi(\alpha)=f(x+\alpha d).
+	\]
+	Then
+	\[
+		\phi'(0)=\nabla f(x)^\top d.
+	\]
+	If $\nabla f(x)^\top d<0$, then $\phi'(0)<0$, so for sufficiently small $\alpha>0$ we have $\phi(\alpha)<\phi(0)$; hence $d$ is a descent direction.
+
+	Conversely, if $d$ is a descent direction, then $\phi(\alpha)<\phi(0)$ for all sufficiently small positive $\alpha$. Therefore
+	\[
+		\frac{\phi(\alpha)-\phi(0)}{\alpha}<0
+	\]
+	for such $\alpha$, and letting $\alpha \downarrow 0$ gives
+	\[
+		\phi'(0)=\nabla f(x)^\top d \le 0.
+	\]
+	Equality cannot occur, because if $\phi'(0)=0$ then the function cannot decrease linearly to first order along $d$. Thus strict descent requires $\nabla f(x)^\top d<0$.
+\end{proof}
+
+\begin{notation}[Generic line search iteration]
+	The standard line search update has the form
+	\[
+		x_{k+1}=x_k+\alpha_k d_k,
+	\]
+	where two choices must be made at iteration $k$:
+	\begin{itemize}
+		\item a direction $d_k$, which should point toward lower objective values,
+		\item a step length $\alpha_k>0$, which controls how far we move along that direction.
+	\end{itemize}
+	A good direction with a terrible step length can stagnate, and a good step length along a poor direction cannot repair a bad search direction.
+\end{notation}
+
+\begin{algorithm}[H]
+	\DontPrintSemicolon
+	\caption{Generic Line Search Method}
+	\KwIn{Initial point $x_0$, direction rule, step-length rule, tolerance $\varepsilon>0$}
+	\For{$k=0,1,2,\dots$}{
+		Compute $g_k=\nabla f(x_k)$\;
+		\If{$\norm{g_k}\le \varepsilon$}{
+			return $x_k$\;
+		}
+		Choose a descent direction $d_k$ such that $g_k^\top d_k<0$\;
+		Choose a step length $\alpha_k>0$\;
+		Set $x_{k+1}=x_k+\alpha_k d_k$\;
+	}
+\end{algorithm}
+
+\begin{definition}[Armijo condition]
+	Given constants $c_1 \in (0,1)$, the step length $\alpha_k>0$ satisfies the \emph{Armijo} or \emph{sufficient decrease} condition if
+	\[
+		f(x_k+\alpha_k d_k)
+		\le
+		f(x_k)+c_1 \alpha_k \nabla f(x_k)^\top d_k.
+	\]
+\end{definition}
+
+\begin{intuition}
+	Since $\nabla f(x_k)^\top d_k<0$, the right-hand side lies below $f(x_k)$. The Armijo condition therefore demands not merely a decrease, but a decrease proportional to the first-order model prediction. It rejects steps that are so tiny that they make negligible progress.
+\end{intuition}
+
+\begin{definition}[Wolfe conditions]
+	Let $0<c_1<c_2<1$. A step length $\alpha_k>0$ satisfies the \emph{Wolfe conditions} if
+	\begin{align*}
+		f(x_k+\alpha_k d_k)
+		 & \le f(x_k)+c_1 \alpha_k \nabla f(x_k)^\top d_k,
+		\\
+		\nabla f(x_k+\alpha_k d_k)^\top d_k
+		 & \ge c_2 \nabla f(x_k)^\top d_k.
+	\end{align*}
+	The first inequality is Armijo; the second is the \emph{curvature condition}.
+\end{definition}
+
+\begin{remark}[Why Armijo alone is not enough]
+	Armijo guarantees decrease, but it does not prevent \emph{arbitrarily small} accepted steps. If one keeps taking vanishingly small steps, the iterates may decrease the objective without making meaningful geometric progress. The curvature condition blocks this pathology by insisting that the directional derivative after the step is not too negative, which means the step has advanced far enough along the chosen direction.
+\end{remark}
+
+\begin{remark}[Why $c_1$ is chosen small]
+	The Armijo condition compares actual decrease to the linear prediction
+	\[
+		f(x_k)+\alpha \nabla f(x_k)^\top d_k.
+	\]
+	Since the linear model is accurate only for small $\alpha$, one typically asks for only a small fraction of that predicted decrease, hence values such as $c_1=10^{-4}$. If $c_1$ were close to $1$, the condition would demand an unrealistically large fraction of the linear-model decrease and would reject many reasonable steps. At $c_1=1$, the inequality would ask the actual objective value to lie below the full first-order prediction, which is generally impossible once second-order curvature is taken into account.
+\end{remark}
+
+\begin{algorithm}[H]
+	\DontPrintSemicolon
+	\caption{Backtracking Line Search}
+	\KwIn{Current iterate $x_k$, descent direction $d_k$, initial trial step $\alpha_0>0$, reduction factor $\rho \in (0,1)$, Armijo constant $c_1 \in (0,1)$}
+	$\alpha \leftarrow \alpha_0$\;
+	\While{$f(x_k+\alpha d_k) > f(x_k)+c_1 \alpha \nabla f(x_k)^\top d_k$}{
+		$\alpha \leftarrow \rho \alpha$\;
+	}
+	\KwOut{Accepted step size $\alpha_k=\alpha$}
+\end{algorithm}
+
+\begin{proposition}[Finite termination of backtracking]
+	Suppose $\nabla f$ is Lipschitz continuous with constant $L$ on a neighborhood of the line segment $\{x_k+\alpha d_k : 0 \le \alpha \le \alpha_0\}$, and suppose $d_k$ is a descent direction. Then the backtracking line search terminates after finitely many reductions.
+\end{proposition}
+\begin{proof}
+	By the descent lemma proved below,
+	\[
+		f(x_k+\alpha d_k)
+		\le f(x_k)+\alpha \nabla f(x_k)^\top d_k + \frac{L}{2}\alpha^2 \norm{d_k}^2.
+	\]
+	Therefore Armijo is guaranteed whenever
+	\[
+		\alpha \nabla f(x_k)^\top d_k + \frac{L}{2}\alpha^2 \norm{d_k}^2
+		\le c_1 \alpha \nabla f(x_k)^\top d_k,
+	\]
+	or equivalently
+	\[
+		\frac{L}{2}\alpha \norm{d_k}^2
+		\le
+		-(1-c_1)\nabla f(x_k)^\top d_k.
+	\]
+	Because $d_k$ is a descent direction, the right-hand side is strictly positive. Hence every step size satisfying
+	\[
+		0<\alpha
+		\le
+		\frac{2(1-c_1)\bigl(-\nabla f(x_k)^\top d_k\bigr)}{L\norm{d_k}^2}
+	\]
+	is accepted. Repeated multiplication by $\rho \in (0,1)$ eventually makes $\alpha$ fall into this interval, so the algorithm terminates in finitely many steps.
+\end{proof}
+
+\begin{eg}[Exact line search in one dimension]
+	\begin{enumerate}[label=(\alph*)]
+		\item Let $f(x)=(x-3)^2$, $x_0=0$, and $d_0=1$. Then
+		      \[
+			      \phi(\alpha)=f(x_0+\alpha d_0)=(\alpha-3)^2.
+		      \]
+		      Differentiating,
+		      \[
+			      \phi'(\alpha)=2(\alpha-3),
+		      \]
+		      so the exact line search step is
+		      \[
+			      \alpha_0^\ast=3.
+		      \]
+
+		\item Let $f(x)=x^4-4x^2$, $x_0=3$, and $d_0=-1$. Then
+		      \[
+			      \phi(\alpha)=f(3-\alpha)=(3-\alpha)^4-4(3-\alpha)^2.
+		      \]
+		      Differentiating,
+		      \[
+			      \phi'(\alpha)
+			      = -4(3-\alpha)^3 + 8(3-\alpha)
+			      = -4(3-\alpha)\bigl((3-\alpha)^2-2\bigr).
+		      \]
+		      Hence the stationary points are
+		      \[
+			      \alpha = 3, \qquad \alpha = 3-\sqrt{2}, \qquad \alpha = 3+\sqrt{2}.
+		      \]
+		      Evaluating the objective,
+		      \[
+			      f(0)=0, \qquad f(\pm \sqrt{2})=-4.
+		      \]
+		      Therefore the exact line search minimizers on the ray are
+		      \[
+			      \alpha^\ast \in \{3-\sqrt{2},\,3+\sqrt{2}\}.
+		      \]
+		      The smaller choice reaches the first global minimizer encountered along the ray.
+	\end{enumerate}
+\end{eg}
+
+\begin{proposition}[Exact line search for convex quadratics]
+	Consider
+	\[
+		f(x)=\frac{1}{2}x^\top Qx-b^\top x,
+		\qquad Q \succ 0,
+	\]
+	and a search direction $d$ with $\nabla f(x)^\top d<0$. Then the exact line search step size along $d$ is
+	\[
+		\alpha^\ast = -\frac{\nabla f(x)^\top d}{d^\top Qd}.
+	\]
+\end{proposition}
+\begin{proof}
+	Define
+	\[
+		\phi(\alpha)=f(x+\alpha d).
+	\]
+	Expanding,
+	\[
+		\phi(\alpha)=f(x)+\alpha \nabla f(x)^\top d+\frac{\alpha^2}{2}d^\top Qd.
+	\]
+	Since $Q\succ 0$, we have $d^\top Qd>0$ for every nonzero $d$, so $\phi$ is a strictly convex quadratic in $\alpha$. Its unique minimizer is obtained from
+	\[
+		\phi'(\alpha)=\nabla f(x)^\top d+\alpha d^\top Qd=0,
+	\]
+	which yields
+	\[
+		\alpha^\ast = -\frac{\nabla f(x)^\top d}{d^\top Qd}.
+	\]
+\end{proof}
+
+\subsection{Steepest Descent}
+
+\begin{definition}[Steepest descent iteration]
+	The \emph{steepest descent} direction at $x_k$ is
+	\[
+		d_k=-\nabla f(x_k).
+	\]
+	The resulting iteration is
+	\[
+		x_{k+1}=x_k-\alpha_k \nabla f(x_k).
+	\]
+	In optimization literature, this is also called \emph{gradient descent}.
+\end{definition}
+
+\begin{proposition}[Why the negative gradient is the steepest descent direction]
+	Among all unit vectors $d$ with $\norm{d}=1$, the quantity $\nabla f(x_k)^\top d$ is minimized by
+	\[
+		d = -\frac{\nabla f(x_k)}{\norm{\nabla f(x_k)}}.
+	\]
+	In particular, $-\nabla f(x_k)$ points in the direction of maximal first-order decrease.
+\end{proposition}
+\begin{proof}
+	By Cauchy--Schwarz,
+	\[
+		\nabla f(x_k)^\top d
+		\ge -\norm{\nabla f(x_k)}\,\norm{d}
+		= -\norm{\nabla f(x_k)}.
+	\]
+	Equality holds if and only if $d$ is the negative unit vector in the gradient direction, namely
+	\[
+		d = -\frac{\nabla f(x_k)}{\norm{\nabla f(x_k)}}.
+	\]
+\end{proof}
+
+\begin{algorithm}[H]
+	\DontPrintSemicolon
+	\caption{Steepest Descent with Line Search}
+	\KwIn{Initial point $x_0$, step selection rule, tolerance $\varepsilon>0$}
+	\For{$k=0,1,2,\dots$}{
+		$g_k \leftarrow \nabla f(x_k)$\;
+		\If{$\norm{g_k}\le \varepsilon$}{
+			return $x_k$\;
+		}
+		$d_k \leftarrow -g_k$\;
+		Choose $\alpha_k>0$ by exact line search, backtracking, or Wolfe line search\;
+		$x_{k+1} \leftarrow x_k+\alpha_k d_k$\;
+	}
+\end{algorithm}
+
+\begin{theorem}[Exact line search step for a quadratic]
+	Let
+	\[
+		f(x)=\frac{1}{2}x^\top Qx-b^\top x,
+		\qquad Q \succ 0,
+	\]
+	and let
+	\[
+		g_k=\nabla f(x_k)=Qx_k-b.
+	\]
+	For steepest descent with exact line search,
+	\[
+		\alpha_k = \frac{g_k^\top g_k}{g_k^\top Q g_k}.
+	\]
+\end{theorem}
+\begin{proof}
+	In steepest descent, $d_k=-g_k$. The general quadratic line-search formula gives
+	\[
+		\alpha_k
+		= -\frac{g_k^\top d_k}{d_k^\top Q d_k}
+		= -\frac{g_k^\top(-g_k)}{(-g_k)^\top Q(-g_k)}
+		= \frac{g_k^\top g_k}{g_k^\top Qg_k}.
+	\]
+\end{proof}
+
+\begin{eg}[Two steepest descent steps and the zig-zag phenomenon]
+	Consider
+	\[
+		f(x_1,x_2)=5x_1^2+x_2^2
+		=\frac{1}{2}
+		\begin{bmatrix}x_1 \\ x_2\end{bmatrix}^\top
+		\begin{bmatrix}
+			10 & 0 \\
+			0  & 2
+		\end{bmatrix}
+		\begin{bmatrix}x_1 \\ x_2\end{bmatrix},
+	\]
+	starting from
+	\[
+		x_0=\begin{bmatrix}1 \\ 1\end{bmatrix}.
+	\]
+	The gradient is
+	\[
+		\nabla f(x)=
+		\begin{bmatrix}
+			10x_1 \\
+			2x_2
+		\end{bmatrix}.
+	\]
+	Thus
+	\[
+		g_0=\begin{bmatrix}10 \\ 2\end{bmatrix},
+		\qquad
+		d_0=-g_0=\begin{bmatrix}-10 \\ -2\end{bmatrix}.
+	\]
+	The exact line-search step is
+	\[
+		\alpha_0
+		=
+		\frac{g_0^\top g_0}{g_0^\top Qg_0}
+		=
+		\frac{10^2+2^2}{10\cdot 10^2 + 2\cdot 2^2}
+		=
+		\frac{104}{1008}
+		=
+		\frac{13}{126}.
+	\]
+	Hence
+	\[
+		x_1=x_0-\alpha_0 g_0
+		=
+		\begin{bmatrix}
+			1 \\
+			1
+		\end{bmatrix}
+		-
+		\frac{13}{126}
+		\begin{bmatrix}
+			10 \\
+			2
+		\end{bmatrix}
+		=
+		\begin{bmatrix}
+			-\frac{2}{63} \\
+			\frac{50}{63}
+		\end{bmatrix}.
+	\]
+	Now
+	\[
+		g_1=
+		\begin{bmatrix}
+			-\frac{20}{63} \\
+			\frac{100}{63}
+		\end{bmatrix},
+		\qquad
+		d_1=-g_1.
+	\]
+	The second exact step is
+	\[
+		\alpha_1
+		=
+		\frac{g_1^\top g_1}{g_1^\top Q g_1}
+		=
+		\frac{13}{30}.
+	\]
+	Therefore
+	\[
+		x_2=x_1-\alpha_1 g_1
+		=
+		\begin{bmatrix}
+			\frac{20}{189} \\
+			\frac{20}{189}
+		\end{bmatrix}.
+	\]
+	The first step moves mostly in the $x_1$ direction because curvature there is much larger; the next step swings toward the $x_2$ direction. This alternating behavior is the classical zig-zag pattern.
+\end{eg}
+
+\begin{proposition}[Orthogonality of consecutive gradients]
+	For steepest descent with exact line search,
+	\[
+		g_{k+1}^\top g_k=0
+		\qquad \text{for all } k.
+	\]
+\end{proposition}
+\begin{proof}
+	Define the line-search function
+	\[
+		\phi_k(\alpha)=f(x_k-\alpha g_k).
+	\]
+	Exact line search chooses $\alpha_k$ so that $\phi_k'(\alpha_k)=0$. By the chain rule,
+	\[
+		\phi_k'(\alpha)
+		=
+		\nabla f(x_k-\alpha g_k)^\top (-g_k).
+	\]
+	Evaluating at $\alpha=\alpha_k$ gives
+	\[
+		0=\phi_k'(\alpha_k)
+		=
+		-\nabla f(x_{k+1})^\top g_k
+		=
+		-g_{k+1}^\top g_k.
+	\]
+	Hence $g_{k+1}^\top g_k=0$.
+\end{proof}
+
+\begin{lemma}[Kantorovich inequality in scalar form]
+	Let $Q \succ 0$ with eigenvalues in the interval $[m,M]$, where $0<m \le M$. Then for every nonzero vector $z$,
+	\[
+		\frac{(z^\top z)^2}{(z^\top Qz)(z^\top Q^{-1}z)}
+		\ge
+		\frac{4mM}{(m+M)^2}.
+	\]
+\end{lemma}
+\begin{proof}
+	Write the spectral decomposition $Q=U \Lambda U^\top$, where $\Lambda=\diag(\lambda_1,\dots,\lambda_n)$ and $\lambda_i \in [m,M]$. Let $w=U^\top z$ and define
+	\[
+		p_i=\frac{w_i^2}{\sum_j w_j^2}.
+	\]
+	Then $p_i \ge 0$ and $\sum_i p_i=1$, while
+	\[
+		\frac{(z^\top Qz)(z^\top Q^{-1}z)}{(z^\top z)^2}
+		=
+		\left(\sum_i p_i \lambda_i\right)\left(\sum_i p_i \frac{1}{\lambda_i}\right).
+	\]
+	For each $\lambda_i \in [m,M]$ we have
+	\[
+		(M-\lambda_i)(\lambda_i-m)\ge 0.
+	\]
+	After dividing by $\lambda_i>0$, this becomes
+	\[
+		\lambda_i+\frac{mM}{\lambda_i}\le m+M.
+	\]
+	Multiply by $p_i$ and sum:
+	\[
+		\sum_i p_i \lambda_i + mM \sum_i p_i \frac{1}{\lambda_i}\le m+M.
+	\]
+	Now apply the arithmetic-geometric mean inequality:
+	\[
+		2\sqrt{
+			mM
+			\left(\sum_i p_i \lambda_i\right)
+			\left(\sum_i p_i \frac{1}{\lambda_i}\right)
+		}
+		\le
+		\sum_i p_i \lambda_i + mM \sum_i p_i \frac{1}{\lambda_i}
+		\le
+		m+M.
+	\]
+	Squaring yields
+	\[
+		\left(\sum_i p_i \lambda_i\right)\left(\sum_i p_i \frac{1}{\lambda_i}\right)
+		\le
+		\frac{(m+M)^2}{4mM}.
+	\]
+	Taking reciprocals proves the stated inequality.
+\end{proof}
+
+\begin{theorem}[Linear convergence rate for steepest descent on quadratics]
+	Let
+	\[
+		f(x)=\frac{1}{2}x^\top Qx-b^\top x,
+		\qquad Q \succ 0,
+	\]
+	and let $x^\star=Q^{-1}b$. Denote the condition number by
+	\[
+		\kappa(Q)=\frac{\lambda_{\max}(Q)}{\lambda_{\min}(Q)}.
+	\]
+	Then steepest descent with exact line search satisfies
+	\[
+		\frac{f(x_{k+1})-f(x^\star)}{f(x_k)-f(x^\star)}
+		\le
+		\left(\frac{\kappa(Q)-1}{\kappa(Q)+1}\right)^2.
+	\]
+	In particular, the method converges linearly.
+\end{theorem}
+\begin{proof}
+	Let
+	\[
+		e_k=x_k-x^\star.
+	\]
+	Because $Qx^\star=b$,
+	\[
+		g_k=\nabla f(x_k)=Qe_k.
+	\]
+	Also,
+	\[
+		f(x_k)-f(x^\star)=\frac{1}{2}e_k^\top Q e_k
+		=\frac{1}{2}g_k^\top Q^{-1}g_k.
+	\]
+	Using the exact line-search step,
+	\[
+		x_{k+1}=x_k-\alpha_k g_k,
+		\qquad
+		\alpha_k=\frac{g_k^\top g_k}{g_k^\top Qg_k}.
+	\]
+	Substituting into the quadratic expression for the objective,
+	\[
+		f(x_{k+1})-f(x^\star)
+		=
+		f(x_k)-f(x^\star)-\frac{(g_k^\top g_k)^2}{2g_k^\top Qg_k}.
+	\]
+	Divide by $f(x_k)-f(x^\star)=\frac{1}{2}g_k^\top Q^{-1}g_k$:
+	\[
+		\frac{f(x_{k+1})-f(x^\star)}{f(x_k)-f(x^\star)}
+		=
+		1-
+		\frac{(g_k^\top g_k)^2}{(g_k^\top Qg_k)(g_k^\top Q^{-1}g_k)}.
+	\]
+	Now apply the Kantorovich inequality with $m=\lambda_{\min}(Q)$ and $M=\lambda_{\max}(Q)$:
+	\[
+		\frac{(g_k^\top g_k)^2}{(g_k^\top Qg_k)(g_k^\top Q^{-1}g_k)}
+		\ge
+		\frac{4mM}{(m+M)^2}
+		=
+		\frac{4\kappa}{(\kappa+1)^2}.
+	\]
+	Hence
+	\[
+		\frac{f(x_{k+1})-f(x^\star)}{f(x_k)-f(x^\star)}
+		\le
+		1-\frac{4\kappa}{(\kappa+1)^2}
+		=
+		\left(\frac{\kappa-1}{\kappa+1}\right)^2.
+	\]
+\end{proof}
+
+\begin{remark}[Condition number and practical behavior]
+	If $\kappa(Q)=1$, then $Q$ is a scalar multiple of the identity and the convergence factor is $0$: one steepest-descent step reaches the minimizer. As $\kappa(Q)\to\infty$, the factor approaches $1$, so progress becomes arbitrarily slow. This is the precise mathematical explanation for the zig-zagging seen on elongated quadratic level sets.
+\end{remark}
+
+\begin{remark}[Why steepest descent is rarely the final algorithm]
+	Steepest descent is globally robust and easy to implement, but in ill-conditioned problems it is typically too slow for serious computation. Modern practice therefore treats it as
+	\begin{itemize}
+		\item a baseline method,
+		\item a first step inside more sophisticated updates,
+		\item or a fallback when curvature information is unreliable.
+	\end{itemize}
+	Conjugate gradients, Newton, quasi-Newton, proximal, and trust-region methods exist precisely because raw steepest descent wastes curvature information.
+\end{remark}
+
+\subsection{Global Convergence Theory}
+
+\begin{definition}[Lipschitz continuous gradient]
+	The gradient $\nabla f$ is \emph{Lipschitz continuous} with constant $L>0$ on a set $D$ if
+	\[
+		\norm{\nabla f(x)-\nabla f(y)} \le L \norm{x-y}
+		\qquad \text{for all } x,y \in D.
+	\]
+\end{definition}
+
+\begin{remark}
+	This assumption controls how fast the gradient can change. It is the natural smoothness condition behind most descent estimates because it replaces the exact Taylor remainder by a uniform quadratic upper bound.
+\end{remark}
+
+\begin{theorem}[Descent lemma / quadratic upper bound]
+	If $\nabla f$ is Lipschitz continuous with constant $L$ on a convex set containing the segment from $x$ to $x+\alpha d$, then
+	\[
+		f(x+\alpha d)
+		\le
+		f(x)+\alpha \nabla f(x)^\top d + \frac{L}{2}\alpha^2 \norm{d}^2.
+	\]
+\end{theorem}
+\begin{proof}
+	Define
+	\[
+		\phi(t)=f(x+t\alpha d), \qquad t \in [0,1].
+	\]
+	By the fundamental theorem of calculus,
+	\[
+		f(x+\alpha d)-f(x)
+		=
+		\int_0^1 \phi'(t)\,dt
+		=
+		\int_0^1 \nabla f(x+t\alpha d)^\top (\alpha d)\,dt.
+	\]
+	Add and subtract $\nabla f(x)$:
+	\begin{align*}
+		f(x+\alpha d)-f(x)
+		 & = \alpha \nabla f(x)^\top d
+		+ \alpha \int_0^1 \bigl(\nabla f(x+t\alpha d)-\nabla f(x)\bigr)^\top d\,dt \\
+		 & \le \alpha \nabla f(x)^\top d
+		+ \alpha \int_0^1 \norm{\nabla f(x+t\alpha d)-\nabla f(x)} \norm{d}\,dt \\
+		 & \le \alpha \nabla f(x)^\top d
+		+ \alpha \int_0^1 Lt\alpha \norm{d}^2\,dt \\
+		 & = \alpha \nabla f(x)^\top d + \frac{L}{2}\alpha^2 \norm{d}^2.
+	\end{align*}
+\end{proof}
+
+\begin{theorem}[Gradient descent with step $1/L$ gives sufficient decrease]
+	If $\nabla f$ is Lipschitz continuous with constant $L$, then the fixed-step gradient descent iteration
+	\[
+		x_{k+1}=x_k-\frac{1}{L}\nabla f(x_k)
+	\]
+	satisfies
+	\[
+		f(x_{k+1})
+		\le
+		f(x_k)-\frac{1}{2L}\norm{\nabla f(x_k)}^2.
+	\]
+\end{theorem}
+\begin{proof}
+	Apply the descent lemma with
+	\[
+		d_k=-\nabla f(x_k),
+		\qquad
+		\alpha=\frac{1}{L}.
+	\]
+	Then
+	\begin{align*}
+		f(x_{k+1})
+		 & \le f(x_k)+\frac{1}{L}\nabla f(x_k)^\top(-\nabla f(x_k))
+		+\frac{L}{2}\frac{1}{L^2}\norm{\nabla f(x_k)}^2 \\
+		 & = f(x_k)-\frac{1}{L}\norm{\nabla f(x_k)}^2
+		+\frac{1}{2L}\norm{\nabla f(x_k)}^2 \\
+		 & = f(x_k)-\frac{1}{2L}\norm{\nabla f(x_k)}^2.
+	\end{align*}
+\end{proof}
+
+\begin{theorem}[Zoutendijk condition]
+	Consider a line-search method
+	\[
+		x_{k+1}=x_k+\alpha_k d_k
+	\]
+	with the following assumptions:
+	\begin{enumerate}[label=(\roman*)]
+		\item $f$ is continuously differentiable and bounded below on the level set
+		      \[
+			      \mathcal{L}=\{x : f(x)\le f(x_0)\},
+		      \]
+		\item $\nabla f$ is Lipschitz continuous with constant $L$ on an open neighborhood of $\mathcal{L}$,
+		\item each $d_k$ is a descent direction,
+		\item each $\alpha_k$ satisfies the Wolfe conditions.
+	\end{enumerate}
+	Let $\theta_k$ be the angle between $d_k$ and $-\nabla f(x_k)$, defined by
+	\[
+		\cos \theta_k
+		=
+		\frac{-\nabla f(x_k)^\top d_k}{\norm{\nabla f(x_k)}\,\norm{d_k}}.
+	\]
+	Then
+	\[
+		\sum_{k=0}^\infty \cos^2 \theta_k \, \norm{\nabla f(x_k)}^2 < \infty.
+	\]
+\end{theorem}
+\begin{proof}
+	Write $g_k=\nabla f(x_k)$. By the curvature condition,
+	\[
+		g_{k+1}^\top d_k \ge c_2 g_k^\top d_k.
+	\]
+	Since $g_k^\top d_k<0$, we rearrange this as
+	\[
+		(g_{k+1}-g_k)^\top d_k
+		\ge
+		(c_2-1)g_k^\top d_k
+		=
+		(1-c_2)(-g_k^\top d_k).
+	\]
+	By Lipschitz continuity of $\nabla f$,
+	\[
+		\norm{g_{k+1}-g_k}
+		\le
+		L \norm{x_{k+1}-x_k}
+		=
+		L\alpha_k \norm{d_k}.
+	\]
+	Hence
+	\[
+		(g_{k+1}-g_k)^\top d_k
+		\le
+		\norm{g_{k+1}-g_k}\norm{d_k}
+		\le
+		L\alpha_k \norm{d_k}^2.
+	\]
+	Combining the two inequalities gives
+	\[
+		\alpha_k
+		\ge
+		\frac{(1-c_2)(-g_k^\top d_k)}{L\norm{d_k}^2}.
+	\]
+	Now apply Armijo:
+	\[
+		f(x_k)-f(x_{k+1})
+		\ge
+		-c_1 \alpha_k g_k^\top d_k.
+	\]
+	Substitute the lower bound on $\alpha_k$:
+	\[
+		f(x_k)-f(x_{k+1})
+		\ge
+		\frac{c_1(1-c_2)(g_k^\top d_k)^2}{L\norm{d_k}^2}.
+	\]
+	Since
+	\[
+		(g_k^\top d_k)^2
+		=
+		\norm{g_k}^2 \norm{d_k}^2 \cos^2 \theta_k,
+	\]
+	we obtain
+	\[
+		f(x_k)-f(x_{k+1})
+		\ge
+		\frac{c_1(1-c_2)}{L}
+		\cos^2 \theta_k \norm{g_k}^2.
+	\]
+	Summing from $k=0$ to $N$ gives
+	\[
+		\frac{c_1(1-c_2)}{L}
+		\sum_{k=0}^N \cos^2 \theta_k \norm{g_k}^2
+		\le
+		f(x_0)-f(x_{N+1}).
+	\]
+	Because all iterates remain in the initial level set, the right-hand side is bounded above by $f(x_0)-\inf_{\mathcal{L}} f < \infty$. Letting $N \to \infty$ proves
+	\[
+		\sum_{k=0}^\infty \cos^2 \theta_k \norm{g_k}^2 < \infty.
+	\]
+\end{proof}
+
+\begin{corollary}[A standard consequence of Zoutendijk]
+	If, in addition to the assumptions of the theorem, there exists $\delta>0$ such that
+	\[
+		\cos \theta_k \ge \delta
+		\qquad \text{for all } k,
+	\]
+	then
+	\[
+		\liminf_{k \to \infty} \norm{\nabla f(x_k)} = 0.
+	\]
+\end{corollary}
+\begin{proof}
+	Suppose instead that there exists $\varepsilon>0$ and $K$ such that
+	\[
+		\norm{\nabla f(x_k)} \ge \varepsilon
+		\qquad \text{for all } k \ge K.
+	\]
+	Then
+	\[
+		\cos^2 \theta_k \norm{\nabla f(x_k)}^2
+		\ge
+		\delta^2 \varepsilon^2
+		\qquad \text{for all } k \ge K.
+	\]
+	The series
+	\[
+		\sum_{k=K}^\infty \cos^2 \theta_k \norm{\nabla f(x_k)}^2
+	\]
+	would therefore diverge, contradicting Zoutendijk's theorem. Hence the assumption was false, and
+	\[
+		\liminf_{k \to \infty} \norm{\nabla f(x_k)}=0.
+	\]
+\end{proof}
+
+\begin{proposition}[Angle bounds for steepest descent and Newton]
+	\begin{enumerate}[label=(\roman*)]
+		\item For steepest descent,
+		      \[
+			      \cos \theta_k = 1
+			      \qquad \text{for every } k.
+		      \]
+		\item For Newton's method, if
+		      \[
+			      mI \preceq \nabla^2 f(x_k) \preceq MI
+		      \qquad \text{with } 0<m \le M,
+		      \]
+		      then the Newton direction $d_k=-[\nabla^2 f(x_k)]^{-1}\nabla f(x_k)$ satisfies
+		      \[
+			      \cos \theta_k \ge \frac{m}{M}.
+		      \]
+	\end{enumerate}
+\end{proposition}
+\begin{proof}
+	For steepest descent,
+	\[
+		d_k=-g_k,
+	\]
+	so
+	\[
+		\cos \theta_k
+		=
+		\frac{-g_k^\top(-g_k)}{\norm{g_k}\norm{-g_k}}
+		=1.
+	\]
+
+	For Newton's method, let $H_k=\nabla^2 f(x_k)$ and $g_k=\nabla f(x_k)$. Then
+	\[
+		d_k=-H_k^{-1}g_k.
+	\]
+	Hence
+	\[
+		\cos \theta_k
+		=
+		\frac{g_k^\top H_k^{-1}g_k}{\norm{g_k}\,\norm{H_k^{-1}g_k}}.
+	\]
+	From $mI \preceq H_k \preceq MI$ we get
+	\[
+		\frac{1}{M}I \preceq H_k^{-1} \preceq \frac{1}{m}I.
+	\]
+	Therefore
+	\[
+		g_k^\top H_k^{-1}g_k \ge \frac{1}{M}\norm{g_k}^2
+	\]
+	and
+	\[
+		\norm{H_k^{-1}g_k} \le \frac{1}{m}\norm{g_k}.
+	\]
+	Substituting these estimates gives
+	\[
+		\cos \theta_k
+		\ge
+		\frac{(1/M)\norm{g_k}^2}{\norm{g_k}\,(1/m)\norm{g_k}}
+		=
+		\frac{m}{M}.
+	\]
+\end{proof}
+
+\begin{remark}[What Zoutendijk does not say]
+	Zoutendijk's theorem is a global convergence \emph{framework}, not a full problem solution. It does \emph{not} imply:
+	\begin{itemize}
+		\item convergence to a local minimum rather than a saddle point,
+		\item any explicit convergence rate,
+		\item applicability to nonsmooth objectives,
+		\item convergence to a global minimum without extra convexity assumptions.
+	\end{itemize}
+	What it does say is more modest but still powerful: if every step is sufficiently well aligned with the negative gradient and Wolfe line search is used, then the method cannot keep producing large gradients forever.
+\end{remark}
+
+\subsection{Convergence Rates for Gradient Descent}
+
+\begin{theorem}[Sublinear $O(1/k)$ rate for $L$-smooth convex functions]
+	Let $f:\mathbb{R}^n \to \mathbb{R}$ be convex and differentiable, and assume $\nabla f$ is Lipschitz continuous with constant $L$. Let $x^\star$ be a global minimizer, and consider
+	\[
+		x_{k+1}=x_k-\frac{1}{L}\nabla f(x_k).
+	\]
+	Then
+	\[
+		f(x_k)-f(x^\star)
+		\le
+		\frac{L\norm{x_0-x^\star}^2}{2k}
+		\qquad \text{for all } k \ge 1.
+	\]
+\end{theorem}
+\begin{proof}
+	Write $g_k=\nabla f(x_k)$. Convexity gives
+	\[
+		f(x^\star)\ge f(x_k)+g_k^\top(x^\star-x_k),
+	\]
+	so
+	\[
+		f(x_k)-f(x^\star)\le g_k^\top(x_k-x^\star).
+	\]
+	On the other hand, since
+	\[
+		x_{k+1}=x_k-\frac{1}{L}g_k,
+	\]
+	we have
+	\begin{align*}
+		\norm{x_k-x^\star}^2-\norm{x_{k+1}-x^\star}^2
+		 & =
+		2\frac{1}{L}g_k^\top(x_k-x^\star)-\frac{1}{L^2}\norm{g_k}^2.
+	\end{align*}
+	Multiplying by $L/2$ yields
+	\[
+		\frac{L}{2}\bigl(\norm{x_k-x^\star}^2-\norm{x_{k+1}-x^\star}^2\bigr)
+		=
+		g_k^\top(x_k-x^\star)-\frac{1}{2L}\norm{g_k}^2.
+	\]
+	Using the sufficient decrease estimate from the previous subsection,
+	\[
+		f(x_{k+1}) \le f(x_k)-\frac{1}{2L}\norm{g_k}^2.
+	\]
+	Combining these relations gives
+	\[
+		f(x_{k+1})-f(x^\star)
+		\le
+		\frac{L}{2}\bigl(\norm{x_k-x^\star}^2-\norm{x_{k+1}-x^\star}^2\bigr).
+	\]
+	Summing from $k=0$ to $N-1$ produces
+	\[
+		\sum_{k=0}^{N-1}\bigl(f(x_{k+1})-f(x^\star)\bigr)
+		\le
+		\frac{L}{2}\norm{x_0-x^\star}^2.
+	\]
+	Because the objective values decrease monotonically under the method,
+	\[
+		N\bigl(f(x_N)-f(x^\star)\bigr)
+		\le
+		\sum_{k=0}^{N-1}\bigl(f(x_{k+1})-f(x^\star)\bigr).
+	\]
+	Therefore
+	\[
+		f(x_N)-f(x^\star)
+		\le
+		\frac{L\norm{x_0-x^\star}^2}{2N}.
+	\]
+\end{proof}
+
+\begin{lemma}[Strong convexity implies a gradient lower bound]
+	If $f$ is differentiable and $m$-strongly convex with minimizer $x^\star$, then for every $x$,
+	\[
+		f(x)-f(x^\star)\le \frac{1}{2m}\norm{\nabla f(x)}^2.
+	\]
+\end{lemma}
+\begin{proof}
+	Strong convexity gives
+	\[
+		f(x^\star)\ge f(x)+\nabla f(x)^\top(x^\star-x)+\frac{m}{2}\norm{x^\star-x}^2.
+	\]
+	Rearranging,
+	\[
+		f(x)-f(x^\star)\le \nabla f(x)^\top(x-x^\star)-\frac{m}{2}\norm{x-x^\star}^2.
+	\]
+	Now maximize the right-hand side over $z=x-x^\star$:
+	\[
+		\nabla f(x)^\top z-\frac{m}{2}\norm{z}^2
+		\le
+		\max_z \left\{\nabla f(x)^\top z-\frac{m}{2}\norm{z}^2\right\}
+		=
+		\frac{1}{2m}\norm{\nabla f(x)}^2.
+	\]
+	This proves the bound.
+\end{proof}
+
+\begin{theorem}[Linear convergence for strongly convex smooth functions]
+	Assume $f$ is differentiable, $L$-smooth, and $m$-strongly convex. Then gradient descent with step size $1/L$ satisfies
+	\[
+		f(x_{k+1})-f(x^\star)
+		\le
+		\left(1-\frac{m}{L}\right)\bigl(f(x_k)-f(x^\star)\bigr),
+	\]
+	and consequently
+	\[
+		f(x_k)-f(x^\star)
+		\le
+		\left(1-\frac{m}{L}\right)^k \bigl(f(x_0)-f(x^\star)\bigr).
+	\]
+\end{theorem}
+\begin{proof}
+	From the sufficient decrease estimate,
+	\[
+		f(x_{k+1}) \le f(x_k)-\frac{1}{2L}\norm{\nabla f(x_k)}^2.
+	\]
+	By the lemma,
+	\[
+		f(x_k)-f(x^\star)\le \frac{1}{2m}\norm{\nabla f(x_k)}^2,
+	\]
+	or equivalently
+	\[
+		\norm{\nabla f(x_k)}^2 \ge 2m\bigl(f(x_k)-f(x^\star)\bigr).
+	\]
+	Substituting into the decrease estimate gives
+	\begin{align*}
+		f(x_{k+1})-f(x^\star)
+		 & \le f(x_k)-f(x^\star)-\frac{1}{2L}\norm{\nabla f(x_k)}^2 \\
+		 & \le f(x_k)-f(x^\star)-\frac{m}{L}\bigl(f(x_k)-f(x^\star)\bigr) \\
+		 & = \left(1-\frac{m}{L}\right)\bigl(f(x_k)-f(x^\star)\bigr).
+	\end{align*}
+	Iterating proves the geometric rate.
+\end{proof}
+
+\begin{remark}[Condition number in the strongly convex case]
+	Writing $\kappa=L/m$, the factor becomes
+	\[
+		1-\frac{1}{\kappa}.
+	\]
+	Large condition number means weak curvature in some directions relative to others, which again translates directly into slow convergence.
+\end{remark}
+
+\subsection{Newton's Method}
+
+\begin{intuition}
+	Steepest descent uses only first-order information, so it cannot distinguish a narrow valley from a wide bowl. Newton's method corrects this by fitting a local quadratic model and minimizing that model exactly. Near a nondegenerate minimizer, this makes the remaining error square itself from one step to the next.
+\end{intuition}
+
+\begin{definition}[Newton direction]
+	Given $x_k$, form the second-order Taylor model
+	\[
+		m_k(d)=f(x_k)+\nabla f(x_k)^\top d+\frac{1}{2}d^\top \nabla^2 f(x_k)d.
+	\]
+	If $\nabla^2 f(x_k)$ is invertible, the minimizer of this quadratic model is the \emph{Newton direction}
+	\[
+		d_k^N = -[\nabla^2 f(x_k)]^{-1}\nabla f(x_k).
+	\]
+\end{definition}
+
+\begin{proposition}[Newton direction is a descent direction under positive definiteness]
+	If $\nabla^2 f(x_k)\succ 0$ and $\nabla f(x_k)\neq 0$, then the Newton direction satisfies
+	\[
+		\nabla f(x_k)^\top d_k^N < 0.
+	\]
+\end{proposition}
+\begin{proof}
+	Let $g_k=\nabla f(x_k)$ and $H_k=\nabla^2 f(x_k)$. Then
+	\[
+		d_k^N=-H_k^{-1}g_k.
+	\]
+	Therefore
+	\[
+		g_k^\top d_k^N = -g_k^\top H_k^{-1}g_k.
+	\]
+	Since $H_k\succ 0$, its inverse is also positive definite. Hence
+	\[
+		g_k^\top H_k^{-1}g_k>0
+	\]
+	whenever $g_k\neq 0$. Thus
+	\[
+		g_k^\top d_k^N<0.
+	\]
+\end{proof}
+
+\begin{algorithm}[H]
+	\DontPrintSemicolon
+	\caption{Damped Newton Method}
+	\KwIn{Initial point $x_0$, tolerance $\varepsilon>0$, line-search parameters}
+	\For{$k=0,1,2,\dots$}{
+		$g_k \leftarrow \nabla f(x_k)$\;
+		\If{$\norm{g_k}\le \varepsilon$}{
+			return $x_k$\;
+		}
+		$H_k \leftarrow \nabla^2 f(x_k)$\;
+		Solve $H_k d_k=-g_k$\;
+		Choose $\alpha_k>0$ by backtracking or Wolfe line search\;
+		$x_{k+1}\leftarrow x_k+\alpha_k d_k$\;
+	}
+\end{algorithm}
+
+\begin{eg}[One Newton step on a quadratic]
+	Consider
+	\[
+		f(x_1,x_2)=x_1^2+2x_2^2+x_1x_2-4x_1.
+	\]
+	Then
+	\[
+		\nabla f(x_1,x_2)=
+		\begin{bmatrix}
+			2x_1+x_2-4 \\
+			x_1+4x_2
+		\end{bmatrix},
+		\qquad
+		\nabla^2 f(x_1,x_2)=
+		\begin{bmatrix}
+			2 & 1 \\
+			1 & 4
+		\end{bmatrix}.
+	\]
+	Starting from
+	\[
+		x_0=\begin{bmatrix}0 \\ 0\end{bmatrix},
+	\]
+	we have
+	\[
+		g_0=
+		\begin{bmatrix}
+			-4 \\
+			0
+		\end{bmatrix}.
+	\]
+	The Newton step solves
+	\[
+		\begin{bmatrix}
+			2 & 1 \\
+			1 & 4
+		\end{bmatrix}
+		d_0
+		=
+		\begin{bmatrix}
+			4 \\
+			0
+		\end{bmatrix},
+	\]
+	which yields
+	\[
+		d_0=
+		\begin{bmatrix}
+			16/7 \\
+			-4/7
+		\end{bmatrix}.
+	\]
+	Hence
+	\[
+		x_1=x_0+d_0=
+		\begin{bmatrix}
+			16/7 \\
+			-4/7
+		\end{bmatrix}.
+	\]
+	Substituting into the gradient shows
+	\[
+		\nabla f(x_1)=0.
+	\]
+	So one Newton step reaches the exact minimizer. This is not an accident; it is a general fact for quadratic objectives.
+\end{eg}
+
+\begin{proposition}[One-step convergence on quadratics]
+	For
+	\[
+		f(x)=\frac{1}{2}x^\top Qx-b^\top x,
+		\qquad Q \succ 0,
+	\]
+	Newton's method reaches the minimizer
+	\[
+		x^\star=Q^{-1}b
+	\]
+	in exactly one iteration from any starting point.
+\end{proposition}
+\begin{proof}
+	Here
+	\[
+		\nabla f(x)=Qx-b,
+		\qquad
+		\nabla^2 f(x)=Q.
+	\]
+	The Newton update is therefore
+	\[
+		x_{k+1}
+		=
+		x_k-Q^{-1}(Qx_k-b)
+		=
+		Q^{-1}b
+		=
+		x^\star.
+	\]
+	So the minimizer is reached in one step, regardless of the starting point.
+\end{proof}
+
+\begin{theorem}[Local quadratic convergence of Newton's method]
+	Let $x^\star$ satisfy
+	\[
+		\nabla f(x^\star)=0,
+		\qquad
+		\nabla^2 f(x^\star)\succ 0.
+	\]
+	Assume $\nabla^2 f$ is Lipschitz continuous with constant $M$ on a neighborhood of $x^\star$. Then there exist constants $r>0$ and $C>0$ such that whenever $\norm{x_k-x^\star}<r$, pure Newton's method is well defined and
+	\[
+		\norm{x_{k+1}-x^\star}\le C \norm{x_k-x^\star}^2.
+	\]
+\end{theorem}
+\begin{proof}
+	Let
+	\[
+		e_k=x_k-x^\star,
+		\qquad
+		H_k=\nabla^2 f(x_k).
+	\]
+	Since $\nabla^2 f(x^\star)\succ 0$, continuity of the Hessian implies that for $x_k$ sufficiently close to $x^\star$, the matrices $H_k$ remain uniformly positive definite. Thus there exists $r>0$ and a constant $\beta>0$ such that
+	\[
+		\norm{H_k^{-1}}\le \beta
+	\]
+	whenever $\norm{e_k}<r$.
+
+	The Newton update gives
+	\[
+		e_{k+1}
+		=
+		x_k-H_k^{-1}\nabla f(x_k)-x^\star
+		=
+		H_k^{-1}\bigl(H_ke_k-\nabla f(x_k)\bigr),
+	\]
+	where we used $\nabla f(x^\star)=0$.
+
+	Now use the integral form of the gradient:
+	\[
+		\nabla f(x_k)-\nabla f(x^\star)
+		=
+		\int_0^1 \nabla^2 f(x^\star+t e_k)e_k\,dt.
+	\]
+	Hence
+	\[
+		H_k e_k-\nabla f(x_k)
+		=
+		\int_0^1 \bigl(H_k-\nabla^2 f(x^\star+t e_k)\bigr)e_k\,dt.
+	\]
+	Taking norms and using Lipschitz continuity of the Hessian,
+	\begin{align*}
+		\norm{H_ke_k-\nabla f(x_k)}
+		 & \le \int_0^1 \norm{H_k-\nabla^2 f(x^\star+t e_k)} \norm{e_k}\,dt \\
+		 & \le \int_0^1 M(1-t)\norm{e_k}^2\,dt \\
+		 & = \frac{M}{2}\norm{e_k}^2.
+	\end{align*}
+	Therefore
+	\[
+		\norm{e_{k+1}}
+		\le
+		\norm{H_k^{-1}} \norm{H_ke_k-\nabla f(x_k)}
+		\le
+		\beta \frac{M}{2}\norm{e_k}^2.
+	\]
+	This is the desired quadratic estimate, with
+	\[
+		C=\frac{\beta M}{2}.
+	\]
+\end{proof}
+
+\begin{remark}[Why pure Newton can fail globally]
+	Newton's method is only a \emph{local} fast method.
+	\begin{itemize}
+		\item Each iteration requires solving a linear system with the Hessian, which can be expensive.
+		\item Far from the minimizer, the quadratic model may be poor and the step may increase the objective.
+		\item If the Hessian is singular or indefinite, the Newton direction may be undefined or may fail to be a descent direction.
+	\end{itemize}
+	This is why practical optimization almost always uses \emph{damped Newton}, namely Newton steps embedded inside a line search or trust-region globalization strategy.
+\end{remark}
+
+\begin{remark}[Newton can converge to a saddle point]
+	Consider
+	\[
+		f(x)=x^3.
+	\]
+	For $x\neq 0$,
+	\[
+		f'(x)=3x^2,
+		\qquad
+		f''(x)=6x.
+	\]
+	Newton's method gives
+	\[
+		x_{k+1}=x_k-\frac{3x_k^2}{6x_k}=\frac{x_k}{2}.
+	\]
+	So every nonzero starting point converges to $x=0$. But $x=0$ is not a minimizer; it is an inflection point. This shows clearly that Newton is not intrinsically an optimization method until one adds globalization and curvature safeguards.
+\end{remark}
+
+\subsection{Quasi-Newton Methods and BFGS}
+
+\begin{intuition}
+	Newton's method is fast because it uses curvature, but expensive because it needs the Hessian. Quasi-Newton methods try to keep the good part and avoid the bad part: they build curvature information incrementally from gradients, updating an approximate Hessian or inverse Hessian at each step.
+\end{intuition}
+
+\begin{definition}[Secant condition]
+	Let
+	\[
+		s_k=x_{k+1}-x_k,
+		\qquad
+		y_k=\nabla f(x_{k+1})-\nabla f(x_k).
+	\]
+	A quasi-Newton matrix $B_{k+1}$ is required to satisfy the \emph{secant condition}
+	\[
+		B_{k+1}s_k=y_k.
+	\]
+\end{definition}
+
+\begin{remark}[Why the secant condition is natural]
+	By the fundamental theorem of calculus,
+	\[
+		y_k
+		=
+		\int_0^1 \nabla^2 f(x_k+t s_k)s_k\,dt.
+	\]
+	So $y_k$ is the exact action of the \emph{average Hessian along the step} on $s_k$. The secant condition therefore asks the new Hessian approximation to reproduce the true curvature at least in the most recently explored direction.
+\end{remark}
+
+\begin{definition}[BFGS inverse-Hessian update]
+	Let $H_k$ approximate the inverse Hessian. Define
+	\[
+		\rho_k=\frac{1}{y_k^\top s_k}.
+	\]
+	The BFGS update is
+	\[
+		H_{k+1}
+		=
+		\bigl(I-\rho_k s_k y_k^\top\bigr)H_k\bigl(I-\rho_k y_k s_k^\top\bigr)
+		+\rho_k s_k s_k^\top.
+	\]
+\end{definition}
+
+\begin{algorithm}[H]
+	\DontPrintSemicolon
+	\caption{BFGS with Line Search}
+	\KwIn{Initial point $x_0$, initial inverse-Hessian approximation $H_0 \succ 0$, tolerance $\varepsilon>0$}
+	\For{$k=0,1,2,\dots$}{
+		$g_k \leftarrow \nabla f(x_k)$\;
+		\If{$\norm{g_k}\le \varepsilon$}{
+			return $x_k$\;
+		}
+		$d_k \leftarrow -H_k g_k$\;
+		Choose $\alpha_k>0$ using a Wolfe line search\;
+		$x_{k+1}\leftarrow x_k+\alpha_k d_k$\;
+		$s_k \leftarrow x_{k+1}-x_k$\;
+		$y_k \leftarrow \nabla f(x_{k+1})-\nabla f(x_k)$\;
+		$\rho_k \leftarrow 1/(y_k^\top s_k)$\;
+		$H_{k+1}\leftarrow (I-\rho_k s_k y_k^\top)H_k(I-\rho_k y_k s_k^\top)+\rho_k s_k s_k^\top$\;
+	}
+\end{algorithm}
+
+\begin{theorem}[Two basic BFGS properties]
+	Suppose $H_k \succ 0$ and $y_k^\top s_k>0$. Then the BFGS update satisfies:
+	\begin{enumerate}[label=(\roman*)]
+		\item the secant condition in inverse form,
+		      \[
+			      H_{k+1}y_k=s_k,
+		      \]
+		\item positive definiteness preservation,
+		      \[
+			      H_{k+1}\succ 0.
+		      \]
+	\end{enumerate}
+\end{theorem}
+\begin{proof}
+	Let
+	\[
+		\rho=\frac{1}{y_k^\top s_k},
+		\qquad
+		V=I-\rho s_k y_k^\top.
+	\]
+	Then
+	\[
+		H_{k+1}=V H_k V^\top + \rho s_k s_k^\top.
+	\]
+
+	To prove the secant condition, note that
+	\[
+		V^\top y_k
+		=
+		\bigl(I-\rho y_k s_k^\top\bigr)y_k
+		=
+		y_k-\rho y_k (s_k^\top y_k)
+		=
+		0.
+	\]
+	Therefore
+	\[
+		H_{k+1}y_k = V H_k V^\top y_k + \rho s_k s_k^\top y_k = \rho s_k (s_k^\top y_k)=s_k.
+	\]
+
+	For positive definiteness, take any nonzero vector $z$ and set
+	\[
+		w=V^\top z.
+	\]
+	Then
+	\[
+		z^\top H_{k+1} z
+		=
+		w^\top H_k w + \rho (s_k^\top z)^2.
+	\]
+	The first term is nonnegative because $H_k\succ 0$, and the second term is nonnegative because $\rho>0$. If $s_k^\top z=0$, then $w=V^\top z=z$, so the first term is strictly positive. If $s_k^\top z\neq 0$, then the second term is strictly positive. Hence
+	\[
+		z^\top H_{k+1} z>0
+	\]
+	for all nonzero $z$, proving $H_{k+1}\succ 0$.
+\end{proof}
+
+\begin{remark}[Why the first BFGS step is steepest descent]
+	If $H_0=I$, then the first search direction is
+	\[
+		d_0=-H_0 \nabla f(x_0)=-\nabla f(x_0).
+	\]
+	So the first BFGS step is exactly a steepest-descent step. This is not a defect; it is the natural starting point before any curvature information has been learned from the iterates.
+\end{remark}
+
+\begin{theorem}[Superlinear convergence of BFGS]
+	Suppose:
+	\begin{itemize}
+		\item $f \in C^2$ in a neighborhood of a minimizer $x^\star$,
+		\item $\nabla^2 f(x^\star)\succ 0$,
+		\item $\nabla^2 f$ is Lipschitz continuous near $x^\star$,
+		\item the BFGS iterates generated with a Wolfe line search converge to $x^\star$.
+	\end{itemize}
+	Then BFGS converges \emph{superlinearly}, meaning
+	\[
+		\frac{\norm{x_{k+1}-x^\star}}{\norm{x_k-x^\star}} \to 0.
+	\]
+\end{theorem}
+
+\begin{theorem}[Dennis--More condition]
+	Let $B_k$ denote a quasi-Newton Hessian approximation and let $d_k$ be the corresponding search direction. Under the standard assumptions for local convergence, the method is superlinearly convergent if and only if
+	\[
+		\lim_{k\to\infty}
+		\frac{\norm{(B_k-\nabla^2 f(x^\star))d_k}}{\norm{d_k}}
+		=0.
+	\]
+\end{theorem}
+
+\begin{remark}[Interpretation of the Dennis--More condition]
+	The quantity
+	\[
+		(B_k-\nabla^2 f(x^\star))d_k
+	\]
+	measures the error in the Hessian model \emph{along the step that the algorithm actually takes}. The condition does not require $B_k$ to converge to the true Hessian in every matrix entry; it requires the approximation to become asymptotically exact in the directions that matter for the iterates. That is precisely the amount of accuracy needed to recover Newton-like superlinear behavior.
+\end{remark}
+
+\begin{remark}[Self-concordance and the quadratic convergence region]
+	For self-concordant functions, one can quantify the region in which Newton's method transitions from a damped global phase to a pure quadratic local phase. This is important in interior-point methods, where self-concordance supplies a rigorous globalization theory beyond the local result proved earlier.
+\end{remark}
+
+\subsection{Comparison of Major Methods}
+
+\begin{center}
+	\renewcommand{\arraystretch}{1.35}
+	\small
+	\begin{adjustbox}{max width=\textwidth}
+	\begin{tabular}{p{0.18\textwidth}p{0.24\textwidth}p{0.24\textwidth}p{0.24\textwidth}}
+		\toprule
+		Method            & Rate type                           & Condition-number dependence         & Per-iteration cost \\
+		\midrule
+		Steepest descent  & Linear on SPD quadratics; often slow & Strongly affected by $\kappa$       & One gradient + line search \\
+		Newton            & Quadratic near $x^\star$            & Essentially insensitive locally     & Gradient + Hessian + linear solve \\
+		BFGS              & Superlinear under standard assumptions & Much milder than steepest descent & Gradient + matrix update + line search \\
+		\bottomrule
+	\end{tabular}
+	\end{adjustbox}
+\end{center}
+
+\begin{remark}
+	The right way to read the table is not ``which method is best in the abstract?'' but ``which information can I afford to compute, and what structure does my problem provide?'' In large-scale optimal control, that question leads naturally to structure-exploiting second-order methods, Riccati recursions, shooting methods, and SQP variants.
+\end{remark}

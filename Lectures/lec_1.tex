@@ -1,0 +1,920 @@
+\lecture{1}{}{Convexity and Unconstrained Optimality}
+
+\begin{notation}
+	Throughout these notes, $\mathbb{R}^n$ is equipped with the standard inner product $x^\top y$ and the Euclidean norm $\norm{x}_2$, usually written simply as $\norm{x}$. Unless stated otherwise, all optimization problems are finite-dimensional and all domains are subsets of $\mathbb{R}^n$.
+\end{notation}
+
+\begin{intuition}
+	Optimal control is built on optimization, and optimization becomes structurally transparent once convexity enters the picture. Convex sets describe feasible regions with no ``holes'' along line segments; convex functions describe landscapes with no spurious local valleys. The first lecture therefore has two jobs:
+	\begin{itemize}
+		\item build the convex-analysis toolkit that makes later control problems tractable,
+		\item connect those ideas to local and global optimality conditions for unconstrained minimization.
+	\end{itemize}
+	The key theme is that curvature controls geometry, and geometry controls algorithms.
+\end{intuition}
+
+\subsection{Convex Sets}
+
+\begin{definition}[Convex set]
+	A set $C \subseteq \mathbb{R}^n$ is \emph{convex} if for every $x,y \in C$ and every $\theta \in [0,1]$,
+	\[
+		\theta x + (1-\theta) y \in C.
+	\]
+	In words: together with any two points, the set contains the entire line segment joining them.
+\end{definition}
+
+\begin{remark}
+	The parameter $\theta$ should be read as an interpolation parameter. The points $\theta x + (1-\theta)y$ are exactly the convex combinations of $x$ and $y$. The distinction between affine combinations and convex combinations matters:
+	\begin{itemize}
+		\item affine combinations allow coefficients summing to $1$ with arbitrary signs,
+		\item convex combinations additionally require nonnegative coefficients.
+	\end{itemize}
+	Convexity is therefore a positivity-restricted affine property.
+\end{remark}
+
+\begin{proposition}[Intersection of convex sets]
+	Let $\{C_\alpha\}_{\alpha \in A}$ be any family of convex subsets of $\mathbb{R}^n$, where the index set $A$ may be finite or infinite. Then
+	\[
+		C = \bigcap_{\alpha \in A} C_\alpha
+	\]
+	is convex.
+\end{proposition}
+\begin{proof}
+	Take any $x,y \in C$. By definition of intersection, $x,y \in C_\alpha$ for every $\alpha \in A$. Since each $C_\alpha$ is convex, for every $\theta \in [0,1]$ we have
+	\[
+		\theta x + (1-\theta)y \in C_\alpha
+		\qquad \text{for every } \alpha \in A.
+	\]
+	Hence the same point belongs to the intersection of all $C_\alpha$, so
+	\[
+		\theta x + (1-\theta)y \in \bigcap_{\alpha \in A} C_\alpha = C.
+	\]
+	Therefore $C$ is convex.
+\end{proof}
+
+\begin{eg}[Basic examples and non-examples]
+	\begin{enumerate}[label=(\alph*)]
+		\item The closed unit ball
+		      \[
+			      B = \{x \in \mathbb{R}^n : \norm{x} \le 1\}
+		      \]
+		      is convex. Indeed, if $\norm{x} \le 1$ and $\norm{y} \le 1$, then by the triangle inequality
+		      \[
+			      \norm{\theta x + (1-\theta)y}
+			      \le \theta \norm{x} + (1-\theta)\norm{y}
+			      \le \theta + (1-\theta) = 1.
+		      \]
+
+		\item The unit circle
+		      \[
+			      S^1 = \{x \in \mathbb{R}^2 : x_1^2 + x_2^2 = 1\}
+		      \]
+		      is not convex. The points $(1,0)$ and $(-1,0)$ belong to $S^1$, but their midpoint $(0,0)$ does not.
+
+		\item The set
+		      \[
+			      \{x \in \mathbb{R}^2 : x_1^2 - x_2^2 \le 1\}
+		      \]
+		      is not convex. Indeed, the points $(\sqrt{2},1)$ and $(\sqrt{2},-1)$ both satisfy $x_1^2 - x_2^2 = 1$, but their midpoint $(\sqrt{2},0)$ satisfies $x_1^2 - x_2^2 = 2 > 1$.
+
+		\item Any affine set
+		      \[
+			      \{x \in \mathbb{R}^n : Ax = b\}
+		      \]
+		      is convex. If $Ax=b$ and $Ay=b$, then
+		      \[
+			      A(\theta x + (1-\theta)y) = \theta Ax + (1-\theta)Ay = \theta b + (1-\theta)b = b.
+		      \]
+
+		\item The positive semidefinite cone
+		      \[
+			      \mathbb{S}_+^n = \{X \in \mathbb{R}^{n \times n} : X = X^\top,\; X \succeq 0\}
+		      \]
+		      is convex. If $X,Y \in \mathbb{S}_+^n$, then $\theta X + (1-\theta)Y$ is symmetric and, for every $v \in \mathbb{R}^n$,
+		      \[
+			      v^\top (\theta X + (1-\theta)Y)v
+			      = \theta v^\top X v + (1-\theta)v^\top Y v \ge 0.
+		      \]
+	\end{enumerate}
+\end{eg}
+
+\begin{remark}[Unions are delicate]
+	The statement ``the union of two convex sets is convex'' is false in general. A standard counterexample is
+	\[
+		C_1 = \{(x,0) : x \in \mathbb{R}\},
+		\qquad
+		C_2 = \{(0,y) : y \in \mathbb{R}\}
+	\]
+	in $\mathbb{R}^2$: each is convex, but their union is a cross, not a line or a plane.
+
+	A very common sufficient condition is simple:
+	\begin{itemize}
+		\item if $C_1 \subseteq C_2$, then $C_1 \cup C_2 = C_2$, which is convex,
+		\item if $C_2 \subseteq C_1$, then $C_1 \cup C_2 = C_1$, which is convex.
+	\end{itemize}
+	This is the condition usually meant in short exam-style answers. It is not necessary in full generality: for example, the union of the two half-spaces $\{x \in \mathbb{R} : x \le 0\}$ and $\{x \in \mathbb{R} : x \ge 0\}$ is all of $\mathbb{R}$, which is convex even though neither set contains the other.
+\end{remark}
+
+\subsection{Convex Functions}
+
+\begin{definition}[Convex and strictly convex functions]
+	Let $C \subseteq \mathbb{R}^n$ be convex. A function $f : C \to \mathbb{R}$ is \emph{convex} if for all $x,y \in C$ and all $\theta \in [0,1]$,
+	\[
+		f(\theta x + (1-\theta)y)
+		\le \theta f(x) + (1-\theta) f(y).
+	\]
+	It is \emph{strictly convex} if for all distinct $x,y \in C$ and all $\theta \in (0,1)$,
+	\[
+		f(\theta x + (1-\theta)y)
+		< \theta f(x) + (1-\theta) f(y).
+	\]
+\end{definition}
+
+\begin{intuition}
+	The graph of a convex function lies below every secant line joining two points on the graph. The graph of a strictly convex function lies strictly below every nontrivial secant line. This is the analytic analogue of a bowl-shaped geometry.
+\end{intuition}
+
+\begin{eg}[Convex but not strictly convex]
+	The function
+	\[
+		f(x) = |x|
+	\]
+	is convex on $\mathbb{R}$ but not strictly convex. Convexity follows from the triangle inequality:
+	\[
+		|\theta x + (1-\theta)y|
+		\le \theta |x| + (1-\theta)|y|.
+	\]
+	It is not strictly convex because equality holds on every interval contained entirely in $(0,\infty)$ or entirely in $(-\infty,0)$; for example, for $x=1$, $y=2$, and $\theta = 1/2$,
+	\[
+		f\!\left(\frac{x+y}{2}\right) = \frac{3}{2}
+		= \frac{f(x)+f(y)}{2}.
+	\]
+\end{eg}
+
+\begin{eg}[Affine functions]
+	Every affine function
+	\[
+		f(x) = a^\top x + b
+	\]
+	is both convex and concave, because
+	\[
+		f(\theta x + (1-\theta)y)
+		= \theta f(x) + (1-\theta)f(y).
+	\]
+	Unless the domain is a single point, affine functions are never strictly convex.
+\end{eg}
+
+\begin{theorem}[Epigraph characterization]
+	Let $C \subseteq \mathbb{R}^n$ be convex and $f:C \to \mathbb{R}$. The function $f$ is convex if and only if its epigraph
+	\[
+		\epi(f) = \{(x,t) \in C \times \mathbb{R} : f(x) \le t\}
+	\]
+	is a convex subset of $\mathbb{R}^{n+1}$.
+\end{theorem}
+\begin{proof}
+	Suppose first that $f$ is convex. Take any $(x,t),(y,s) \in \epi(f)$. Then $f(x) \le t$ and $f(y) \le s$. For $\theta \in [0,1]$,
+	\[
+		f(\theta x + (1-\theta)y)
+		\le \theta f(x) + (1-\theta)f(y)
+		\le \theta t + (1-\theta)s.
+	\]
+	Hence
+	\[
+		(\theta x + (1-\theta)y,\; \theta t + (1-\theta)s) \in \epi(f),
+	\]
+	so $\epi(f)$ is convex.
+
+	Conversely, suppose $\epi(f)$ is convex. For any $x,y \in C$, the points $(x,f(x))$ and $(y,f(y))$ belong to $\epi(f)$. Therefore, for every $\theta \in [0,1]$,
+	\[
+		(\theta x + (1-\theta)y,\; \theta f(x) + (1-\theta)f(y)) \in \epi(f).
+	\]
+	By definition of epigraph,
+	\[
+		f(\theta x + (1-\theta)y)
+		\le \theta f(x) + (1-\theta)f(y).
+	\]
+	So $f$ is convex.
+\end{proof}
+
+\begin{theorem}[First-order characterization of convexity]
+	Let $C \subseteq \mathbb{R}^n$ be open and convex, and let $f:C \to \mathbb{R}$ be differentiable. Then the following are equivalent:
+	\begin{enumerate}[label=(\roman*)]
+		\item $f$ is convex on $C$.
+		\item For all $x,y \in C$,
+		      \[
+			      f(y) \ge f(x) + \nabla f(x)^\top (y-x).
+		      \]
+	\end{enumerate}
+\end{theorem}
+\begin{proof}
+	Assume first that $f$ is convex. Fix $x,y \in C$, and define
+	\[
+		\phi(t) = f(x+t(y-x)), \qquad t \in [0,1].
+	\]
+	Because $C$ is convex, the segment lies in $C$. Convexity of $f$ implies convexity of the one-variable function $\phi$. For any $t \in (0,1]$,
+	\[
+		\phi(t) \le (1-t)\phi(0) + t \phi(1).
+	\]
+	Rearranging gives
+	\[
+		\frac{\phi(t)-\phi(0)}{t} \le \phi(1)-\phi(0).
+	\]
+	Letting $t \downarrow 0$ and using differentiability,
+	\[
+		\phi'(0) = \nabla f(x)^\top (y-x) \le f(y)-f(x),
+	\]
+	which is exactly
+	\[
+		f(y) \ge f(x) + \nabla f(x)^\top (y-x).
+	\]
+
+	Conversely, assume the inequality holds for all $x,y \in C$. Fix $x,y \in C$ and $\theta \in [0,1]$, and define
+	\[
+		z = \theta x + (1-\theta)y.
+	\]
+	Applying the assumed inequality with base point $z$ and test points $x$ and $y$ yields
+	\[
+		f(x) \ge f(z) + \nabla f(z)^\top (x-z),
+	\]
+	\[
+		f(y) \ge f(z) + \nabla f(z)^\top (y-z).
+	\]
+	Multiply the first relation by $\theta$ and the second by $(1-\theta)$ and add:
+	\[
+		\theta f(x) + (1-\theta)f(y)
+		\ge f(z) + \nabla f(z)^\top \bigl(\theta(x-z) + (1-\theta)(y-z)\bigr).
+	\]
+	But $\theta(x-z)+(1-\theta)(y-z)=0$, so
+	\[
+		f(z) \le \theta f(x) + (1-\theta)f(y).
+	\]
+	Since $z = \theta x + (1-\theta)y$, this is convexity.
+\end{proof}
+
+\begin{remark}[Geometric meaning]
+	The first-order inequality says that every tangent hyperplane to the graph of a differentiable convex function is a global underestimator. In optimization this is decisive: the gradient is no longer merely a local linear approximation, but a certificate that the graph never drops below the tangent plane.
+\end{remark}
+
+\begin{theorem}[Second-order characterization]
+	Let $C \subseteq \mathbb{R}^n$ be open and convex, and let $f:C \to \mathbb{R}$ be twice continuously differentiable. Then $f$ is convex on $C$ if and only if
+	\[
+		\nabla^2 f(x) \succeq 0
+		\qquad \text{for all } x \in C.
+	\]
+\end{theorem}
+\begin{proof}
+	Suppose first that $f$ is convex. Fix $x \in C$ and $d \in \mathbb{R}^n$. Because $C$ is open, for sufficiently small $t$ the point $x+td$ lies in $C$. Define
+	\[
+		\phi(t) = f(x+td).
+	\]
+	The function $\phi$ is convex on a neighborhood of $0$ because it is the restriction of a convex function to a line. Hence $\phi''(0) \ge 0$. By the chain rule,
+	\[
+		\phi''(0) = d^\top \nabla^2 f(x)\, d.
+	\]
+	Since this is nonnegative for every $d$, we conclude that $\nabla^2 f(x) \succeq 0$.
+
+	Conversely, suppose $\nabla^2 f(x) \succeq 0$ for every $x \in C$. Fix $x,y \in C$ and define again
+	\[
+		\phi(t) = f(x+t(y-x)), \qquad t \in [0,1].
+	\]
+	Then
+	\[
+		\phi''(t) = (y-x)^\top \nabla^2 f(x+t(y-x))(y-x) \ge 0
+	\]
+	for all $t \in [0,1]$. Hence $\phi$ is a convex function of one variable. Therefore,
+	\[
+		\phi(\theta) \le \theta \phi(1) + (1-\theta)\phi(0)
+	\]
+	for every $\theta \in [0,1]$. Rewriting in terms of $f$ gives
+	\[
+		f(\theta y + (1-\theta)x)
+		\le \theta f(y) + (1-\theta)f(x),
+	\]
+	so $f$ is convex.
+\end{proof}
+
+\begin{eg}[Checking convexity by Hessians]
+	For each function below, the Hessian provides a complete answer.
+	\begin{enumerate}[label=(\alph*)]
+		\item For $f(x)=3x^2-4x+7$,
+		      \[
+			      f''(x)=6>0,
+		      \]
+		      so $f$ is strictly convex.
+
+		\item For $f(x_1,x_2)=x_1^2+x_1x_2+x_2^2$,
+		      \[
+			      \nabla^2 f = \begin{bmatrix}
+				      2 & 1 \\
+				      1 & 2
+			      \end{bmatrix}.
+		      \]
+		      Its eigenvalues are $3$ and $1$, so the Hessian is positive definite. Hence $f$ is strictly convex.
+
+		\item For $f(x_1,x_2)=x_1^2-x_1x_2+x_2^2$,
+		      \[
+			      \nabla^2 f = \begin{bmatrix}
+				      2  & -1 \\
+				      -1 & 2
+			      \end{bmatrix},
+		      \]
+		      whose eigenvalues are again $3$ and $1$. So $f$ is strictly convex.
+
+		\item For $f(x_1,x_2)=x_1^2-6x_1x_2+x_2^2$,
+		      \[
+			      \nabla^2 f = \begin{bmatrix}
+				      2  & -6 \\
+				      -6 & 2
+			      \end{bmatrix}.
+		      \]
+		      Its eigenvalues are $8$ and $-4$, so the Hessian is indefinite. Therefore $f$ is neither convex nor concave.
+	\end{enumerate}
+\end{eg}
+
+\begin{remark}[Non-differentiable convexity]
+	Convexity does not imply differentiability. The function $f(x)=|x|$ is convex but has no derivative at $x=0$. This matters algorithmically:
+	\begin{itemize}
+		\item classical gradient descent is not directly defined at nondifferentiable points,
+		\item one must instead use subgradient, proximal, bundle, or smoothing methods,
+		\item optimal control formulations with absolute values or norms routinely lead to such nonsmooth structures.
+	\end{itemize}
+\end{remark}
+
+\subsection{Operations Preserving Convexity}
+
+\begin{proposition}[Nonnegative weighted sums]
+	If $f_1,f_2:C \to \mathbb{R}$ are convex on a convex set $C$, and $\alpha,\beta \ge 0$, then
+	\[
+		g(x)=\alpha f_1(x)+\beta f_2(x)
+	\]
+	is convex on $C$.
+\end{proposition}
+\begin{proof}
+	For $x,y \in C$ and $\theta \in [0,1]$,
+	\begin{align*}
+		g(\theta x+(1-\theta)y)
+		 & = \alpha f_1(\theta x+(1-\theta)y)+\beta f_2(\theta x+(1-\theta)y) \\
+		 & \le \alpha\bigl(\theta f_1(x)+(1-\theta)f_1(y)\bigr)
+		+\beta\bigl(\theta f_2(x)+(1-\theta)f_2(y)\bigr) \\
+		 & = \theta g(x)+(1-\theta)g(y).
+	\end{align*}
+\end{proof}
+
+\begin{proposition}[Pointwise maxima]
+	If $f_1,f_2:C \to \mathbb{R}$ are convex, then
+	\[
+		g(x)=\max\{f_1(x),f_2(x)\}
+	\]
+	is convex.
+\end{proposition}
+\begin{proof}
+	Fix $x,y \in C$ and $\theta \in [0,1]$. Then
+	\begin{align*}
+		g(\theta x+(1-\theta)y)
+		 & = \max\{f_1(\theta x+(1-\theta)y),\,f_2(\theta x+(1-\theta)y)\} \\
+		 & \le \max\{\theta f_1(x)+(1-\theta)f_1(y),\,
+		\theta f_2(x)+(1-\theta)f_2(y)\} \\
+		 & \le \theta \max\{f_1(x),f_2(x)\} + (1-\theta)\max\{f_1(y),f_2(y)\} \\
+		 & = \theta g(x)+(1-\theta)g(y).
+	\end{align*}
+\end{proof}
+
+\begin{proposition}[Composition with affine maps]
+	If $f:D \to \mathbb{R}$ is convex on a convex set $D \subseteq \mathbb{R}^m$, and if $A \in \mathbb{R}^{m \times n}$ and $b \in \mathbb{R}^m$ are such that $Ax+b \in D$ for every $x$ in a convex set $C \subseteq \mathbb{R}^n$, then
+	\[
+		h(x)=f(Ax+b)
+	\]
+	is convex on $C$.
+\end{proposition}
+\begin{proof}
+	Let $x,y \in C$ and $\theta \in [0,1]$. Since affine maps preserve convex combinations,
+	\[
+		A(\theta x+(1-\theta)y)+b
+		= \theta(Ax+b)+(1-\theta)(Ay+b).
+	\]
+	Therefore,
+	\begin{align*}
+		h(\theta x+(1-\theta)y)
+		 & = f\bigl(\theta(Ax+b)+(1-\theta)(Ay+b)\bigr) \\
+		 & \le \theta f(Ax+b)+(1-\theta)f(Ay+b) \\
+		 & = \theta h(x)+(1-\theta)h(y).
+	\end{align*}
+\end{proof}
+
+\begin{proposition}[Scalar composition rule]
+	Let $f:C \to I$ be convex, where $C \subseteq \mathbb{R}^n$ is convex and $I \subseteq \mathbb{R}$ is an interval. Let $g:I \to \mathbb{R}$ be convex and nondecreasing. Then
+	\[
+		h = g \circ f
+	\]
+	is convex on $C$.
+\end{proposition}
+\begin{proof}
+	For $x,y \in C$ and $\theta \in [0,1]$, convexity of $f$ gives
+	\[
+		f(\theta x+(1-\theta)y)
+		\le \theta f(x)+(1-\theta)f(y).
+	\]
+	Because $g$ is nondecreasing,
+	\[
+		g(f(\theta x+(1-\theta)y))
+		\le g(\theta f(x)+(1-\theta)f(y)).
+	\]
+	Now apply convexity of $g$:
+	\[
+		g(\theta f(x)+(1-\theta)f(y))
+		\le \theta g(f(x))+(1-\theta)g(f(y)).
+	\]
+	Thus $h(\theta x+(1-\theta)y)\le \theta h(x)+(1-\theta)h(y)$.
+\end{proof}
+
+\begin{remark}[Why monotonicity is necessary]
+	Convexity of both inner and outer functions is not enough by itself. Take
+	\[
+		f(x)=x^2,
+		\qquad
+		g(t)=-t.
+	\]
+	The function $g$ is affine, hence convex, but decreasing. Then
+	\[
+		(g\circ f)(x) = -x^2
+	\]
+	is concave, not convex. The monotonicity assumption is therefore structural, not cosmetic.
+\end{remark}
+
+\subsection{Strong Convexity and Conjugates}
+
+\begin{definition}[Strong convexity]
+	A differentiable function $f:C \to \mathbb{R}$, with $C \subseteq \mathbb{R}^n$ convex, is \emph{$m$-strongly convex} for some $m>0$ if
+	\[
+		x \mapsto f(x)-\frac{m}{2}\norm{x}^2
+	\]
+	is convex on $C$.
+\end{definition}
+
+\begin{theorem}[Strong convexity lower bound]
+	If $f$ is differentiable and $m$-strongly convex on an open convex set $C$, then for all $x,y \in C$,
+	\[
+		f(y) \ge f(x) + \nabla f(x)^\top (y-x) + \frac{m}{2}\norm{y-x}^2.
+	\]
+\end{theorem}
+\begin{proof}
+	Define
+	\[
+		g(x)=f(x)-\frac{m}{2}\norm{x}^2.
+	\]
+	By assumption, $g$ is convex. Applying the first-order characterization of convexity to $g$ gives
+	\[
+		g(y)\ge g(x)+\nabla g(x)^\top(y-x).
+	\]
+	Substituting $g$ and $\nabla g(x)=\nabla f(x)-mx$ yields
+	\[
+		f(y)-\frac{m}{2}\norm{y}^2
+		\ge
+		f(x)-\frac{m}{2}\norm{x}^2
+		+\bigl(\nabla f(x)-mx\bigr)^\top(y-x).
+	\]
+	Rearranging,
+	\[
+		f(y)\ge f(x)+\nabla f(x)^\top(y-x)
+		+\frac{m}{2}\bigl(\norm{y}^2-\norm{x}^2-2x^\top(y-x)\bigr).
+	\]
+	The bracket simplifies to
+	\[
+		\norm{y-x}^2,
+	\]
+	so the result follows.
+\end{proof}
+
+\begin{corollary}[Uniqueness of minimizers]
+	If $f$ is strongly convex on a convex set $C$, then $f$ has at most one global minimizer on $C$.
+\end{corollary}
+\begin{proof}
+	Suppose $x^\star$ and $y^\star$ are two distinct global minimizers. Strong convexity implies, with $\theta=1/2$,
+	\[
+		f\!\left(\frac{x^\star+y^\star}{2}\right)
+		\le \frac{f(x^\star)+f(y^\star)}{2} - \frac{m}{8}\norm{x^\star-y^\star}^2.
+	\]
+	Since $x^\star \neq y^\star$ and $m>0$, the final term is strictly negative. Hence
+	\[
+		f\!\left(\frac{x^\star+y^\star}{2}\right)
+		< \frac{f(x^\star)+f(y^\star)}{2}.
+	\]
+	But the right-hand side equals the minimal value, contradicting global minimality of $x^\star$ and $y^\star$. Therefore the minimizer is unique whenever it exists.
+\end{proof}
+
+\begin{corollary}[Hessian test for strong convexity]
+	If $f \in C^2(C)$ on an open convex set $C$, then $f$ is $m$-strongly convex if and only if
+	\[
+		\nabla^2 f(x) \succeq m I
+		\qquad \text{for all } x \in C.
+	\]
+\end{corollary}
+\begin{proof}
+	Apply the second-order convexity criterion to $g(x)=f(x)-\frac{m}{2}\norm{x}^2$, whose Hessian is
+	\[
+		\nabla^2 g(x)=\nabla^2 f(x)-mI.
+	\]
+\end{proof}
+
+\begin{definition}[Legendre--Fenchel conjugate]
+	For a function $f:\mathbb{R}^n \to \mathbb{R} \cup \{+\infty\}$, its \emph{conjugate} is defined by
+	\[
+		f^\ast(y)=\sup_{x \in \mathbb{R}^n}\bigl\{y^\top x - f(x)\bigr\}.
+	\]
+\end{definition}
+
+\begin{proposition}[Convexity of the conjugate]
+	The conjugate $f^\ast$ is always convex, regardless of whether $f$ itself is convex.
+\end{proposition}
+\begin{proof}
+	For each fixed $x$, the function
+	\[
+		\ell_x(y)=y^\top x-f(x)
+	\]
+	is affine in $y$. The conjugate is the pointwise supremum of this family:
+	\[
+		f^\ast(y)=\sup_{x \in \mathbb{R}^n}\ell_x(y).
+	\]
+	A pointwise supremum of affine functions is convex. Explicitly, for $y_1,y_2 \in \mathbb{R}^n$ and $\theta \in [0,1]$,
+	\begin{align*}
+		f^\ast(\theta y_1+(1-\theta)y_2)
+		 & = \sup_x \{\theta y_1^\top x + (1-\theta)y_2^\top x - f(x)\} \\
+		 & = \sup_x \{\theta \ell_x(y_1)+(1-\theta)\ell_x(y_2)\} \\
+		 & \le \theta \sup_x \ell_x(y_1) + (1-\theta)\sup_x \ell_x(y_2) \\
+		 & = \theta f^\ast(y_1)+(1-\theta)f^\ast(y_2).
+	\end{align*}
+\end{proof}
+
+\begin{eg}[Conjugate of a quadratic form]
+	Let
+	\[
+		f(x)=\frac{1}{2}x^\top Qx,
+		\qquad Q \succ 0.
+	\]
+	Then
+	\[
+		f^\ast(y)=\sup_x \left\{y^\top x-\frac{1}{2}x^\top Qx\right\}.
+	\]
+	The expression inside the braces is strictly concave in $x$, so its maximizer is found from the first-order condition
+	\[
+		y-Qx=0
+		\qquad \Longrightarrow \qquad
+		x=Q^{-1}y.
+	\]
+	Substituting this maximizing $x$ gives
+	\[
+		f^\ast(y)
+		= y^\top Q^{-1}y - \frac{1}{2}y^\top Q^{-1}QQ^{-1}y
+		= \frac{1}{2}y^\top Q^{-1}y.
+	\]
+	So the conjugate of a positive definite quadratic is again a positive definite quadratic.
+\end{eg}
+
+\subsection{Optimality Conditions for Unconstrained Problems}
+
+\begin{definition}[Local and global minima]
+	Let $f:C \to \mathbb{R}$ and let $x^\star \in C$.
+	\begin{itemize}
+		\item $x^\star$ is a \emph{local minimizer} if there exists $r>0$ such that
+		      \[
+			      f(x^\star) \le f(x)
+			      \qquad \text{for all } x \in C \cap B_r(x^\star).
+		      \]
+		\item $x^\star$ is a \emph{strict local minimizer} if the inequality is strict for all $x \neq x^\star$ sufficiently close to $x^\star$.
+		\item $x^\star$ is a \emph{global minimizer} if
+		      \[
+			      f(x^\star)\le f(x)
+			      \qquad \text{for all } x \in C.
+		      \]
+	\end{itemize}
+\end{definition}
+
+\begin{definition}[Stationary point]
+	If $f$ is differentiable, a point $x^\star$ with
+	\[
+		\nabla f(x^\star)=0
+	\]
+	is called a \emph{stationary} or \emph{critical} point.
+\end{definition}
+
+\begin{theorem}[First-order necessary condition]
+	Let $f:U \to \mathbb{R}$ be continuously differentiable on an open set $U \subseteq \mathbb{R}^n$. If $x^\star \in U$ is a local minimizer of $f$, then
+	\[
+		\nabla f(x^\star)=0.
+	\]
+\end{theorem}
+\begin{proof}
+	Fix any direction $d \in \mathbb{R}^n$, and define
+	\[
+		\phi(t)=f(x^\star+td).
+	\]
+	Because $U$ is open, $\phi$ is well defined for sufficiently small $t$. Since $x^\star$ is a local minimizer of $f$, the point $t=0$ is a local minimizer of the scalar function $\phi$. Therefore
+	\[
+		\phi'(0)=0.
+	\]
+	By the chain rule,
+	\[
+		\phi'(0)=\nabla f(x^\star)^\top d.
+	\]
+	This holds for every direction $d$. The only vector orthogonal to every $d$ is the zero vector, so $\nabla f(x^\star)=0$.
+\end{proof}
+
+\begin{theorem}[Second-order necessary and sufficient conditions]
+	Let $f:U \to \mathbb{R}$ be twice continuously differentiable on an open set $U \subseteq \mathbb{R}^n$.
+	\begin{enumerate}[label=(\roman*)]
+		\item If $x^\star$ is a local minimizer, then
+		      \[
+			      \nabla f(x^\star)=0,
+			      \qquad
+			      \nabla^2 f(x^\star)\succeq 0.
+		      \]
+		\item If
+		      \[
+			      \nabla f(x^\star)=0,
+			      \qquad
+			      \nabla^2 f(x^\star)\succ 0,
+		      \]
+		      then $x^\star$ is a strict local minimizer.
+	\end{enumerate}
+\end{theorem}
+\begin{proof}
+	Part (i): the first assertion is the first-order necessary condition. To prove positive semidefiniteness of the Hessian, fix any direction $d$ and again consider
+	\[
+		\phi(t)=f(x^\star+td).
+	\]
+	Since $t=0$ is a local minimizer of the scalar function $\phi$, we have $\phi''(0)\ge 0$. The chain rule gives
+	\[
+		\phi''(0)=d^\top \nabla^2 f(x^\star)d.
+	\]
+	Because this is nonnegative for every $d$, the Hessian is positive semidefinite.
+
+	Part (ii): let $\lambda_{\min}>0$ be the smallest eigenvalue of $\nabla^2 f(x^\star)$. Then
+	\[
+		d^\top \nabla^2 f(x^\star)d \ge \lambda_{\min}\norm{d}^2
+		\qquad \text{for all } d.
+	\]
+	By continuity of the Hessian, there exists $r>0$ such that for every $x$ with $\norm{x-x^\star}<r$,
+	\[
+		\nabla^2 f(x)\succeq \frac{\lambda_{\min}}{2}I.
+	\]
+	Now Taylor's theorem with remainder gives, for $x$ near $x^\star$,
+	\[
+		f(x)=f(x^\star)+\nabla f(x^\star)^\top(x-x^\star)
+		+\frac{1}{2}(x-x^\star)^\top \nabla^2 f(\xi)(x-x^\star)
+	\]
+	for some point $\xi$ on the segment between $x^\star$ and $x$. Since $\nabla f(x^\star)=0$,
+	\[
+		f(x)-f(x^\star)
+		\ge \frac{1}{2}\cdot \frac{\lambda_{\min}}{2}\norm{x-x^\star}^2
+		= \frac{\lambda_{\min}}{4}\norm{x-x^\star}^2
+	\]
+	for all $x \neq x^\star$ sufficiently close to $x^\star$. Hence $x^\star$ is a strict local minimizer.
+\end{proof}
+
+\begin{remark}[The gap between necessary and sufficient conditions]
+	The second-order necessary condition $\nabla^2 f(x^\star)\succeq 0$ is not sufficient for local minimality.
+	\begin{itemize}
+		\item For $f(x)=x^3$, we have $f'(0)=0$ and $f''(0)=0$, but $x=0$ is neither a local minimum nor a local maximum.
+		\item For $f(x)=x^4$, we again have $f'(0)=0$ and $f''(0)=0$, but now $x=0$ \emph{is} a strict local minimum.
+	\end{itemize}
+	So a semidefinite Hessian leaves unresolved higher-order behavior.
+\end{remark}
+
+\begin{theorem}[Local minima of convex functions are global]
+	Let $C \subseteq \mathbb{R}^n$ be convex and let $f:C \to \mathbb{R}$ be convex. Every local minimizer of $f$ is a global minimizer.
+\end{theorem}
+\begin{proof}
+	Let $x^\star$ be a local minimizer, and suppose for contradiction that it is not global. Then there exists $y \in C$ with
+	\[
+		f(y)<f(x^\star).
+	\]
+	For $\theta \in (0,1)$, define
+	\[
+		x_\theta = (1-\theta)x^\star+\theta y.
+	\]
+	By convexity,
+	\[
+		f(x_\theta)
+		\le (1-\theta)f(x^\star)+\theta f(y)
+		< (1-\theta)f(x^\star)+\theta f(x^\star)
+		= f(x^\star).
+	\]
+	As $\theta \downarrow 0$, the points $x_\theta$ converge to $x^\star$. Thus arbitrarily close to $x^\star$ there are points with strictly smaller objective value, contradicting local minimality. Hence $x^\star$ must be global.
+\end{proof}
+
+\begin{proposition}[Indefinite Hessian implies saddle point]
+	Let $f \in C^2(U)$ and let $x^\star \in U$ satisfy
+	\[
+		\nabla f(x^\star)=0.
+	\]
+	If the Hessian $\nabla^2 f(x^\star)$ has both a positive and a negative eigenvalue, then $x^\star$ is a saddle point.
+\end{proposition}
+\begin{proof}
+	Choose unit eigenvectors $v_+$ and $v_-$ corresponding to eigenvalues $\lambda_+>0$ and $\lambda_-<0$, respectively. Taylor expansion along those directions gives, for sufficiently small $t$,
+	\[
+		f(x^\star+tv_+) = f(x^\star) + \frac{t^2}{2}\lambda_+ + o(t^2),
+	\]
+	\[
+		f(x^\star+tv_-) = f(x^\star) + \frac{t^2}{2}\lambda_- + o(t^2).
+	\]
+	For sufficiently small nonzero $t$, the first expression is strictly larger than $f(x^\star)$ and the second strictly smaller. Therefore every neighborhood of $x^\star$ contains points with both larger and smaller objective values, so $x^\star$ is a saddle point.
+\end{proof}
+
+\begin{definition}[Coercive function]
+	A function $f:\mathbb{R}^n \to \mathbb{R}$ is \emph{coercive} if
+	\[
+		f(x)\to +\infty
+		\qquad \text{as } \norm{x}\to \infty.
+	\]
+\end{definition}
+
+\begin{theorem}[Existence of global minimizers under coercivity]
+	If $f:\mathbb{R}^n \to \mathbb{R}$ is continuous and coercive, then $f$ attains a global minimum on $\mathbb{R}^n$.
+\end{theorem}
+\begin{proof}
+	Choose any point $x_0 \in \mathbb{R}^n$. By coercivity, there exists $R>0$ such that
+	\[
+		\norm{x}\ge R \implies f(x)\ge f(x_0).
+	\]
+	Thus every point with objective value smaller than $f(x_0)$ lies in the closed ball $\overline{B_R(0)}$, which is compact. The continuous function $f$ therefore attains its minimum on $\overline{B_R(0)}$ by the Weierstrass theorem; call the minimizer $\bar x$. For points outside the ball, the function value is at least $f(x_0)$ and hence at least as large as the minimum attained inside the ball. Therefore $\bar x$ is a global minimizer on all of $\mathbb{R}^n$.
+\end{proof}
+
+\begin{remark}[Even-degree polynomials]
+	If a polynomial has even degree and positive leading behavior in the sense that $f(x)\to +\infty$ as $\norm{x}\to \infty$, then it is coercive and therefore attains a global minimum. The minimizer need not be unique: for
+	\[
+		f(x)=(x^2-1)^2,
+	\]
+	both $x=1$ and $x=-1$ are global minimizers.
+\end{remark}
+
+\subsection{Worked Examples}
+
+\begin{eg}[A stationary point with semidefinite Hessian that is not a minimum]
+	Consider
+	\[
+		f(x_1,x_2)=x_1^2+x_2^3.
+	\]
+	The gradient is
+	\[
+		\nabla f(x_1,x_2)=
+		\begin{bmatrix}
+			2x_1 \\
+			3x_2^2
+		\end{bmatrix},
+	\]
+	so the only stationary point is $(0,0)$. The Hessian is
+	\[
+		\nabla^2 f(x_1,x_2)=
+		\begin{bmatrix}
+			2 & 0 \\
+			0 & 6x_2
+		\end{bmatrix},
+	\]
+	and therefore
+	\[
+		\nabla^2 f(0,0)=
+		\begin{bmatrix}
+			2 & 0 \\
+			0 & 0
+		\end{bmatrix}
+		\succeq 0.
+	\]
+	Nevertheless $(0,0)$ is not a local minimum, because along the curve $x_1=0$ we have
+	\[
+		f(0,x_2)=x_2^3,
+	\]
+	which is negative for $x_2<0$ and positive for $x_2>0$. Hence $(0,0)$ is a saddle point. This is a standard multivariable counterexample to the incorrect claim that a positive semidefinite Hessian at a stationary point guarantees local optimality.
+\end{eg}
+
+\begin{eg}[Classifying a quadratic critical point]
+	Consider
+	\[
+		f(x_1,x_2)=2x_1^2+x_2^2-2x_1x_2+4x_1-6x_2.
+	\]
+	The gradient is
+	\[
+		\nabla f(x_1,x_2)=
+		\begin{bmatrix}
+			4x_1-2x_2+4 \\
+			2x_2-2x_1-6
+		\end{bmatrix}.
+	\]
+	Solving $\nabla f=0$ gives
+	\[
+		2x_1-x_2=-2,
+		\qquad
+		-x_1+x_2=3,
+	\]
+	so
+	\[
+		x^\star = (-1,2).
+	\]
+	The Hessian is constant:
+	\[
+		\nabla^2 f=
+		\begin{bmatrix}
+			4  & -2 \\
+			-2 & 2
+		\end{bmatrix}.
+	\]
+	Its leading principal minors are $4>0$ and $4\cdot 2-(-2)^2=4>0$, so the Hessian is positive definite. Therefore $x^\star$ is a strict local minimum. Because $f$ is a convex quadratic, this minimum is automatically global. The optimal value is
+	\[
+		f(-1,2)=2(1)+4-2(-1)(2)+4(-1)-6(2)=-6.
+	\]
+\end{eg}
+
+\begin{eg}[A quartic with two global minima]
+	Let
+	\[
+		f(x)=x^4-4x^2+3.
+	\]
+	Then
+	\[
+		f'(x)=4x^3-8x=4x(x^2-2),
+	\]
+	so the critical points are
+	\[
+		x=0, \qquad x=\pm \sqrt{2}.
+	\]
+	Further,
+	\[
+		f''(x)=12x^2-8.
+	\]
+	Thus
+	\[
+		f''(0)=-8<0,
+	\]
+	so $x=0$ is a strict local maximum, while
+	\[
+		f''(\pm \sqrt{2}) = 16 > 0,
+	\]
+	so $x=\pm \sqrt{2}$ are strict local minima. Since the leading term is $x^4$, the function is coercive, so these local minima are in fact global minima. Their common value is
+	\[
+		f(\pm \sqrt{2}) = 4-8+3=-1.
+	\]
+\end{eg}
+
+\begin{eg}[General quadratic optimization]
+	Consider
+	\[
+		f(x)=\frac{1}{2}x^\top Qx-b^\top x,
+	\]
+	where $Q \in \mathbb{R}^{n \times n}$ is symmetric.
+	Then
+	\[
+		\nabla f(x)=Qx-b,
+		\qquad
+		\nabla^2 f(x)=Q.
+	\]
+	A stationary point satisfies
+	\[
+		Qx=b.
+	\]
+	If $Q \succ 0$, then $Q$ is invertible, the stationary point is unique,
+	\[
+		x^\star = Q^{-1}b,
+	\]
+	and positive definiteness of the Hessian shows that $x^\star$ is the unique global minimizer. Substituting back,
+	\[
+		f(x^\star)=\frac{1}{2}b^\top Q^{-1}b - b^\top Q^{-1}b
+		= -\frac{1}{2}b^\top Q^{-1}b.
+	\]
+
+	If $Q \succeq 0$ but not positive definite, then the function is convex but may fail to have a unique minimizer. It has a minimizer exactly when $b \in \operatorname{range}(Q)$; in that case the set of minimizers is an affine space
+	\[
+		x^\star + \operatorname{null}(Q).
+	\]
+\end{eg}
+
+\begin{eg}[An analytic scalar minimization]
+	For
+	\[
+		f(x)=e^x-2x,
+	\]
+	we compute
+	\[
+		f'(x)=e^x-2,
+		\qquad
+		f''(x)=e^x.
+	\]
+	The first-order condition gives the unique stationary point
+	\[
+		e^x=2
+		\qquad \Longrightarrow \qquad
+		x^\star=\ln 2.
+	\]
+	Since $f''(x^\star)=2>0$, the point $x^\star$ is a strict local minimum. In fact $f$ is strictly convex on all of $\mathbb{R}$ because $f''(x)>0$ everywhere, so the local minimum is global. The minimal value is
+	\[
+		f(\ln 2)=2-2\ln 2.
+	\]
+\end{eg}
+
+\begin{remark}
+	Lecture 1 establishes the three structural facts used repeatedly later:
+	\begin{enumerate}[label=(\roman*)]
+		\item convexity turns local statements into global ones,
+		\item strong convexity gives uniqueness and quantitative curvature,
+		\item Hessian information is decisive when it is strictly positive or genuinely indefinite, but semidefinite cases require extra analysis.
+	\end{enumerate}
+	These themes return in line search, Newton methods, Riccati theory, and model predictive control.
+\end{remark}
