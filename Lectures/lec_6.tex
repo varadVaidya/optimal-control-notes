@@ -1,12 +1,14 @@
 \lecture{6}{}{Linear Quadratic Regulator}
+\label{lec:l6}
 
 \begin{intuition}
 	LQR is the canonical optimal-control problem because it is rich enough to produce a nontrivial feedback law and structured enough to solve exactly. The value function is quadratic, the optimal policy is linear, and both dynamic programming and Pontryagin's principle collapse to the same Riccati equation. This lecture develops that structure carefully and keeps the presentation strictly within the finite-horizon, infinite-horizon, and Riccati themes laid out in the plan.
 \end{intuition}
 
 \subsection{Problem Statement and Structure}
+\label{sec:l6-problem-statement-and-structure}
 
-\begin{definition}[Finite-horizon discrete-time LQR]
+\begin{definition}[Finite-horizon discrete-time LQR]\label{def:l6-finite-horizon-discrete-time-lqr}
 	The finite-horizon discrete-time linear quadratic regulator problem is
 	\begin{align*}
 		\min_{\{u_k\}_{k=0}^{N-1}} \quad & x_N^\top Q_f x_N + \sum_{k=0}^{N-1}\left(x_k^\top Q x_k + u_k^\top R u_k\right) \\
@@ -64,7 +66,7 @@
 	may become singular. Algebraically, the Riccati recursion may cease to be well defined in the standard inverse form. Intuitively, the problem is no longer penalizing all actuation channels.
 \end{remark}
 
-\begin{definition}[Linear regulator structure]
+\begin{definition}[Linear regulator structure]\label{def:l6-linear-regulator-structure}
 	A feedback law is called a \emph{linear regulator} if it has the form
 	\[
 		u_k = -K_k x_k
@@ -76,8 +78,9 @@
 \end{definition}
 
 \subsection{Finite-Horizon LQR via Dynamic Programming}
+\label{sec:l6-finite-horizon-lqr-via-dynamic-programming}
 
-\begin{theorem}[Quadratic value function and linear optimal control]
+\begin{theorem}[Quadratic value function and linear optimal control]\label{thm:l6-quadratic-value-function-and-linear-optimal-control}
 	For finite-horizon discrete-time LQR, the value function at stage $k$ has the quadratic form
 	\[
 		V_k(x)=x^\top P_k x,
@@ -163,7 +166,7 @@
 	This completes the induction.
 \end{proof}
 
-\begin{definition}[Riccati gain matrix]
+\begin{definition}[Riccati gain matrix]\label{def:l6-riccati-gain-matrix}
 	The matrix
 	\[
 		K_k = \left(R+B^\top P_{k+1}B\right)^{-1}B^\top P_{k+1}A
@@ -174,7 +177,7 @@
 	\]
 \end{definition}
 
-\begin{proposition}[Equivalent completed-square form]
+\begin{proposition}[Equivalent completed-square form]\label{prop:l6-equivalent-completed-square-form}
 	The Riccati recursion can be rewritten as
 	\[
 		x^\top P_k x
@@ -215,6 +218,7 @@
 \begin{algorithm}[H]
 	\DontPrintSemicolon
 	\caption{Finite-Horizon Discrete-Time LQR}
+\label{alg:l6-finite-horizon-discrete-time-lqr}
 	\KwIn{$A$, $B$, $Q \succeq 0$, $R \succ 0$, terminal weight $Q_f \succeq 0$, horizon $N$, initial state $x_0$}
 	Set $P_N \gets Q_f$\;
 	\For{$k=N-1,N-2,\dots,0$}{
@@ -296,8 +300,9 @@
 \end{remark}
 
 \subsection{Infinite-Horizon LQR and the Algebraic Riccati Equation}
+\label{sec:l6-infinite-horizon-lqr-and-the-algebraic-riccati-equation}
 
-\begin{definition}[Infinite-horizon discrete-time LQR]
+\begin{definition}[Infinite-horizon discrete-time LQR]\label{def:l6-infinite-horizon-discrete-time-lqr}
 	The infinite-horizon discrete-time LQR problem is
 	\begin{align*}
 		\min_{\{u_k\}_{k=0}^{\infty}} \quad & \sum_{k=0}^{\infty}\left(x_k^\top Q x_k + u_k^\top R u_k\right) \\
@@ -315,7 +320,7 @@
 	The first prevents uncontrollable unstable modes from remaining in the closed loop. The second prevents unstable directions from carrying zero cost.
 \end{remark}
 
-\begin{theorem}[Discrete-time algebraic Riccati equation and optimal gain]
+\begin{theorem}[Discrete-time algebraic Riccati equation and optimal gain]\label{thm:l6-discrete-time-algebraic-riccati-equation-and-optimal-gain}
 	Assume $(A,B)$ is stabilizable, $(Q^{1/2},A)$ is detectable, and
 	\[
 		Q \succeq 0,
@@ -343,7 +348,7 @@
 	the infinite-horizon optimal controller is stationary.
 \end{proof}
 
-\begin{theorem}[Closed-loop stability of infinite-horizon LQR]
+\begin{theorem}[Closed-loop stability of infinite-horizon LQR]\label{thm:l6-closed-loop-stability-of-infinite-horizon-lqr}
 	Let $P \succeq 0$ be the stabilizing solution of the DARE, and define
 	\[
 		K = \left(R+B^\top P B\right)^{-1}B^\top P A,
@@ -444,8 +449,9 @@
 \end{eg}
 
 \subsection{The Riccati Equation -- Properties and Structure}
+\label{sec:l6-the-riccati-equation-properties-and-structure}
 
-\begin{definition}[DARE versus CARE]
+\begin{definition}[DARE versus CARE]\label{def:l6-dare-versus-care}
 	The \emph{discrete-time algebraic Riccati equation} (DARE) is
 	\[
 		P = Q + A^\top P A - A^\top P B\left(R+B^\top P B\right)^{-1}B^\top P A.
@@ -457,7 +463,7 @@
 	Both equations characterize stationary quadratic value functions for linear-quadratic optimal control, but one comes from discrete-time dynamics and the other from continuous-time dynamics.
 \end{definition}
 
-\begin{definition}[Riccati operator]
+\begin{definition}[Riccati operator]\label{def:l6-riccati-operator}
 	For $P \succeq 0$, define the discrete Riccati operator
 	\[
 		\mathcal{T}(P)
@@ -466,7 +472,7 @@
 	\]
 \end{definition}
 
-\begin{theorem}[Monotonicity and convergence of the Riccati iteration]
+\begin{theorem}[Monotonicity and convergence of the Riccati iteration]\label{thm:l6-monotonicity-and-convergence-of-the-riccati-iteration}
 	Assume
 	\[
 		Q \succeq 0,
@@ -533,7 +539,7 @@
 	so $\Pi_\infty$ is a fixed point of the DARE.
 \end{proof}
 
-\begin{proposition}[Symmetry of the Riccati matrices]
+\begin{proposition}[Symmetry of the Riccati matrices]\label{prop:l6-symmetry-of-the-riccati-matrices}
 	If the terminal weight $Q_f$ is symmetric, then every finite-horizon Riccati matrix $P_k$ is symmetric.
 \end{proposition}
 \begin{proof}
@@ -558,7 +564,7 @@
 	are symmetric, the recursion shows that $P_k$ is symmetric.
 \end{proof}
 
-\begin{proposition}[Invertibility of $R+B^\top P B$]
+\begin{proposition}[Invertibility of $R+B^\top P B$]\label{prop:l6-invertibility-of}
 	If
 	\[
 		R \succ 0
@@ -585,7 +591,7 @@
 	for all $z \ne 0$.
 \end{proof}
 
-\begin{theorem}[Hamiltonian matrix connection for continuous-time LQR]
+\begin{theorem}[Hamiltonian matrix connection for continuous-time LQR]\label{thm:l6-hamiltonian-matrix-connection-for-continuous-time-lqr}
 	Consider the continuous-time Hamiltonian matrix
 	\[
 		\mathcal{H}
@@ -715,8 +721,9 @@
 \end{remark}
 
 \subsection{Continuous-Time LQR}
+\label{sec:l6-continuous-time-lqr}
 
-\begin{definition}[Continuous-time LQR]
+\begin{definition}[Continuous-time LQR]\label{def:l6-continuous-time-lqr}
 	The finite-horizon continuous-time LQR problem is
 	\begin{align*}
 		\min_{u(\cdot)} \quad & x(t_f)^\top S_f x(t_f) + \int_{t_0}^{t_f}\left(x(t)^\top Q x(t) + u(t)^\top R u(t)\right)\,dt \\
@@ -733,7 +740,7 @@
 	\]
 \end{definition}
 
-\begin{theorem}[Differential Riccati equation]
+\begin{theorem}[Differential Riccati equation]\label{thm:l6-differential-riccati-equation}
 	For continuous-time finite-horizon LQR, the value function has the form
 	\[
 		V(t,x)=x^\top P(t)x,
@@ -791,7 +798,7 @@
 	Substituting this control into the HJB equation and identifying coefficients of the quadratic form in $x$ yields the differential Riccati equation.
 \end{proof}
 
-\begin{definition}[Continuous-time algebraic Riccati equation]
+\begin{definition}[Continuous-time algebraic Riccati equation]\label{def:l6-continuous-time-algebraic-riccati-equation}
 	In the infinite-horizon continuous-time case, stationarity of the value matrix leads to the CARE
 	\[
 		A^\top P + P A - P B R^{-1}B^\top P + Q = 0.
@@ -843,7 +850,7 @@
 	\]
 \end{eg}
 
-\begin{theorem}[Classical robustness margins of continuous-time LQR]
+\begin{theorem}[Classical robustness margins of continuous-time LQR]\label{thm:l6-classical-robustness-margins-of-continuous-time-lqr}
 	For the continuous-time full-state-feedback LQR law
 	\[
 		u=-Kx,
@@ -855,12 +862,13 @@
 \end{proof}
 
 \subsection{LQR and Pontryagin's Minimum Principle}
+\label{sec:l6-lqr-and-pontryagin-s-minimum-principle}
 
 \begin{remark}
 	LQR is one of the cleanest demonstrations that dynamic programming and Pontryagin's principle are complementary rather than competing theories. Dynamic programming produces the Riccati equation from the value function. PMP produces the same Riccati equation from the adjoint dynamics.
 \end{remark}
 
-\begin{theorem}[PMP derivation of the continuous-time Riccati equation]
+\begin{theorem}[PMP derivation of the continuous-time Riccati equation]\label{thm:l6-pmp-derivation-of-the-continuous-time-riccati-equation}
 	Consider the finite-horizon continuous-time LQR problem
 	\begin{align*}
 		\min_{u(\cdot)} \quad & x(t_f)^\top S_f x(t_f) + \int_{t_0}^{t_f}\left(x^\top Q x + u^\top R u\right)\,dt \\

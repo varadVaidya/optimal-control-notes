@@ -1,12 +1,14 @@
 \lecture{7}{}{Estimation -- The Kalman Filter}
+\label{lec:l7}
 
 \begin{intuition}
 	The Kalman filter is the estimation counterpart of LQR. LQR chooses a control law that minimizes a quadratic cost for a linear system; the Kalman filter chooses an estimator that minimizes mean-square estimation error for a linear stochastic system. The same Riccati structure reappears, but with the roles of dynamics, actuation, and sensing transposed. This lecture follows the planned path: algorithm, gain derivation, covariance recursion, steady-state behavior, duality, innovations, EKF, and a full scalar worked example.
 \end{intuition}
 
 \subsection{Problem Setup}
+\label{sec:l7-problem-setup}
 
-\begin{definition}[Linear stochastic state-space model]
+\begin{definition}[Linear stochastic state-space model]\label{def:l7-linear-stochastic-state-space-model}
 	The discrete-time Kalman-filter setting is the linear stochastic system
 	\begin{align*}
 		x_{k+1} &= A x_k + B u_k + w_k, \\
@@ -44,7 +46,7 @@
 	Gaussianity upgrades the Kalman filter from a best linear estimator to the exact minimum-variance conditional-mean estimator.
 \end{notation}
 
-\begin{definition}[State estimation problem]
+\begin{definition}[State estimation problem]\label{def:l7-state-estimation-problem}
 	Given the measurement history
 	\[
 		\mathcal{Y}_k = \sigma(y_0,\dots,y_k),
@@ -62,7 +64,7 @@
 	\end{itemize}
 \end{definition}
 
-\begin{definition}[Prediction and filtering error covariances]
+\begin{definition}[Prediction and filtering error covariances]\label{def:l7-prediction-and-filtering-error-covariances}
 	The corresponding error covariances are
 	\[
 		P_{k|k-1}
@@ -76,7 +78,7 @@
 	\]
 \end{definition}
 
-\begin{theorem}[Optimality criterion]
+\begin{theorem}[Optimality criterion]\label{thm:l7-optimality-criterion}
 	Let $\mathcal{G}$ be any sigma-algebra and let $x$ be square integrable. Then the conditional expectation
 	\[
 		\mathbb{E}[x \mid \mathcal{G}]
@@ -131,8 +133,9 @@
 \end{proof}
 
 \subsection{The Kalman Filter Algorithm}
+\label{sec:l7-the-kalman-filter-algorithm}
 
-\begin{definition}[Prediction step]
+\begin{definition}[Prediction step]\label{def:l7-prediction-step}
 	Given $\hat x_{k-1|k-1}$ and $P_{k-1|k-1}$, the Kalman predictor is
 	\[
 		\hat x_{k|k-1}=A\hat x_{k-1|k-1}+Bu_{k-1},
@@ -142,7 +145,7 @@
 	\]
 \end{definition}
 
-\begin{definition}[Correction step]
+\begin{definition}[Correction step]\label{def:l7-correction-step}
 	After receiving measurement $y_k$, the Kalman correction is
 	\[
 		L_k = P_{k|k-1}C^\top\left(CP_{k|k-1}C^\top + R_v\right)^{-1},
@@ -168,6 +171,7 @@
 \begin{algorithm}[H]
 	\DontPrintSemicolon
 	\caption{Discrete-Time Kalman Filter}
+\label{alg:l7-discrete-time-kalman-filter}
 	\KwIn{$A$, $B$, $C$, process covariance $Q_w$, measurement covariance $R_v$, initial estimate $\hat x_{0|-1}$, initial covariance $P_{0|-1}$}
 	\For{$k=0,1,2,\dots$}{
 		Receive input $u_{k-1}$ if applicable and measurement $y_k$\;
@@ -195,8 +199,9 @@
 \end{algorithm}
 
 \subsection{Derivation of the Kalman Gain}
+\label{sec:l7-derivation-of-the-kalman-gain}
 
-\begin{theorem}[Kalman gain from covariance minimization]
+\begin{theorem}[Kalman gain from covariance minimization]\label{thm:l7-kalman-gain-from-covariance-minimization}
 	Fix a predicted estimate $\hat x_{k|k-1}$ with prediction covariance
 	\[
 		P^- := P_{k|k-1}.
@@ -283,8 +288,9 @@
 \end{remark}
 
 \subsection{Error Covariance and Riccati Recursion}
+\label{sec:l7-error-covariance-and-riccati-recursion}
 
-\begin{theorem}[Riccati recursion for the error covariance]
+\begin{theorem}[Riccati recursion for the error covariance]\label{thm:l7-riccati-recursion-for-the-error-covariance}
 	The Kalman-filter covariance recursion is
 	\[
 		P_{k|k-1}=A P_{k-1|k-1}A^\top + Q_w,
@@ -337,7 +343,7 @@
 	The covariance recursion is a Riccati equation in disguise. Structurally it mirrors the LQR Riccati equation, but with sensing matrices and noise covariances replacing actuation matrices and control penalties.
 \end{remark}
 
-\begin{proposition}[Limiting behavior of the Kalman gain with respect to noise levels]
+\begin{proposition}[Limiting behavior of the Kalman gain with respect to noise levels]\label{prop:l7-limiting-behavior-of-the-kalman-gain-with-respect-to-noise-levels}
 	Let
 	\[
 		L_k = P_{k|k-1}C^\top\left(CP_{k|k-1}C^\top+R_v\right)^{-1}.
@@ -375,8 +381,9 @@
 \end{proof}
 
 \subsection{Steady-State Kalman Filter}
+\label{sec:l7-steady-state-kalman-filter}
 
-\begin{theorem}[Steady-state convergence conditions]
+\begin{theorem}[Steady-state convergence conditions]\label{thm:l7-steady-state-convergence-conditions}
 	Assume
 	\[
 		R_v \succ 0,
@@ -401,7 +408,7 @@
 	The Kalman covariance recursion is monotone on the cone of positive semidefinite matrices and remains bounded under the detectability and stabilizability assumptions. Bounded monotone sequences converge, and continuity of the Riccati map shows that the limit must solve the fixed-point equation. The same hypotheses also guarantee that the associated steady-state observer is stable in the estimation-error dynamics.
 \end{proof}
 
-\begin{definition}[Steady-state Kalman filter]
+\begin{definition}[Steady-state Kalman filter]\label{def:l7-steady-state-kalman-filter}
 	If
 	\[
 		P_{k|k-1} \to \bar P,
@@ -437,8 +444,9 @@
 \end{remark}
 
 \subsection{Duality Between LQR and Kalman Filter}
+\label{sec:l7-duality-between-lqr-and-kalman-filter}
 
-\begin{theorem}[LQR-Kalman duality]
+\begin{theorem}[LQR-Kalman duality]\label{thm:l7-lqr-kalman-duality}
 	The Riccati equation of the Kalman filter is the transpose-dual of the Riccati equation of LQR. Under the mapping
 	\[
 		A_{\text{LQR}} \leftrightarrow A_{\text{KF}}^\top,
@@ -500,8 +508,9 @@
 \end{remark}
 
 \subsection{Innovation Sequence}
+\label{sec:l7-innovation-sequence}
 
-\begin{definition}[Innovation]
+\begin{definition}[Innovation]\label{def:l7-innovation}
 	The \emph{innovation} at time $k$ is
 	\[
 		\nu_k = y_k - C\hat x_{k|k-1}.
@@ -509,7 +518,7 @@
 	It is the part of the measurement that was not predictable from past data.
 \end{definition}
 
-\begin{proposition}[Innovations are white for a correctly tuned filter]
+\begin{proposition}[Innovations are white for a correctly tuned filter]\label{prop:l7-innovations-are-white-for-a-correctly-tuned-filter}
 	Assume the Kalman filter is correctly matched to the system and noise statistics. Then the innovation sequence $\{\nu_k\}$ is zero mean and white:
 	\[
 		\mathbb{E}[\nu_k]=0,
@@ -553,8 +562,9 @@
 \end{remark}
 
 \subsection{Extended Kalman Filter}
+\label{sec:l7-extended-kalman-filter}
 
-\begin{definition}[Extended Kalman filter]
+\begin{definition}[Extended Kalman filter]\label{def:l7-extended-kalman-filter}
 	For the nonlinear system
 	\begin{align*}
 		x_{k+1} &= f(x_k,u_k) + w_k, \\
@@ -598,6 +608,7 @@
 \end{remark}
 
 \subsection{Scalar Kalman Filter Example}
+\label{sec:l7-scalar-kalman-filter-example}
 
 \begin{eg}[Two Kalman-filter iterations by hand]
 	Consider the scalar model

@@ -1,12 +1,14 @@
 \lecture{8}{}{LQG Control, Trajectory Optimization, and iLQR}
+\label{lec:l8}
 
 \begin{intuition}
-	Lecture 6 solved the fully observed linear-quadratic control problem. Lecture 7 solved the linear-Gaussian state-estimation problem. The first half of this lecture shows how these pieces combine into the linear quadratic Gaussian controller. The second half leaves the linear world: once the dynamics or costs become nonlinear, exact Riccati theory is lost, and one instead repeatedly linearizes the dynamics, quadratizes the cost, solves a local LQR problem, and updates the nominal trajectory. That is the basic idea behind iLQR and DDP.
+	\autoref{sec:l6-finite-horizon-lqr-via-dynamic-programming} solved the fully observed linear-quadratic control problem, and \autoref{sec:l7-the-kalman-filter-algorithm} solved the linear-Gaussian state-estimation problem. The first half of this lecture shows how these pieces combine into the linear quadratic Gaussian controller. The second half leaves the linear world: once the dynamics or costs become nonlinear, exact Riccati theory is lost, and one instead repeatedly linearizes the dynamics, quadratizes the cost, solves a local LQR problem, and updates the nominal trajectory. That is the basic idea behind iLQR and DDP.
 \end{intuition}
 
 \subsection{Linear Quadratic Gaussian Control}
+\label{sec:l8-linear-quadratic-gaussian-control}
 
-\begin{definition}[Discrete-time LQG problem]
+\begin{definition}[Discrete-time LQG problem]\label{def:l8-discrete-time-lqg-problem}
 	The discrete-time linear quadratic Gaussian (LQG) problem is
 	\begin{align*}
 		x_{k+1} &= A x_k + B u_k + w_k, \\
@@ -42,7 +44,7 @@
 	\]
 \end{definition}
 
-\begin{theorem}[Separation principle]
+\begin{theorem}[Separation principle]\label{thm:l8-separation-principle}
 	For the linear-Gaussian-quadratic problem above, the optimal controller has the certainty-equivalent structure
 	\[
 		u_k^\star = -K_k \hat x_{k|k},
@@ -50,7 +52,7 @@
 	where:
 	\begin{itemize}
 		\item $\hat x_{k|k}$ is the Kalman-filter estimate of the state given $\mathcal{I}_k$,
-		\item $K_k$ is the finite-horizon LQR gain obtained from the Riccati recursion of Lecture 6.
+		\item $K_k$ is the finite-horizon LQR gain obtained from the Riccati recursion in \autoref{thm:l6-quadratic-value-function-and-linear-optimal-control}.
 	\end{itemize}
 	In particular, optimal estimation and optimal control can be designed independently and then interconnected.
 \end{theorem}
@@ -76,7 +78,7 @@
 	\end{align*}
 	The last term does not depend on the control. So, conditioned on the information state, the controllable part of the cost is exactly the same quadratic form as in the fully observed LQR problem, but with the true state replaced by the estimate.
 
-	Meanwhile, the Kalman filter is the minimum-variance estimator and its covariance recursion is independent of the control law in the standard additive-noise LQG setup. Therefore the estimator design can be solved independently by Lecture 7, and the control design can be solved independently by Lecture 6.
+	Meanwhile, the Kalman filter is the minimum-variance estimator and its covariance recursion is independent of the control law in the standard additive-noise LQG setup. Therefore the estimator design can be solved independently through \autoref{sec:l7-the-kalman-filter-algorithm}, and the control design can be solved independently through \autoref{sec:l6-finite-horizon-lqr-via-dynamic-programming}.
 
 	The resulting optimal controller is certainty equivalent:
 	\[
@@ -142,7 +144,7 @@
 		\approx 0.462.
 	\]
 
-	For the estimation design, using the prior-covariance DARE of Lecture 7 gives
+	For the estimation design, using the prior-covariance DARE from \autoref{thm:l7-steady-state-convergence-conditions} gives
 	\[
 		\bar P
 		=
@@ -174,19 +176,20 @@
 \end{eg}
 
 \subsection{Robustness of LQG}
+\label{sec:l8-robustness-of-lqg}
 
-\begin{theorem}[Doyle's counterexample]
+\begin{theorem}[Doyle's counterexample]\label{thm:l8-doyle-s-counterexample}
 	LQG does not inherit the guaranteed gain and phase margins of full-state-feedback LQR. In fact, there exist plants for which the LQG controller has arbitrarily poor robustness margins.
 \end{theorem}
 \begin{proof}[Explanation]
-	The LQR robustness theorem of Lecture 6 is a property of the full-state-feedback loop and the return-difference identity induced by the Riccati equation. Once the true state is replaced by an observer state, the controller becomes a dynamic output-feedback compensator. The added estimator dynamics introduce new poles and zeros into the loop and destroy the return-difference structure responsible for the LQR margins. Doyle's counterexample shows that even though the LQR part and the Kalman-filter part are each individually optimal, their interconnection can have extremely weak robustness margins.
+	The LQR robustness theorem \autoref{thm:l6-classical-robustness-margins-of-continuous-time-lqr} is a property of the full-state-feedback loop and the return-difference identity induced by the Riccati equation. Once the true state is replaced by an observer state, the controller becomes a dynamic output-feedback compensator. The added estimator dynamics introduce new poles and zeros into the loop and destroy the return-difference structure responsible for the LQR margins. Doyle's counterexample shows that even though the LQR part and the Kalman-filter part are each individually optimal, their interconnection can have extremely weak robustness margins.
 \end{proof}
 
 \begin{remark}[Why the observer can destroy robustness]
 	The Kalman filter is tuned for estimation performance under the assumed stochastic model, not for worst-case loop shaping. If the plant model is slightly wrong, if hidden nonminimum-phase behavior appears, or if the estimator bandwidth interacts badly with the controller bandwidth, then the output-feedback loop can amplify uncertainty much more strongly than the full-state-feedback loop would.
 \end{remark}
 
-\begin{definition}[Loop transfer recovery]
+\begin{definition}[Loop transfer recovery]\label{def:l8-loop-transfer-recovery}
 	Loop transfer recovery (LTR) is a design methodology that modifies the Kalman-filter design, usually by artificially inflating the process-noise covariance, so that the open-loop transfer of the resulting LQG compensator approaches the loop transfer of the underlying LQR design over a desired frequency range.
 \end{definition}
 
@@ -210,8 +213,9 @@
 \end{remark}
 
 \subsection{Nonlinear Trajectory Optimization}
+\label{sec:l8-nonlinear-trajectory-optimization}
 
-\begin{definition}[General nonlinear trajectory optimization problem]
+\begin{definition}[General nonlinear trajectory optimization problem]\label{def:l8-general-nonlinear-trajectory-optimization-problem}
 	A discrete-time nonlinear trajectory-optimization problem has the form
 	\begin{align*}
 		\min_{\{x_k,u_k\}} \quad & \phi(x_N) + \sum_{k=0}^{N-1}\ell_k(x_k,u_k) \\
@@ -237,12 +241,13 @@
 \end{intuition}
 
 \subsection{Iterative LQR}
+\label{sec:l8-iterative-lqr}
 
-\begin{definition}[What iLQR solves]
+\begin{definition}[What iLQR solves]\label{def:l8-what-ilqr-solves}
 	Iterative LQR (iLQR) solves nonlinear finite-horizon trajectory-optimization problems by repeatedly approximating them with time-varying linear-quadratic subproblems. Standard LQR computes the optimal controller for a \emph{given} linear-quadratic model. iLQR handles nonlinear dynamics and, more generally, smooth nonlinear costs by solving a sequence of local LQR problems.
 \end{definition}
 
-\begin{definition}[Linearization and quadratization about a nominal trajectory]
+\begin{definition}[Linearization and quadratization about a nominal trajectory]\label{def:l8-linearization-and-quadratization-about-a-nominal-trajectory}
 	Given a nominal trajectory
 	\[
 		\{(\bar x_k,\bar u_k)\}_{k=0}^{N-1},
@@ -287,7 +292,7 @@
 	The cost must be quadratized because the backward Riccati pass requires a local quadratic model of the objective. A purely first-order model would identify only descent directions, not a curvature-based local feedback law.
 \end{remark}
 
-\begin{definition}[Local $Q$-function derivatives in iLQR]
+\begin{definition}[Local $Q$-function derivatives in iLQR]\label{def:l8-local-function-derivatives-in-ilqr}
 	Let the quadratic local value approximation at stage $k+1$ be
 	\[
 		\delta V_{k+1}(\delta x)
@@ -310,7 +315,7 @@
 	\]
 \end{definition}
 
-\begin{proposition}[Backward-pass gains]
+\begin{proposition}[Backward-pass gains]\label{prop:l8-backward-pass-gains}
 	If $Q_{uu,k} \succ 0$, then the minimizer of the local quadratic model at stage $k$ is
 	\[
 		\delta u_k^\star = k_k + K_k \delta x_k,
@@ -352,6 +357,7 @@
 \begin{algorithm}[H]
 	\DontPrintSemicolon
 	\caption{iLQR}
+\label{alg:l8-ilqr}
 	\KwIn{Nominal controls $\{\bar u_k\}_{k=0}^{N-1}$, initial state $x_0$, tolerance $\varepsilon$}
 	Simulate the dynamics forward to obtain the nominal trajectory $\{\bar x_k\}$\;
 	\For{$r=0,1,2,\dots$}{
@@ -367,7 +373,7 @@
 	}
 \end{algorithm}
 
-\begin{proposition}[iLQR as approximate Newton on trajectory space]
+\begin{proposition}[iLQR as approximate Newton on trajectory space]\label{prop:l8-ilqr-as-approximate-newton-on-trajectory-space}
 	iLQR can be interpreted as an approximate Newton method for the nonlinear trajectory-optimization problem. The approximation is that iLQR keeps second-order cost terms but neglects second-order derivatives of the dynamics in the local quadratic model.
 \end{proposition}
 \begin{proof}
@@ -399,8 +405,9 @@
 \end{remark}
 
 \subsection{iLQR: Practical Considerations}
+\label{sec:l8-ilqr-practical-considerations}
 
-\begin{definition}[Regularization]
+\begin{definition}[Regularization]\label{def:l8-regularization}
 	Regularization modifies the backward pass to keep
 	\[
 		Q_{uu,k}
@@ -434,8 +441,9 @@
 \end{remark}
 
 \subsection{Differential Dynamic Programming}
+\label{sec:l8-differential-dynamic-programming}
 
-\begin{definition}[DDP versus iLQR]
+\begin{definition}[DDP versus iLQR]\label{def:l8-ddp-versus-ilqr}
 	Differential dynamic programming (DDP) is the full second-order version of local dynamic-programming trajectory optimization. It expands both the cost and the dynamics to second order. iLQR is the simplified variant that retains only first-order dynamics and therefore ignores the second-order dynamics tensors.
 \end{definition}
 
@@ -456,12 +464,13 @@
 \end{remark}
 
 \subsection{Handling Constraints in Trajectory Optimization}
+\label{sec:l8-handling-constraints-in-trajectory-optimization}
 
 \begin{remark}
 	Standard iLQR and DDP do not natively handle general inequality constraints such as actuator saturation, state bounds, or obstacle avoidance. Their native formulation is essentially unconstrained.
 \end{remark}
 
-\begin{definition}[Augmented-Lagrangian iLQR]
+\begin{definition}[Augmented-Lagrangian iLQR]\label{def:l8-augmented-lagrangian-ilqr}
 	Let the nonlinear trajectory optimization problem include constraints
 	\[
 		c_k(x_k,u_k)=0,
@@ -494,6 +503,7 @@
 \end{remark}
 
 \subsection{Worked iLQR Example}
+\label{sec:l8-worked-ilqr-example}
 
 \begin{eg}[One iLQR iteration for a scalar nonlinear system]
 	Consider

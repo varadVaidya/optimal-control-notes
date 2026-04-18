@@ -1,4 +1,5 @@
 \lecture{2}{}{Numerical Methods for Unconstrained Optimization}
+\label{lec:l2}
 
 \begin{intuition}
 	Lecture 1 answered the question ``what does optimality look like?'' Lecture 2 addresses the harder computational question: ``how do we actually get there?'' The answer is not a single algorithm but a hierarchy:
@@ -12,8 +13,9 @@
 \end{intuition}
 
 \subsection{Descent Directions and the Line Search Framework}
+\label{sec:l2-descent-directions-and-the-line-search-framework}
 
-\begin{definition}[Descent direction]
+\begin{definition}[Descent direction]\label{def:l2-descent-direction}
 	Let $f:U \to \mathbb{R}$ be differentiable on an open set $U \subseteq \mathbb{R}^n$, and let $x \in U$. A vector $d \in \mathbb{R}^n$ is called a \emph{descent direction} for $f$ at $x$ if there exists $\bar\alpha>0$ such that
 	\[
 		f(x+\alpha d) < f(x)
@@ -21,7 +23,7 @@
 	\]
 \end{definition}
 
-\begin{proposition}[Characterization of descent directions]
+\begin{proposition}[Characterization of descent directions]\label{prop:l2-characterization-of-descent-directions}
 	Let $f$ be differentiable at $x$. A vector $d$ is a descent direction at $x$ if and only if
 	\[
 		\nabla f(x)^\top d < 0.
@@ -65,6 +67,7 @@
 \begin{algorithm}[H]
 	\DontPrintSemicolon
 	\caption{Generic Line Search Method}
+\label{alg:l2-generic-line-search-method}
 	\KwIn{Initial point $x_0$, direction rule, step-length rule, tolerance $\varepsilon>0$}
 	\For{$k=0,1,2,\dots$}{
 		Compute $g_k=\nabla f(x_k)$\;
@@ -77,7 +80,7 @@
 	}
 \end{algorithm}
 
-\begin{definition}[Armijo condition]
+\begin{definition}[Armijo condition]\label{def:l2-armijo-condition}
 	Given constants $c_1 \in (0,1)$, the step length $\alpha_k>0$ satisfies the \emph{Armijo} or \emph{sufficient decrease} condition if
 	\[
 		f(x_k+\alpha_k d_k)
@@ -90,7 +93,7 @@
 	Since $\nabla f(x_k)^\top d_k<0$, the right-hand side lies below $f(x_k)$. The Armijo condition therefore demands not merely a decrease, but a decrease proportional to the first-order model prediction. It rejects steps that are so tiny that they make negligible progress.
 \end{intuition}
 
-\begin{definition}[Wolfe conditions]
+\begin{definition}[Wolfe conditions]\label{def:l2-wolfe-conditions}
 	Let $0<c_1<c_2<1$. A step length $\alpha_k>0$ satisfies the \emph{Wolfe conditions} if
 	\begin{align*}
 		f(x_k+\alpha_k d_k)
@@ -117,6 +120,7 @@
 \begin{algorithm}[H]
 	\DontPrintSemicolon
 	\caption{Backtracking Line Search}
+\label{alg:l2-backtracking-line-search}
 	\KwIn{Current iterate $x_k$, descent direction $d_k$, initial trial step $\alpha_0>0$, reduction factor $\rho \in (0,1)$, Armijo constant $c_1 \in (0,1)$}
 	$\alpha \leftarrow \alpha_0$\;
 	\While{$f(x_k+\alpha d_k) > f(x_k)+c_1 \alpha \nabla f(x_k)^\top d_k$}{
@@ -125,7 +129,7 @@
 	\KwOut{Accepted step size $\alpha_k=\alpha$}
 \end{algorithm}
 
-\begin{proposition}[Finite termination of backtracking]
+\begin{proposition}[Finite termination of backtracking]\label{prop:l2-finite-termination-of-backtracking}
 	Suppose $\nabla f$ is Lipschitz continuous with constant $L$ on a neighborhood of the line segment $\{x_k+\alpha d_k : 0 \le \alpha \le \alpha_0\}$, and suppose $d_k$ is a descent direction. Then the backtracking line search terminates after finitely many reductions.
 \end{proposition}
 \begin{proof}
@@ -195,7 +199,7 @@
 	\end{enumerate}
 \end{eg}
 
-\begin{proposition}[Exact line search for convex quadratics]
+\begin{proposition}[Exact line search for convex quadratics]\label{prop:l2-exact-line-search-for-convex-quadratics}
 	Consider
 	\[
 		f(x)=\frac{1}{2}x^\top Qx-b^\top x,
@@ -226,8 +230,9 @@
 \end{proof}
 
 \subsection{Steepest Descent}
+\label{sec:l2-steepest-descent}
 
-\begin{definition}[Steepest descent iteration]
+\begin{definition}[Steepest descent iteration]\label{def:l2-steepest-descent-iteration}
 	The \emph{steepest descent} direction at $x_k$ is
 	\[
 		d_k=-\nabla f(x_k).
@@ -239,7 +244,7 @@
 	In optimization literature, this is also called \emph{gradient descent}.
 \end{definition}
 
-\begin{proposition}[Why the negative gradient is the steepest descent direction]
+\begin{proposition}[Why the negative gradient is the steepest descent direction]\label{prop:l2-why-the-negative-gradient-is-the-steepest-descent-direction}
 	Among all unit vectors $d$ with $\norm{d}=1$, the quantity $\nabla f(x_k)^\top d$ is minimized by
 	\[
 		d = -\frac{\nabla f(x_k)}{\norm{\nabla f(x_k)}}.
@@ -262,6 +267,7 @@
 \begin{algorithm}[H]
 	\DontPrintSemicolon
 	\caption{Steepest Descent with Line Search}
+\label{alg:l2-steepest-descent-with-line-search}
 	\KwIn{Initial point $x_0$, step selection rule, tolerance $\varepsilon>0$}
 	\For{$k=0,1,2,\dots$}{
 		$g_k \leftarrow \nabla f(x_k)$\;
@@ -274,7 +280,7 @@
 	}
 \end{algorithm}
 
-\begin{theorem}[Exact line search step for a quadratic]
+\begin{theorem}[Exact line search step for a quadratic]\label{thm:l2-exact-line-search-step-for-a-quadratic}
 	Let
 	\[
 		f(x)=\frac{1}{2}x^\top Qx-b^\top x,
@@ -391,7 +397,7 @@
 	The first step moves mostly in the $x_1$ direction because curvature there is much larger; the next step swings toward the $x_2$ direction. This alternating behavior is the classical zig-zag pattern.
 \end{eg}
 
-\begin{proposition}[Orthogonality of consecutive gradients]
+\begin{proposition}[Orthogonality of consecutive gradients]\label{prop:l2-orthogonality-of-consecutive-gradients}
 	For steepest descent with exact line search,
 	\[
 		g_{k+1}^\top g_k=0
@@ -420,7 +426,7 @@
 	Hence $g_{k+1}^\top g_k=0$.
 \end{proof}
 
-\begin{lemma}[Kantorovich inequality in scalar form]
+\begin{lemma}[Kantorovich inequality in scalar form]\label{lem:l2-kantorovich-inequality-in-scalar-form}
 	Let $Q \succ 0$ with eigenvalues in the interval $[m,M]$, where $0<m \le M$. Then for every nonzero vector $z$,
 	\[
 		\frac{(z^\top z)^2}{(z^\top Qz)(z^\top Q^{-1}z)}
@@ -472,7 +478,7 @@
 	Taking reciprocals proves the stated inequality.
 \end{proof}
 
-\begin{theorem}[Linear convergence rate for steepest descent on quadratics]
+\begin{theorem}[Linear convergence rate for steepest descent on quadratics]\label{thm:l2-linear-convergence-rate-for-steepest-descent-on-quadratics}
 	Let
 	\[
 		f(x)=\frac{1}{2}x^\top Qx-b^\top x,
@@ -556,8 +562,9 @@
 \end{remark}
 
 \subsection{Global Convergence Theory}
+\label{sec:l2-global-convergence-theory}
 
-\begin{definition}[Lipschitz continuous gradient]
+\begin{definition}[Lipschitz continuous gradient]\label{def:l2-lipschitz-continuous-gradient}
 	The gradient $\nabla f$ is \emph{Lipschitz continuous} with constant $L>0$ on a set $D$ if
 	\[
 		\norm{\nabla f(x)-\nabla f(y)} \le L \norm{x-y}
@@ -569,7 +576,7 @@
 	This assumption controls how fast the gradient can change. It is the natural smoothness condition behind most descent estimates because it replaces the exact Taylor remainder by a uniform quadratic upper bound.
 \end{remark}
 
-\begin{theorem}[Descent lemma / quadratic upper bound]
+\begin{theorem}[Descent lemma / quadratic upper bound]\label{thm:l2-descent-lemma-quadratic-upper-bound}
 	If $\nabla f$ is Lipschitz continuous with constant $L$ on a convex set containing the segment from $x$ to $x+\alpha d$, then
 	\[
 		f(x+\alpha d)
@@ -603,7 +610,7 @@
 	\end{align*}
 \end{proof}
 
-\begin{theorem}[Gradient descent with step $1/L$ gives sufficient decrease]
+\begin{theorem}[Gradient descent with step $1/L$ gives sufficient decrease]\label{thm:l2-gradient-descent-with-step-gives-sufficient-decrease}
 	If $\nabla f$ is Lipschitz continuous with constant $L$, then the fixed-step gradient descent iteration
 	\[
 		x_{k+1}=x_k-\frac{1}{L}\nabla f(x_k)
@@ -633,7 +640,7 @@
 	\end{align*}
 \end{proof}
 
-\begin{theorem}[Zoutendijk condition]
+\begin{theorem}[Zoutendijk condition]\label{thm:l2-zoutendijk-condition}
 	Consider a line-search method
 	\[
 		x_{k+1}=x_k+\alpha_k d_k
@@ -732,7 +739,7 @@
 	\]
 \end{proof}
 
-\begin{corollary}[A standard consequence of Zoutendijk]
+\begin{corollary}[A standard consequence of Zoutendijk]\label{cor:l2-a-standard-consequence-of-zoutendijk}
 	If, in addition to the assumptions of the theorem, there exists $\delta>0$ such that
 	\[
 		\cos \theta_k \ge \delta
@@ -766,7 +773,7 @@
 	\]
 \end{proof}
 
-\begin{proposition}[Angle bounds for steepest descent and Newton]
+\begin{proposition}[Angle bounds for steepest descent and Newton]\label{prop:l2-angle-bounds-for-steepest-descent-and-newton}
 	\begin{enumerate}[label=(\roman*)]
 		\item For steepest descent,
 		      \[
@@ -841,8 +848,9 @@
 \end{remark}
 
 \subsection{Convergence Rates for Gradient Descent}
+\label{sec:l2-convergence-rates-for-gradient-descent}
 
-\begin{theorem}[Sublinear $O(1/k)$ rate for $L$-smooth convex functions]
+\begin{theorem}[Sublinear $O(1/k)$ rate for $L$-smooth convex functions]\label{thm:l2-sublinear-rate-for-smooth-convex-functions}
 	Let $f:\mathbb{R}^n \to \mathbb{R}$ be convex and differentiable, and assume $\nabla f$ is Lipschitz continuous with constant $L$. Let $x^\star$ be a global minimizer, and consider
 	\[
 		x_{k+1}=x_k-\frac{1}{L}\nabla f(x_k).
@@ -910,7 +918,7 @@
 	\]
 \end{proof}
 
-\begin{lemma}[Strong convexity implies a gradient lower bound]
+\begin{lemma}[Strong convexity implies a gradient lower bound]\label{lem:l2-strong-convexity-implies-a-gradient-lower-bound}
 	If $f$ is differentiable and $m$-strongly convex with minimizer $x^\star$, then for every $x$,
 	\[
 		f(x)-f(x^\star)\le \frac{1}{2m}\norm{\nabla f(x)}^2.
@@ -936,7 +944,7 @@
 	This proves the bound.
 \end{proof}
 
-\begin{theorem}[Linear convergence for strongly convex smooth functions]
+\begin{theorem}[Linear convergence for strongly convex smooth functions]\label{thm:l2-linear-convergence-for-strongly-convex-smooth-functions}
 	Assume $f$ is differentiable, $L$-smooth, and $m$-strongly convex. Then gradient descent with step size $1/L$ satisfies
 	\[
 		f(x_{k+1})-f(x^\star)
@@ -982,12 +990,13 @@
 \end{remark}
 
 \subsection{Newton's Method}
+\label{sec:l2-newton-s-method}
 
 \begin{intuition}
 	Steepest descent uses only first-order information, so it cannot distinguish a narrow valley from a wide bowl. Newton's method corrects this by fitting a local quadratic model and minimizing that model exactly. Near a nondegenerate minimizer, this makes the remaining error square itself from one step to the next.
 \end{intuition}
 
-\begin{definition}[Newton direction]
+\begin{definition}[Newton direction]\label{def:l2-newton-direction}
 	Given $x_k$, form the second-order Taylor model
 	\[
 		m_k(d)=f(x_k)+\nabla f(x_k)^\top d+\frac{1}{2}d^\top \nabla^2 f(x_k)d.
@@ -998,7 +1007,7 @@
 	\]
 \end{definition}
 
-\begin{proposition}[Newton direction is a descent direction under positive definiteness]
+\begin{proposition}[Newton direction is a descent direction under positive definiteness]\label{prop:l2-newton-direction-is-a-descent-direction-under-positive-definiteness}
 	If $\nabla^2 f(x_k)\succ 0$ and $\nabla f(x_k)\neq 0$, then the Newton direction satisfies
 	\[
 		\nabla f(x_k)^\top d_k^N < 0.
@@ -1026,6 +1035,7 @@
 \begin{algorithm}[H]
 	\DontPrintSemicolon
 	\caption{Damped Newton Method}
+\label{alg:l2-damped-newton-method}
 	\KwIn{Initial point $x_0$, tolerance $\varepsilon>0$, line-search parameters}
 	\For{$k=0,1,2,\dots$}{
 		$g_k \leftarrow \nabla f(x_k)$\;
@@ -1106,7 +1116,7 @@
 	So one Newton step reaches the exact minimizer. This is not an accident; it is a general fact for quadratic objectives.
 \end{eg}
 
-\begin{proposition}[One-step convergence on quadratics]
+\begin{proposition}[One-step convergence on quadratics]\label{prop:l2-one-step-convergence-on-quadratics}
 	For
 	\[
 		f(x)=\frac{1}{2}x^\top Qx-b^\top x,
@@ -1138,7 +1148,7 @@
 	So the minimizer is reached in one step, regardless of the starting point.
 \end{proof}
 
-\begin{theorem}[Local quadratic convergence of Newton's method]
+\begin{theorem}[Local quadratic convergence of Newton's method]\label{thm:l2-local-quadratic-convergence-of-newton-s-method}
 	Let $x^\star$ satisfy
 	\[
 		\nabla f(x^\star)=0,
@@ -1235,12 +1245,13 @@
 \end{remark}
 
 \subsection{Quasi-Newton Methods and BFGS}
+\label{sec:l2-quasi-newton-methods-and-bfgs}
 
 \begin{intuition}
 	Newton's method is fast because it uses curvature, but expensive because it needs the Hessian. Quasi-Newton methods try to keep the good part and avoid the bad part: they build curvature information incrementally from gradients, updating an approximate Hessian or inverse Hessian at each step.
 \end{intuition}
 
-\begin{definition}[Secant condition]
+\begin{definition}[Secant condition]\label{def:l2-secant-condition}
 	Let
 	\[
 		s_k=x_{k+1}-x_k,
@@ -1263,7 +1274,7 @@
 	So $y_k$ is the exact action of the \emph{average Hessian along the step} on $s_k$. The secant condition therefore asks the new Hessian approximation to reproduce the true curvature at least in the most recently explored direction.
 \end{remark}
 
-\begin{definition}[BFGS inverse-Hessian update]
+\begin{definition}[BFGS inverse-Hessian update]\label{def:l2-bfgs-inverse-hessian-update}
 	Let $H_k$ approximate the inverse Hessian. Define
 	\[
 		\rho_k=\frac{1}{y_k^\top s_k}.
@@ -1280,6 +1291,7 @@
 \begin{algorithm}[H]
 	\DontPrintSemicolon
 	\caption{BFGS with Line Search}
+\label{alg:l2-bfgs-with-line-search}
 	\KwIn{Initial point $x_0$, initial inverse-Hessian approximation $H_0 \succ 0$, tolerance $\varepsilon>0$}
 	\For{$k=0,1,2,\dots$}{
 		$g_k \leftarrow \nabla f(x_k)$\;
@@ -1296,7 +1308,7 @@
 	}
 \end{algorithm}
 
-\begin{theorem}[Two basic BFGS properties]
+\begin{theorem}[Two basic BFGS properties]\label{thm:l2-two-basic-bfgs-properties}
 	Suppose $H_k \succ 0$ and $y_k^\top s_k>0$. Then the BFGS update satisfies:
 	\begin{enumerate}[label=(\roman*)]
 		\item the secant condition in inverse form,
@@ -1361,7 +1373,7 @@
 	So the first BFGS step is exactly a steepest-descent step. This is not a defect; it is the natural starting point before any curvature information has been learned from the iterates.
 \end{remark}
 
-\begin{theorem}[Superlinear convergence of BFGS]
+\begin{theorem}[Superlinear convergence of BFGS]\label{thm:l2-superlinear-convergence-of-bfgs}
 	Suppose:
 	\begin{itemize}
 		\item $f \in C^2$ in a neighborhood of a minimizer $x^\star$,
@@ -1375,7 +1387,7 @@
 	\]
 \end{theorem}
 
-\begin{theorem}[Dennis--More condition]
+\begin{theorem}[Dennis--More condition]\label{thm:l2-dennis-more-condition}
 	Let $B_k$ denote a quasi-Newton Hessian approximation and let $d_k$ be the corresponding search direction. Under the standard assumptions for local convergence, the method is superlinearly convergent if and only if
 	\[
 		\lim_{k\to\infty}
@@ -1397,6 +1409,7 @@
 \end{remark}
 
 \subsection{Comparison of Major Methods}
+\label{sec:l2-comparison-of-major-methods}
 
 \begin{center}
 	\renewcommand{\arraystretch}{1.35}

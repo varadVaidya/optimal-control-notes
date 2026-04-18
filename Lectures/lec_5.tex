@@ -1,10 +1,12 @@
 \lecture{5}{}{Numerical Methods for Trajectory Optimization}
+\label{lec:l5}
 
 \begin{intuition}
-	Lecture 4 supplied the theory: HJB gives a PDE, and PMP gives a coupled two-point boundary value problem. Those descriptions are conceptually complete but rarely computationally friendly. Real trajectory optimization therefore proceeds by \emph{numerical transcriptions}: either solve the PMP boundary value problem indirectly, or discretize the trajectories and solve a finite-dimensional nonlinear program directly. This lecture explains the main families of methods used in practice.
+	\autoref{sec:l4-the-hamilton-jacobi-bellman-equation} and \autoref{sec:l4-pontryagin-s-minimum-principle} supplied the theory: HJB gives a PDE, and PMP gives a coupled two-point boundary value problem. Those descriptions are conceptually complete but rarely computationally friendly. Real trajectory optimization therefore proceeds by \emph{numerical transcriptions}: either solve the PMP boundary value problem indirectly, or discretize the trajectories and solve a finite-dimensional nonlinear program directly. This lecture explains the main families of methods used in practice.
 \end{intuition}
 
 \subsection{The Two-Point Boundary Value Problem from PMP}
+\label{sec:l5-the-two-point-boundary-value-problem-from-pmp}
 
 \begin{remark}
 	For a fixed-final-time problem, Pontryagin's principle produces the coupled system
@@ -24,7 +26,7 @@
 	or some transversality variant. This is a \emph{two-point boundary value problem} (TPBVP): part of the boundary data is specified at $t_0$, part at $t_f$.
 \end{remark}
 
-\begin{definition}[TPBVP structure]
+\begin{definition}[TPBVP structure]\label{def:l5-tpbvp-structure}
 	A generic TPBVP arising from optimal control can be written abstractly as
 	\begin{align*}
 		\dot z(t) & = F(t,z(t)), \\
@@ -48,12 +50,13 @@
 \end{remark}
 
 \subsection{Indirect Shooting Methods}
+\label{sec:l5-indirect-shooting-methods}
 
 \begin{intuition}
 	Indirect shooting converts the TPBVP into root-finding. One guesses the missing boundary data, integrates the ODEs forward, measures the terminal mismatch, and iterates on the guess until the mismatch vanishes.
 \end{intuition}
 
-\begin{definition}[Single shooting for a TPBVP]
+\begin{definition}[Single shooting for a TPBVP]\label{def:l5-single-shooting-for-a-tpbvp}
 	Suppose $x(t_0)=x_0$ is known but $p(t_0)$ is unknown. Let the unknown initial costate be denoted by
 	\[
 		s=p(t_0).
@@ -83,6 +86,7 @@
 \begin{algorithm}[H]
 	\DontPrintSemicolon
 	\caption{Indirect Single Shooting}
+\label{alg:l5-indirect-single-shooting}
 	\KwIn{Initial state $x_0$, horizon $[t_0,t_f]$, initial guess $s^{(0)}$ for the unknown costate, tolerance $\varepsilon$}
 	\For{$r=0,1,2,\dots$}{
 		Set $p(t_0)=s^{(r)}$ and solve the PMP state-costate ODEs forward in time\;
@@ -151,12 +155,13 @@
 \end{eg}
 
 \subsection{Direct Single Shooting}
+\label{sec:l5-direct-single-shooting}
 
 \begin{intuition}
 	Direct methods optimize the controls themselves rather than solving the PMP boundary value problem. In direct single shooting, the controls are parameterized and the dynamics are used to eliminate the states entirely by forward simulation.
 \end{intuition}
 
-\begin{definition}[Direct single shooting]
+\begin{definition}[Direct single shooting]\label{def:l5-direct-single-shooting}
 	Choose a time grid
 	\[
 		t_0<t_1<\cdots<t_N
@@ -186,6 +191,7 @@
 \begin{algorithm}[H]
 	\DontPrintSemicolon
 	\caption{Direct Single Shooting}
+\label{alg:l5-direct-single-shooting}
 	\KwIn{Initial state $x_0$, control parameterization $w$, integrator, discretized objective, NLP tolerance}
 	\For{outer NLP iterations}{
 		Given $w$, simulate the dynamics forward to obtain $x_1,\dots,x_N$\;
@@ -211,12 +217,13 @@
 \end{remark}
 
 \subsection{Direct Multiple Shooting}
+\label{sec:l5-direct-multiple-shooting}
 
 \begin{intuition}
 	Multiple shooting keeps the simulation-based flavor of shooting but introduces intermediate state variables. Instead of forcing one long simulation to carry all information, it breaks the trajectory into shorter segments and enforces continuity between them.
 \end{intuition}
 
-\begin{definition}[Multiple shooting transcription]
+\begin{definition}[Multiple shooting transcription]\label{def:l5-multiple-shooting-transcription}
 	Given a grid $t_0<\cdots<t_N$, introduce decision variables
 	\[
 		x_0,\dots,x_N,
@@ -238,6 +245,7 @@
 \begin{algorithm}[H]
 	\DontPrintSemicolon
 	\caption{Direct Multiple Shooting}
+\label{alg:l5-direct-multiple-shooting}
 	\KwIn{Initial guess for node states and controls, segment integrator, discretized objective}
 	\For{outer NLP iterations}{
 		For each interval, integrate from $x_k$ under $u_k$ to compute $\Phi_k(x_k,u_k)$\;
@@ -251,7 +259,7 @@
 	Multiple shooting is often markedly better conditioned than single shooting because each integration window is short. The state variables at grid points also make path and boundary constraints much easier to impose directly.
 \end{remark}
 
-\begin{proposition}[Sparsity structure of multiple shooting]
+\begin{proposition}[Sparsity structure of multiple shooting]\label{prop:l5-sparsity-structure-of-multiple-shooting}
 	The Jacobian of the multiple-shooting continuity constraints is block sparse. Specifically, each constraint
 	\[
 		c_k(x_k,x_{k+1},u_k)=x_{k+1}-\Phi_k(x_k,u_k)
@@ -267,12 +275,13 @@
 \end{remark}
 
 \subsection{Direct Collocation}
+\label{sec:l5-direct-collocation}
 
 \begin{intuition}
 	Collocation abandons explicit forward simulation and instead approximates the state trajectory by low-order polynomials on each interval. The dynamics are enforced at selected collocation points, turning differential equations into algebraic equality constraints.
 \end{intuition}
 
-\begin{definition}[Trapezoidal collocation]
+\begin{definition}[Trapezoidal collocation]\label{def:l5-trapezoidal-collocation}
 	Let the step size be
 	\[
 		h_k=t_{k+1}-t_k.
@@ -283,7 +292,7 @@
 	\]
 \end{definition}
 
-\begin{definition}[Hermite--Simpson collocation]
+\begin{definition}[Hermite--Simpson collocation]\label{def:l5-hermite-simpson-collocation}
 	Hermite--Simpson collocation introduces a midpoint state and control:
 	\[
 		u_{k+\frac{1}{2}}=\frac{u_k+u_{k+1}}{2},
@@ -310,6 +319,7 @@
 \begin{algorithm}[H]
 	\DontPrintSemicolon
 	\caption{Direct Collocation Transcription}
+\label{alg:l5-direct-collocation-transcription}
 	\KwIn{Time grid, initial guess for node states and controls, collocation rule}
 	Choose optimization variables containing all node states and controls\;
 	For each interval, form the collocation defect equations\;
@@ -322,7 +332,7 @@
 	In direct collocation, both states and controls are explicit decision variables. This is the opposite design choice from single shooting. The reward is flexibility: state constraints, path constraints, and stiff dynamics are often handled more robustly.
 \end{remark}
 
-\begin{proposition}[Sparsity of direct collocation NLPs]
+\begin{proposition}[Sparsity of direct collocation NLPs]\label{prop:l5-sparsity-of-direct-collocation-nlps}
 	Direct collocation produces a large but sparse nonlinear program. Each defect constraint couples only neighboring nodes and, in midpoint formulas, a small number of auxiliary midpoint variables.
 \end{proposition}
 \begin{proof}
@@ -338,8 +348,9 @@
 \end{remark}
 
 \subsection{Transcription to Nonlinear Programming}
+\label{sec:l5-transcription-to-nonlinear-programming}
 
-\begin{definition}[General NLP form from direct transcription]
+\begin{definition}[General NLP form from direct transcription]\label{def:l5-general-nlp-form-from-direct-transcription}
 	After discretization, most direct trajectory-optimization methods produce an NLP of the form
 	\begin{align*}
 		\min_{z} \quad & F(z) \\
@@ -350,7 +361,7 @@
 \end{definition}
 
 \begin{remark}[Connection to Lecture 3]
-	Once transcribed, the problem is a standard finite-dimensional constrained optimization problem. The KKT conditions, Lagrange multipliers, SQP subproblems, interior-point barrier terms, and dual variables are exactly those of Lecture 3. Dynamic optimal control becomes large-scale nonlinear programming after transcription.
+	Once transcribed, the problem is a standard finite-dimensional constrained optimization problem. The KKT conditions, Lagrange multipliers, SQP subproblems, interior-point barrier terms, and dual variables are exactly those of \autoref{thm:l3-kkt-necessary-conditions}. Dynamic optimal control becomes large-scale nonlinear programming after transcription.
 \end{remark}
 
 \begin{remark}[Sparsity and band structure]
@@ -362,6 +373,7 @@
 \end{remark}
 
 \subsection{Comparison of Major Trajectory-Optimization Methods}
+\label{sec:l5-comparison-of-major-trajectory-optimization-methods}
 
 \begin{center}
 	\small
@@ -386,8 +398,8 @@
 \begin{remark}
 	Lecture 5 closes the loop from theory to computation:
 	\begin{itemize}
-		\item Lecture 4 described optimality through HJB and PMP,
-		\item Lecture 5 described how those problems are actually solved numerically,
+		\item \autoref{sec:l4-the-hamilton-jacobi-bellman-equation} and \autoref{sec:l4-pontryagin-s-minimum-principle} described optimality through HJB and PMP,
+		\item \autoref{sec:l5-indirect-shooting-methods} through \autoref{sec:l5-transcription-to-nonlinear-programming} described how those problems are actually solved numerically,
 		\item later lectures will show how special structure, especially linear-quadratic structure, leads to much more specialized and efficient solvers.
 	\end{itemize}
 	In particular, iLQR can be viewed as a specialized trajectory-optimization method for problems whose local subproblems are solved by Riccati recursions rather than generic sparse NLP algebra.

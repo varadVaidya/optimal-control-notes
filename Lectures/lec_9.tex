@@ -1,12 +1,14 @@
 \lecture{9}{}{Model Predictive Control}
+\label{lec:l9}
 
 \begin{intuition}
 	Model predictive control turns optimal control into an online feedback law. At every sampling instant, one solves a finite-horizon optimal-control problem using the current state as the initial condition, applies only the first control move, shifts the horizon forward, and repeats. This simple idea is what allows MPC to combine prediction, constraint handling, and feedback in one unified framework.
 \end{intuition}
 
 \subsection{The MPC Concept}
+\label{sec:l9-the-mpc-concept}
 
-\begin{definition}[Discrete-time MPC problem formulation]
+\begin{definition}[Discrete-time MPC problem formulation]\label{def:l9-discrete-time-mpc-problem-formulation}
 	A standard discrete-time MPC problem at time $t$ is
 	\begin{align*}
 		\min_{\{x_{k|t},u_{k|t}\}} \quad &
@@ -29,7 +31,7 @@
 	LQR gives an elegant closed-form law for linear-quadratic problems, but it does not natively handle hard state or input constraints. MPC does. This is one of its decisive practical advantages.
 \end{remark}
 
-\begin{definition}[Receding-horizon strategy]
+\begin{definition}[Receding-horizon strategy]\label{def:l9-receding-horizon-strategy}
 	After solving the finite-horizon problem at time $t$, MPC applies only the first input
 	\[
 		u(t)=u_{0|t}^\star,
@@ -40,6 +42,7 @@
 \begin{algorithm}[H]
 	\DontPrintSemicolon
 	\caption{Receding-Horizon MPC}
+\label{alg:l9-receding-horizon-mpc}
 	\KwIn{Prediction model, stage cost $\ell$, terminal cost $V_f$, horizon $N$, constraints}
 	\For{$t=0,1,2,\dots$}{
 		Measure or estimate the current state $x(t)$\;
@@ -53,7 +56,7 @@
 	}
 \end{algorithm}
 
-\begin{proposition}[MPC reduces to LQR in the unconstrained linear-quadratic case]
+\begin{proposition}[MPC reduces to LQR in the unconstrained linear-quadratic case]\label{prop:l9-mpc-reduces-to-lqr-in-the-unconstrained-linear-quadratic-case}
 	Consider the unconstrained linear system
 	\[
 		x_{k+1}=Ax_k+Bu_k
@@ -66,7 +69,7 @@
 	\[
 		V_f(x)=x^\top P x,
 	\]
-	where $P$ is the stabilizing DARE solution of Lecture 6. Then finite-horizon MPC produces the infinite-horizon LQR control law
+	where $P$ is the stabilizing DARE solution from \autoref{thm:l6-discrete-time-algebraic-riccati-equation-and-optimal-gain}. Then finite-horizon MPC produces the infinite-horizon LQR control law
 	\[
 		u_{0|t}^\star = -Kx(t)
 	\]
@@ -96,8 +99,9 @@
 \end{proof}
 
 \subsection{Linear MPC and QP Formulation}
+\label{sec:l9-linear-mpc-and-qp-formulation}
 
-\begin{definition}[Linear MPC]
+\begin{definition}[Linear MPC]\label{def:l9-linear-mpc}
 	Linear MPC specializes the MPC problem to linear dynamics
 	\[
 		x_{k+1}=Ax_k+Bu_k,
@@ -116,7 +120,7 @@
 	\]
 \end{definition}
 
-\begin{theorem}[Condensing linear MPC into a quadratic program]
+\begin{theorem}[Condensing linear MPC into a quadratic program]\label{thm:l9-condensing-linear-mpc-into-a-quadratic-program}
 	For linear MPC, the predicted state sequence can be eliminated to produce a finite-dimensional quadratic program in the stacked input vector alone.
 \end{theorem}
 \begin{proof}
@@ -268,12 +272,13 @@
 \end{remark}
 
 \subsection{Stability of MPC}
+\label{sec:l9-stability-of-mpc}
 
 \begin{intuition}
 	Finite-horizon optimization alone does not automatically imply closed-loop stability. An optimizer with too short a horizon may postpone corrective action or exploit short-term benefits that are harmful in the long run. Stability must therefore be enforced through terminal ingredients or sufficiently long horizons under additional assumptions.
 \end{intuition}
 
-\begin{definition}[Terminal cost and terminal set]
+\begin{definition}[Terminal cost and terminal set]\label{def:l9-terminal-cost-and-terminal-set}
 	A \emph{terminal cost} is a nonnegative function
 	\[
 		V_f:\mathbb{R}^n \to \mathbb{R}_{\ge 0}.
@@ -293,7 +298,7 @@
 	for all $x \in \mathcal{X}_f$.
 \end{definition}
 
-\begin{theorem}[Stability of MPC via a terminal Lyapunov condition]
+\begin{theorem}[Stability of MPC via a terminal Lyapunov condition]\label{thm:l9-stability-of-mpc-via-a-terminal-lyapunov-condition}
 	Suppose the stage cost $\ell(x,u)$ is positive definite and there exists a terminal controller $\kappa_f$ on $\mathcal{X}_f$ such that for all $x \in \mathcal{X}_f$,
 	\[
 		\kappa_f(x)\in \mathcal{U},
@@ -363,12 +368,13 @@
 \end{remark}
 
 \subsection{Feasibility and Recursive Feasibility}
+\label{sec:l9-feasibility-and-recursive-feasibility}
 
-\begin{definition}[Recursive feasibility]
+\begin{definition}[Recursive feasibility]\label{def:l9-recursive-feasibility}
 	MPC is \emph{recursively feasible} if feasibility of the optimization problem at time $t$ implies feasibility at time $t+1$ under the applied MPC control law.
 \end{definition}
 
-\begin{proposition}[Terminal constraint ensures recursive feasibility]
+\begin{proposition}[Terminal constraint ensures recursive feasibility]\label{prop:l9-terminal-constraint-ensures-recursive-feasibility}
 	Under the same assumptions as the stability theorem, if the MPC problem is feasible at time $t$, then it is feasible at time $t+1$.
 \end{proposition}
 \begin{proof}
@@ -400,8 +406,9 @@
 \end{remark}
 
 \subsection{Nonlinear MPC}
+\label{sec:l9-nonlinear-mpc}
 
-\begin{definition}[Nonlinear MPC]
+\begin{definition}[Nonlinear MPC]\label{def:l9-nonlinear-mpc}
 	Nonlinear MPC (NMPC) uses the same receding-horizon strategy as linear MPC but solves at each step a nonlinear optimal-control problem:
 	\begin{align*}
 		\min_{\{x_{k|t},u_{k|t}\}} \quad &
@@ -428,6 +435,7 @@
 \begin{algorithm}[H]
 	\DontPrintSemicolon
 	\caption{Real-Time Iteration Scheme for NMPC}
+\label{alg:l9-real-time-iteration-scheme-for-nmpc}
 	\KwIn{Current state estimate $x(t)$, previous trajectory and multipliers, prediction model}
 		Shift the previous solution forward in time to warm start the current problem\;
 		Linearize the dynamics and constraints, and quadratize the cost around the shifted trajectory\;
@@ -441,6 +449,7 @@
 \end{remark}
 
 \subsection{MPC in Practice}
+\label{sec:l9-mpc-in-practice}
 
 \begin{remark}[QP solvers and timing constraints]
 	Linear MPC reduces to a quadratic program, so real-time performance depends heavily on the QP solver. Active-set methods, operator-splitting methods, interior-point methods, and Riccati-based sparse solvers each occupy different regions of the speed-versus-accuracy tradeoff. The choice is dictated by sampling rate, horizon length, and available compute.
@@ -465,10 +474,10 @@
 \begin{remark}
 	MPC is where the main threads of these notes converge:
 	\begin{itemize}
-		\item Lecture 3 supplied constrained optimization and KKT structure,
-		\item Lecture 5 supplied transcription and numerical optimal-control machinery,
-		\item Lecture 6 supplied the linear-quadratic terminal ingredients,
-		\item Lecture 8 supplied local nonlinear solvers such as iLQR.
+		\item \autoref{sec:l3-inequality-constraints-and-kkt-conditions} supplied constrained optimization and KKT structure,
+		\item \autoref{sec:l5-transcription-to-nonlinear-programming} supplied transcription and numerical optimal-control machinery,
+		\item \autoref{sec:l6-infinite-horizon-lqr-and-the-algebraic-riccati-equation} supplied the linear-quadratic terminal ingredients,
+		\item \autoref{sec:l8-iterative-lqr} supplied local nonlinear solvers such as iLQR.
 	\end{itemize}
 	In that sense, MPC is not a separate island of theory. It is the operational synthesis of the entire subject.
 \end{remark}

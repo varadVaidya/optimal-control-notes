@@ -1,12 +1,14 @@
 \lecture{3}{}{Constrained Optimization}
+\label{lec:l3}
 
 \begin{intuition}
 	Unconstrained optimization is the exception, not the rule. In optimal control, dynamics, actuator bounds, state limits, terminal conditions, and collision-avoidance requirements all appear as constraints. Once constraints are present, the gradient of the objective need no longer vanish at an optimum; instead, it must be balanced against the gradients of the active constraints. This lecture builds the static constrained-optimization theory that later reappears in infinite-dimensional form inside Pontryagin's principle, trajectory transcription, and model predictive control.
 \end{intuition}
 
 \subsection{Problem Formulation}
+\label{sec:l3-problem-formulation}
 
-\begin{definition}[General constrained optimization problem]
+\begin{definition}[General constrained optimization problem]\label{def:l3-general-constrained-optimization-problem}
 	A finite-dimensional constrained optimization problem has the form
 	\begin{align*}
 		\min_{x \in \mathbb{R}^n} \quad & f(x) \\
@@ -31,7 +33,7 @@
 	\]
 \end{definition}
 
-\begin{definition}[Feasible set, active set, inactive set]
+\begin{definition}[Feasible set, active set, inactive set]\label{def:l3-feasible-set-active-set-inactive-set}
 	The \emph{feasible set} is
 	\[
 		\mathcal{F} = \{x \in \mathbb{R}^n : h(x)=0,\; g(x)\le 0\}.
@@ -79,7 +81,7 @@
 	\end{enumerate}
 \end{eg}
 
-\begin{definition}[Feasible direction]
+\begin{definition}[Feasible direction]\label{def:l3-feasible-direction}
 	Let $x \in \mathcal{F}$. A vector $d \in \mathbb{R}^n$ is a \emph{feasible direction} at $x$ if there exists $\bar t>0$ and a curve $\gamma:[0,\bar t)\to \mathcal{F}$ such that
 	\[
 		\gamma(0)=x,
@@ -93,12 +95,13 @@
 \end{remark}
 
 \subsection{Equality-Constrained Optimization and Lagrange Multipliers}
+\label{sec:l3-equality-constrained-optimization-and-lagrange-multipliers}
 
 \begin{intuition}
 	In unconstrained optimization, stationarity means that the objective cannot decrease along any direction, so the gradient must vanish. Under equality constraints, only \emph{feasible} directions are allowed. The gradient need not vanish; it must only vanish on the tangent space of the feasible manifold. That forces the gradient of the objective to lie in the span of the gradients of the constraints.
 \end{intuition}
 
-\begin{definition}[Lagrangian for equality constraints]
+\begin{definition}[Lagrangian for equality constraints]\label{def:l3-lagrangian-for-equality-constraints}
 	For the problem
 	\begin{align*}
 		\min_{x \in \mathbb{R}^n}\quad & f(x) \\
@@ -112,7 +115,7 @@
 	\]
 \end{definition}
 
-\begin{definition}[LICQ for equality constraints]
+\begin{definition}[LICQ for equality constraints]\label{def:l3-licq-for-equality-constraints}
 	The \emph{linear independence constraint qualification} (LICQ) at a feasible point $x$ means that the gradients
 	\[
 		\nabla h_1(x),\dots,\nabla h_m(x)
@@ -124,7 +127,7 @@
 	has full row rank $m$.
 \end{definition}
 
-\begin{theorem}[Lagrange multiplier theorem]
+\begin{theorem}[Lagrange multiplier theorem]\label{thm:l3-lagrange-multiplier-theorem}
 	Assume $f,h_1,\dots,h_m$ are continuously differentiable, and let $x^\star$ be a local minimizer of
 	\begin{align*}
 		\min_x \quad & f(x) \\
@@ -236,8 +239,9 @@
 \end{remark}
 
 \subsection{Inequality Constraints and KKT Conditions}
+\label{sec:l3-inequality-constraints-and-kkt-conditions}
 
-\begin{definition}[Lagrangian for mixed equality and inequality constraints]
+\begin{definition}[Lagrangian for mixed equality and inequality constraints]\label{def:l3-lagrangian-for-mixed-equality-and-inequality-constraints}
 	For the problem
 	\begin{align*}
 		\min_x \quad & f(x) \\
@@ -256,7 +260,7 @@
 	\]
 \end{definition}
 
-\begin{definition}[LICQ for mixed constraints]
+\begin{definition}[LICQ for mixed constraints]\label{def:l3-licq-for-mixed-constraints}
 	LICQ holds at a feasible point $x$ if the vectors
 	\[
 		\nabla h_1(x),\dots,\nabla h_m(x),
@@ -266,7 +270,7 @@
 	are linearly independent.
 \end{definition}
 
-\begin{lemma}[Linearized alternative for constrained stationarity]
+\begin{lemma}[Linearized alternative for constrained stationarity]\label{lem:l3-linearized-alternative-for-constrained-stationarity}
 	Let
 	\[
 		a_1,\dots,a_m,b_1,\dots,b_q,c \in \mathbb{R}^n.
@@ -290,7 +294,7 @@
 	This is a standard consequence of Farkas' lemma. It is the linear-algebraic mechanism behind the Karush--Kuhn--Tucker theorem.
 \end{remark}
 
-\begin{theorem}[KKT necessary conditions]
+\begin{theorem}[KKT necessary conditions]\label{thm:l3-kkt-necessary-conditions}
 	Assume $f,h,g$ are continuously differentiable. Let $x^\star$ be a local minimizer of
 	\begin{align*}
 		\min_x \quad & f(x) \\
@@ -446,7 +450,7 @@
 	All KKT conditions are satisfied, and because the problem is convex, this point is globally optimal.
 \end{eg}
 
-\begin{theorem}[KKT sufficient conditions for convex problems]
+\begin{theorem}[KKT sufficient conditions for convex problems]\label{thm:l3-kkt-sufficient-conditions-for-convex-problems}
 	Assume:
 	\begin{itemize}
 		\item $f$ is convex,
@@ -510,8 +514,9 @@
 \end{proof}
 
 \subsection{Second-Order Conditions for Constrained Problems}
+\label{sec:l3-second-order-conditions-for-constrained-problems}
 
-\begin{definition}[Critical cone]
+\begin{definition}[Critical cone]\label{def:l3-critical-cone}
 	Let $(x^\star,\lambda^\star,\mu^\star)$ be a KKT point, and let
 	\[
 		\mathcal{A}^\star=\mathcal{A}(x^\star).
@@ -536,7 +541,7 @@
 	The critical cone consists of first-order feasible directions along which the objective has zero first-order change. These are precisely the directions in which second-order information matters.
 \end{remark}
 
-\begin{theorem}[Second-order necessary condition]
+\begin{theorem}[Second-order necessary condition]\label{thm:l3-second-order-necessary-condition}
 	Assume $f,h,g$ are twice continuously differentiable, and let $(x^\star,\lambda^\star,\mu^\star)$ satisfy the KKT conditions. If $x^\star$ is a local minimizer, then
 	\[
 		d^\top \nabla^2_{xx}\mathcal{L}(x^\star,\lambda^\star,\mu^\star)d \ge 0
@@ -557,7 +562,7 @@
 	This is the constrained analogue of the unconstrained positive-semidefinite Hessian test.
 \end{proof}
 
-\begin{theorem}[Second-order sufficient condition]
+\begin{theorem}[Second-order sufficient condition]\label{thm:l3-second-order-sufficient-condition}
 	Assume $f,h,g$ are twice continuously differentiable, and let $(x^\star,\lambda^\star,\mu^\star)$ satisfy the KKT conditions. If
 	\[
 		d^\top \nabla^2_{xx}\mathcal{L}(x^\star,\lambda^\star,\mu^\star)d > 0
@@ -578,8 +583,9 @@
 \end{proof}
 
 \subsection{Lagrangian Duality}
+\label{sec:l3-lagrangian-duality}
 
-\begin{definition}[Dual function]
+\begin{definition}[Dual function]\label{def:l3-dual-function}
 	The \emph{Lagrange dual function} is
 	\[
 		q(\lambda,\mu)
@@ -594,7 +600,7 @@
 	\]
 \end{definition}
 
-\begin{proposition}[The dual function is concave]
+\begin{proposition}[The dual function is concave]\label{prop:l3-the-dual-function-is-concave}
 	The function $q(\lambda,\mu)$ is concave in $(\lambda,\mu)$, even if the primal problem is not convex.
 \end{proposition}
 \begin{proof}
@@ -611,7 +617,7 @@
 	\end{align*}
 \end{proof}
 
-\begin{definition}[Dual problem]
+\begin{definition}[Dual problem]\label{def:l3-dual-problem}
 	The \emph{dual optimization problem} is
 	\begin{align*}
 		\max_{\lambda,\mu}\quad & q(\lambda,\mu) \\
@@ -619,7 +625,7 @@
 	\end{align*}
 \end{definition}
 
-\begin{theorem}[Weak duality]
+\begin{theorem}[Weak duality]\label{thm:l3-weak-duality}
 	Let $x$ be any primal-feasible point and $(\lambda,\mu)$ any dual-feasible point. Then
 	\[
 		q(\lambda,\mu)\le f(x).
@@ -657,7 +663,7 @@
 	This proves weak duality.
 \end{proof}
 
-\begin{definition}[Duality gap]
+\begin{definition}[Duality gap]\label{def:l3-duality-gap}
 	The \emph{duality gap} is the difference
 	\[
 		p^\star-d^\star,
@@ -671,7 +677,7 @@
 	By weak duality, the duality gap is always nonnegative.
 \end{definition}
 
-\begin{theorem}[Strong duality under Slater's condition]
+\begin{theorem}[Strong duality under Slater's condition]\label{thm:l3-strong-duality-under-slater-s-condition}
 	Consider the convex problem
 	\begin{align*}
 		\min_x \quad & f(x) \\
@@ -704,8 +710,9 @@
 \newpage
 
 \subsection{Quadratic Programming}
+\label{sec:l3-quadratic-programming}
 
-\begin{definition}[Quadratic program]
+\begin{definition}[Quadratic program]\label{def:l3-quadratic-program}
 	A \emph{quadratic program} (QP) has the form
 	\begin{align*}
 		\min_x \quad & \frac{1}{2}x^\top Hx+c^\top x \\
@@ -719,7 +726,7 @@
 	QPs are the workhorse subproblems of modern optimal control. Linear MPC is a QP solved online at every time step, and SQP methods for nonlinear optimal control repeatedly solve structured QPs.
 \end{remark}
 
-\begin{proposition}[Equality-constrained QP KKT system]
+\begin{proposition}[Equality-constrained QP KKT system]\label{prop:l3-equality-constrained-qp-kkt-system}
 	Consider the equality-constrained QP
 	\begin{align*}
 		\min_x \quad & \frac{1}{2}x^\top Hx+c^\top x \\

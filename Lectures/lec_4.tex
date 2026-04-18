@@ -1,4 +1,5 @@
 \lecture{4}{}{Dynamic Programming and the Calculus of Optimal Control}
+\label{lec:l4}
 
 \begin{intuition}
 	Static optimization chooses a point. Optimal control chooses an entire signal or trajectory. That single change transforms the problem fundamentally: decisions are now coupled through dynamics, information flows over time, and optimality can be analyzed either by backward induction on value functions or by forward-backward necessary conditions. Bellman and Pontryagin are therefore not competing viewpoints but complementary ones:
@@ -10,8 +11,9 @@
 \end{intuition}
 
 \subsection{Optimal Control Problem Formulation}
+\label{sec:l4-optimal-control-problem-formulation}
 
-\begin{definition}[Continuous-time optimal control problem in Bolza form]
+\begin{definition}[Continuous-time optimal control problem in Bolza form]\label{def:l4-continuous-time-optimal-control-problem-in-bolza-form}
 	A continuous-time optimal control problem (OCP) in Bolza form is
 	\begin{align*}
 		\min_{u(\cdot)} \quad & \phi(x(t_f),t_f) + \int_{t_0}^{t_f} L(t,x(t),u(t))\,dt \\
@@ -28,7 +30,7 @@
 	are the state and control, $L$ is the running cost, and $\phi$ is the terminal cost.
 \end{definition}
 
-\begin{definition}[Discrete-time optimal control problem]
+\begin{definition}[Discrete-time optimal control problem]\label{def:l4-discrete-time-optimal-control-problem}
 	A finite-horizon discrete-time OCP is
 	\begin{align*}
 		\min_{\{u_k\}_{k=0}^{N-1}} \quad & \phi_N(x_N) + \sum_{k=0}^{N-1} \ell_k(x_k,u_k) \\
@@ -67,12 +69,13 @@
 \end{remark}
 
 \subsection{Dynamic Programming in Discrete Time}
+\label{sec:l4-dynamic-programming-in-discrete-time}
 
 \begin{intuition}
 	Dynamic programming is based on a brutally simple observation: if a trajectory is optimal from time $k$ onward, then its suffix from time $k+1$ onward must already be optimal for the state reached at time $k+1$. Otherwise one could replace that suffix by a cheaper one and improve the whole trajectory. This recursive structure is what makes backward solution possible.
 \end{intuition}
 
-\begin{theorem}[Bellman's principle of optimality]
+\begin{theorem}[Bellman's principle of optimality]\label{thm:l4-bellman-s-principle-of-optimality}
 	Consider a finite-horizon discrete-time OCP. Let
 	\[
 		\{x_k^\star,u_k^\star\}_{k=0}^{N-1}
@@ -87,7 +90,7 @@
 	Assume the tail from time $j$ onward were not optimal for the state $x_j^\star$. Then there would exist another admissible tail with smaller cost and the same initial state $x_j^\star$. Replacing the original tail by this cheaper one would preserve feasibility of the whole trajectory and strictly reduce the total cost, contradicting optimality of the original solution. Therefore every optimal trajectory has optimal tails.
 \end{proof}
 
-\begin{definition}[Value function]
+\begin{definition}[Value function]\label{def:l4-value-function}
 	The \emph{value function} at stage $k$ is
 	\[
 		V_k(x)=
@@ -108,7 +111,7 @@
 	\]
 \end{definition}
 
-\begin{theorem}[Bellman equation]
+\begin{theorem}[Bellman equation]\label{thm:l4-bellman-equation}
 	For the finite-horizon discrete-time OCP,
 	\[
 		V_N(x)=\phi_N(x),
@@ -179,8 +182,9 @@
 \end{remark}
 
 \subsection{The Hamilton--Jacobi--Bellman Equation}
+\label{sec:l4-the-hamilton-jacobi-bellman-equation}
 
-\begin{definition}[Continuous-time value function]
+\begin{definition}[Continuous-time value function]\label{def:l4-continuous-time-value-function}
 	For the continuous-time Bolza problem, the value function is
 	\[
 		V(t,x)
@@ -196,7 +200,7 @@
 	\]
 \end{definition}
 
-\begin{theorem}[Hamilton--Jacobi--Bellman equation]
+\begin{theorem}[Hamilton--Jacobi--Bellman equation]\label{thm:l4-hamilton-jacobi-bellman-equation}
 	Assume the value function is sufficiently smooth. Then it satisfies
 	\[
 		\partial_t V(t,x)
@@ -241,7 +245,7 @@
 	Subtract $V(t,x)$ from both sides, divide by $\Delta t$, and let $\Delta t \to 0$. The result is the HJB equation.
 \end{proof}
 
-\begin{theorem}[Verification theorem]
+\begin{theorem}[Verification theorem]\label{thm:l4-verification-theorem}
 	Suppose a smooth function $W(t,x)$ satisfies the HJB equation with the correct terminal condition, and suppose there exists a feedback law
 	\[
 		u^\star(t,x)\in \argmin_{u \in \mathcal{U}}
@@ -282,8 +286,9 @@
 \end{remark}
 
 \subsection{Pontryagin's Minimum Principle}
+\label{sec:l4-pontryagin-s-minimum-principle}
 
-\begin{definition}[Hamiltonian]
+\begin{definition}[Hamiltonian]\label{def:l4-hamiltonian}
 	For the continuous-time OCP
 	\[
 		J=\phi(x(t_f),t_f)+\int_{t_0}^{t_f}L(t,x(t),u(t))\,dt,
@@ -300,14 +305,14 @@
 \end{definition}
 
 \begin{intuition}
-	The costate plays exactly the role that Lagrange multipliers played in Lecture 3. There the constraint was algebraic, such as $Ax=b$ or $g(x)\le 0$. Here the constraint is differential:
+	The costate plays exactly the role that Lagrange multipliers played in \autoref{thm:l3-kkt-necessary-conditions}. There the constraint was algebraic, such as $Ax=b$ or $g(x)\le 0$. Here the constraint is differential:
 	\[
 		\dot x-f(t,x,u)=0.
 	\]
 	The multiplier for this infinite family of constraints is no longer a vector but a time-varying function $p(t)$.
 \end{intuition}
 
-\begin{theorem}[Pontryagin's Minimum Principle]
+\begin{theorem}[Pontryagin's Minimum Principle]\label{thm:l4-pontryagin-s-minimum-principle}
 	Consider the fixed-final-time problem
 	\begin{align*}
 		\min_{u(\cdot)} \quad & \phi(x(t_f))+\int_{t_0}^{t_f}L(t,x(t),u(t))\,dt \\
@@ -415,8 +420,9 @@
 \end{remark}
 
 \subsection{Calculus of Variations}
+\label{sec:l4-calculus-of-variations}
 
-\begin{definition}[Variational problem]
+\begin{definition}[Variational problem]\label{def:l4-variational-problem}
 	A basic problem in the calculus of variations seeks a function $x(\cdot)$ minimizing
 	\[
 		J[x]=\int_{t_0}^{t_1} F(t,x(t),\dot x(t))\,dt
@@ -429,7 +435,7 @@
 	\]
 \end{definition}
 
-\begin{definition}[Admissible variation]
+\begin{definition}[Admissible variation]\label{def:l4-admissible-variation}
 	An \emph{admissible variation} is a smooth perturbation
 	\[
 		x_\varepsilon(t)=x(t)+\varepsilon \eta(t)
@@ -440,7 +446,7 @@
 	\]
 \end{definition}
 
-\begin{theorem}[Euler--Lagrange equation]
+\begin{theorem}[Euler--Lagrange equation]\label{thm:l4-euler-lagrange-equation}
 	If $x^\star(\cdot)$ is a smooth minimizer of the variational problem, then it satisfies
 	\[
 		\frac{d}{dt}\left(\partial_{\dot x} F(t,x^\star(t),\dot x^\star(t))\right)

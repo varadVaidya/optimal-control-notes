@@ -1,4 +1,5 @@
 \lecture{1}{}{Convexity and Unconstrained Optimality}
+\label{lec:l1}
 
 \begin{notation}
 	Throughout these notes, $\mathbb{R}^n$ is equipped with the standard inner product $x^\top y$ and the Euclidean norm $\norm{x}_2$, usually written simply as $\norm{x}$. Unless stated otherwise, all optimization problems are finite-dimensional and all domains are subsets of $\mathbb{R}^n$.
@@ -14,8 +15,9 @@
 \end{intuition}
 
 \subsection{Convex Sets}
+\label{sec:l1-convex-sets}
 
-\begin{definition}[Convex set]
+\begin{definition}[Convex set]\label{def:l1-convex-set}
 	A set $C \subseteq \mathbb{R}^n$ is \emph{convex} if for every $x,y \in C$ and every $\theta \in [0,1]$,
 	\[
 		\theta x + (1-\theta) y \in C.
@@ -32,7 +34,7 @@
 	Convexity is therefore a positivity-restricted affine property.
 \end{remark}
 
-\begin{proposition}[Intersection of convex sets]
+\begin{proposition}[Intersection of convex sets]\label{prop:l1-intersection-of-convex-sets}
 	Let $\{C_\alpha\}_{\alpha \in A}$ be any family of convex subsets of $\mathbb{R}^n$, where the index set $A$ may be finite or infinite. Then
 	\[
 		C = \bigcap_{\alpha \in A} C_\alpha
@@ -116,8 +118,9 @@
 \end{remark}
 
 \subsection{Convex Functions}
+\label{sec:l1-convex-functions}
 
-\begin{definition}[Convex and strictly convex functions]
+\begin{definition}[Convex and strictly convex functions]\label{def:l1-convex-and-strictly-convex-functions}
 	Let $C \subseteq \mathbb{R}^n$ be convex. A function $f : C \to \mathbb{R}$ is \emph{convex} if for all $x,y \in C$ and all $\theta \in [0,1]$,
 	\[
 		f(\theta x + (1-\theta)y)
@@ -164,7 +167,7 @@
 	Unless the domain is a single point, affine functions are never strictly convex.
 \end{eg}
 
-\begin{theorem}[Epigraph characterization]
+\begin{theorem}[Epigraph characterization]\label{thm:l1-epigraph-characterization}
 	Let $C \subseteq \mathbb{R}^n$ be convex and $f:C \to \mathbb{R}$. The function $f$ is convex if and only if its epigraph
 	\[
 		\epi(f) = \{(x,t) \in C \times \mathbb{R} : f(x) \le t\}
@@ -196,7 +199,7 @@
 	So $f$ is convex.
 \end{proof}
 
-\begin{theorem}[First-order characterization of convexity]
+\begin{theorem}[First-order characterization of convexity]\label{thm:l1-first-order-characterization-of-convexity}
 	Let $C \subseteq \mathbb{R}^n$ be open and convex, and let $f:C \to \mathbb{R}$ be differentiable. Then the following are equivalent:
 	\begin{enumerate}[label=(\roman*)]
 		\item $f$ is convex on $C$.
@@ -255,7 +258,7 @@
 	The first-order inequality says that every tangent hyperplane to the graph of a differentiable convex function is a global underestimator. In optimization this is decisive: the gradient is no longer merely a local linear approximation, but a certificate that the graph never drops below the tangent plane.
 \end{remark}
 
-\begin{theorem}[Second-order characterization]
+\begin{theorem}[Second-order characterization]\label{thm:l1-second-order-characterization}
 	Let $C \subseteq \mathbb{R}^n$ be open and convex, and let $f:C \to \mathbb{R}$ be twice continuously differentiable. Then $f$ is convex on $C$ if and only if
 	\[
 		\nabla^2 f(x) \succeq 0
@@ -341,8 +344,9 @@
 \end{remark}
 
 \subsection{Operations Preserving Convexity}
+\label{sec:l1-operations-preserving-convexity}
 
-\begin{proposition}[Nonnegative weighted sums]
+\begin{proposition}[Nonnegative weighted sums]\label{prop:l1-nonnegative-weighted-sums}
 	If $f_1,f_2:C \to \mathbb{R}$ are convex on a convex set $C$, and $\alpha,\beta \ge 0$, then
 	\[
 		g(x)=\alpha f_1(x)+\beta f_2(x)
@@ -360,7 +364,7 @@
 	\end{align*}
 \end{proof}
 
-\begin{proposition}[Pointwise maxima]
+\begin{proposition}[Pointwise maxima]\label{prop:l1-pointwise-maxima}
 	If $f_1,f_2:C \to \mathbb{R}$ are convex, then
 	\[
 		g(x)=\max\{f_1(x),f_2(x)\}
@@ -379,7 +383,7 @@
 	\end{align*}
 \end{proof}
 
-\begin{proposition}[Composition with affine maps]
+\begin{proposition}[Composition with affine maps]\label{prop:l1-composition-with-affine-maps}
 	If $f:D \to \mathbb{R}$ is convex on a convex set $D \subseteq \mathbb{R}^m$, and if $A \in \mathbb{R}^{m \times n}$ and $b \in \mathbb{R}^m$ are such that $Ax+b \in D$ for every $x$ in a convex set $C \subseteq \mathbb{R}^n$, then
 	\[
 		h(x)=f(Ax+b)
@@ -401,7 +405,7 @@
 	\end{align*}
 \end{proof}
 
-\begin{proposition}[Scalar composition rule]
+\begin{proposition}[Scalar composition rule]\label{prop:l1-scalar-composition-rule}
 	Let $f:C \to I$ be convex, where $C \subseteq \mathbb{R}^n$ is convex and $I \subseteq \mathbb{R}$ is an interval. Let $g:I \to \mathbb{R}$ be convex and nondecreasing. Then
 	\[
 		h = g \circ f
@@ -442,8 +446,9 @@
 \end{remark}
 
 \subsection{Strong Convexity and Conjugates}
+\label{sec:l1-strong-convexity-and-conjugates}
 
-\begin{definition}[Strong convexity]
+\begin{definition}[Strong convexity]\label{def:l1-strong-convexity}
 	A differentiable function $f:C \to \mathbb{R}$, with $C \subseteq \mathbb{R}^n$ convex, is \emph{$m$-strongly convex} for some $m>0$ if
 	\[
 		x \mapsto f(x)-\frac{m}{2}\norm{x}^2
@@ -451,7 +456,7 @@
 	is convex on $C$.
 \end{definition}
 
-\begin{theorem}[Strong convexity lower bound]
+\begin{theorem}[Strong convexity lower bound]\label{thm:l1-strong-convexity-lower-bound}
 	If $f$ is differentiable and $m$-strongly convex on an open convex set $C$, then for all $x,y \in C$,
 	\[
 		f(y) \ge f(x) + \nabla f(x)^\top (y-x) + \frac{m}{2}\norm{y-x}^2.
@@ -485,7 +490,7 @@
 	so the result follows.
 \end{proof}
 
-\begin{corollary}[Uniqueness of minimizers]
+\begin{corollary}[Uniqueness of minimizers]\label{cor:l1-uniqueness-of-minimizers}
 	If $f$ is strongly convex on a convex set $C$, then $f$ has at most one global minimizer on $C$.
 \end{corollary}
 \begin{proof}
@@ -502,7 +507,7 @@
 	But the right-hand side equals the minimal value, contradicting global minimality of $x^\star$ and $y^\star$. Therefore the minimizer is unique whenever it exists.
 \end{proof}
 
-\begin{corollary}[Hessian test for strong convexity]
+\begin{corollary}[Hessian test for strong convexity]\label{cor:l1-hessian-test-for-strong-convexity}
 	If $f \in C^2(C)$ on an open convex set $C$, then $f$ is $m$-strongly convex if and only if
 	\[
 		\nabla^2 f(x) \succeq m I
@@ -516,14 +521,14 @@
 	\]
 \end{proof}
 
-\begin{definition}[Legendre--Fenchel conjugate]
+\begin{definition}[Legendre--Fenchel conjugate]\label{def:l1-legendre-fenchel-conjugate}
 	For a function $f:\mathbb{R}^n \to \mathbb{R} \cup \{+\infty\}$, its \emph{conjugate} is defined by
 	\[
 		f^\ast(y)=\sup_{x \in \mathbb{R}^n}\bigl\{y^\top x - f(x)\bigr\}.
 	\]
 \end{definition}
 
-\begin{proposition}[Convexity of the conjugate]
+\begin{proposition}[Convexity of the conjugate]\label{prop:l1-convexity-of-the-conjugate}
 	The conjugate $f^\ast$ is always convex, regardless of whether $f$ itself is convex.
 \end{proposition}
 \begin{proof}
@@ -571,8 +576,9 @@
 \end{eg}
 
 \subsection{Optimality Conditions for Unconstrained Problems}
+\label{sec:l1-optimality-conditions-for-unconstrained-problems}
 
-\begin{definition}[Local and global minima]
+\begin{definition}[Local and global minima]\label{def:l1-local-and-global-minima}
 	Let $f:C \to \mathbb{R}$ and let $x^\star \in C$.
 	\begin{itemize}
 		\item $x^\star$ is a \emph{local minimizer} if there exists $r>0$ such that
@@ -589,7 +595,7 @@
 	\end{itemize}
 \end{definition}
 
-\begin{definition}[Stationary point]
+\begin{definition}[Stationary point]\label{def:l1-stationary-point}
 	If $f$ is differentiable, a point $x^\star$ with
 	\[
 		\nabla f(x^\star)=0
@@ -597,7 +603,7 @@
 	is called a \emph{stationary} or \emph{critical} point.
 \end{definition}
 
-\begin{theorem}[First-order necessary condition]
+\begin{theorem}[First-order necessary condition]\label{thm:l1-first-order-necessary-condition}
 	Let $f:U \to \mathbb{R}$ be continuously differentiable on an open set $U \subseteq \mathbb{R}^n$. If $x^\star \in U$ is a local minimizer of $f$, then
 	\[
 		\nabla f(x^\star)=0.
@@ -619,7 +625,7 @@
 	This holds for every direction $d$. The only vector orthogonal to every $d$ is the zero vector, so $\nabla f(x^\star)=0$.
 \end{proof}
 
-\begin{theorem}[Second-order necessary and sufficient conditions]
+\begin{theorem}[Second-order necessary and sufficient conditions]\label{thm:l1-second-order-necessary-and-sufficient-conditions}
 	Let $f:U \to \mathbb{R}$ be twice continuously differentiable on an open set $U \subseteq \mathbb{R}^n$.
 	\begin{enumerate}[label=(\roman*)]
 		\item If $x^\star$ is a local minimizer, then
@@ -680,7 +686,7 @@
 	So a semidefinite Hessian leaves unresolved higher-order behavior.
 \end{remark}
 
-\begin{theorem}[Local minima of convex functions are global]
+\begin{theorem}[Local minima of convex functions are global]\label{thm:l1-local-minima-of-convex-functions-are-global}
 	Let $C \subseteq \mathbb{R}^n$ be convex and let $f:C \to \mathbb{R}$ be convex. Every local minimizer of $f$ is a global minimizer.
 \end{theorem}
 \begin{proof}
@@ -702,7 +708,7 @@
 	As $\theta \downarrow 0$, the points $x_\theta$ converge to $x^\star$. Thus arbitrarily close to $x^\star$ there are points with strictly smaller objective value, contradicting local minimality. Hence $x^\star$ must be global.
 \end{proof}
 
-\begin{proposition}[Indefinite Hessian implies saddle point]
+\begin{proposition}[Indefinite Hessian implies saddle point]\label{prop:l1-indefinite-hessian-implies-saddle-point}
 	Let $f \in C^2(U)$ and let $x^\star \in U$ satisfy
 	\[
 		\nabla f(x^\star)=0.
@@ -720,7 +726,7 @@
 	For sufficiently small nonzero $t$, the first expression is strictly larger than $f(x^\star)$ and the second strictly smaller. Therefore every neighborhood of $x^\star$ contains points with both larger and smaller objective values, so $x^\star$ is a saddle point.
 \end{proof}
 
-\begin{definition}[Coercive function]
+\begin{definition}[Coercive function]\label{def:l1-coercive-function}
 	A function $f:\mathbb{R}^n \to \mathbb{R}$ is \emph{coercive} if
 	\[
 		f(x)\to +\infty
@@ -728,7 +734,7 @@
 	\]
 \end{definition}
 
-\begin{theorem}[Existence of global minimizers under coercivity]
+\begin{theorem}[Existence of global minimizers under coercivity]\label{thm:l1-existence-of-global-minimizers-under-coercivity}
 	If $f:\mathbb{R}^n \to \mathbb{R}$ is continuous and coercive, then $f$ attains a global minimum on $\mathbb{R}^n$.
 \end{theorem}
 \begin{proof}
@@ -748,6 +754,7 @@
 \end{remark}
 
 \subsection{Worked Examples}
+\label{sec:l1-worked-examples}
 
 \begin{eg}[A stationary point with semidefinite Hessian that is not a minimum]
 	Consider
