@@ -1,0 +1,24 @@
+INFO:  latexindent version 3.24.2, 2024-06-15, a script to indent .tex files
+       latexindent lives here: /home/varad/Downloads/
+       Sun Apr 19 12:16:03 2026
+       Filename: /scratch/phd/prep/notes/optimal-control-notes/optimal-control.tex
+INFO:  Processing switches:
+INFO:  Directory for backup files and log file indent.log:
+       /scratch/phd/prep/notes/optimal-control-notes
+INFO:  YAML settings read: defaultSettings.yaml
+       Reading defaultSettings.yaml from /home/varad/Downloads/defaultSettings.yaml
+       Reading defaultSettings.yaml (2nd attempt) from /home/varad/Downloads/../../texmf-dist/scripts/latexindent/defaultSettings.yaml
+       and then, if necessary, /home/varad/Downloads/LatexIndent/defaultSettings.yaml
+INFO:  YAML reading settings
+       Home directory is /home/varad
+       latexindent.pl didn't find indentconfig.yaml or .indentconfig.yaml
+       see all possible locations: https://latexindentpl.readthedocs.io/en/latest/sec-appendices.html#indentconfig-options)
+INFO:  Phase 1: searching for objects
+INFO:  Phase 2: finding surrounding indentation
+INFO:  Phase 3: indenting objects
+INFO:  Phase 4: final indentation check
+INFO:  Output routine:
+       Not outputting to file; see -w and -o switches for more options.
+       --------------
+INFO:  Please direct all communication/issues to:
+        https://github.com/cmhughes/latexindent.pl
