@@ -411,12 +411,100 @@
 	which lies on the boundary of the control set at all times. This is the defining bang-bang phenomenon.
 \end{eg}
 
-\begin{remark}[Connection between HJB and PMP]
-	If the value function is smooth and the optimal feedback is regular, then along an optimal trajectory
+\subsection{The Fundamental Connection Between Dynamic Programming and PMP}
+\label{sec:l4-the-fundamental-connection-between-dynamic-programming-and-pmp}
+
+\begin{remark}
+	At a conceptual level, HJB and PMP appear to solve different problems. HJB seeks the value function itself and is therefore globally sufficient but computationally intractable in high dimension. PMP introduces a costate and gives a two-point boundary-value problem whose solution is only locally necessary. The two theories meet when the value function is smooth: the costate is then the gradient of the value function evaluated along the optimal trajectory.
+\end{remark}
+
+\begin{theorem}[Costate equals gradient of the value function]\label{thm:l4-costate-equals-gradient-of-the-value-function}
+	Suppose the value function
+	\[
+		V:[t_0,t_f]\times \mathbb{R}^{n}\to \mathbb{R}
+	\]
+	is continuously differentiable, and suppose an optimal feedback $u^\star(t,x)$ exists and is sufficiently regular that the optimal trajectory $x^\star(\cdot)$ is classical. Define
+	\[
+		p(t):=\nabla_x V(t,x^\star(t)).
+	\]
+	Then $p(\cdot)$ satisfies the PMP adjoint equation and terminal condition:
+	\begin{align*}
+		\dot p(t) & = -\partial_x H(t,x^\star(t),u^\star(t),p(t)), \\
+		p(t_f) & = \nabla_x \phi(x^\star(t_f)).
+	\end{align*}
+	Moreover,
+	\[
+		u^\star(t)\in \argmin_{u \in \mathcal{U}} H(t,x^\star(t),u,p(t)).
+	\]
+\end{theorem}
+\begin{proof}[Proof sketch]
+	Because
+	\[
+		V(t_f,x)=\phi(x),
+	\]
+	the terminal condition is immediate:
+	\[
+		p(t_f)=\nabla_x V(t_f,x^\star(t_f))=\nabla_x \phi(x^\star(t_f)).
+	\]
+	Next, the HJB equation reads
+	\[
+		\partial_t V(t,x)
+		+
+		\min_{u \in \mathcal{U}}
+		\left\{
+			L(t,x,u)+\nabla_x V(t,x)^\top f(t,x,u)
+		\right\}
+		=0.
+	\]
+	Along the optimal trajectory, the minimizing control is $u^\star(t)=u^\star(t,x^\star(t))$, so
+	\[
+		\partial_t V(t,x^\star(t))
+		+
+		H(t,x^\star(t),u^\star(t),p(t))
+		=0.
+	\]
+	Differentiate this identity with respect to $x$ along the optimal feedback branch. Because $u^\star$ minimizes the Hamiltonian, the envelope principle removes the derivative of the minimizer itself and yields
+	\[
+		\partial_t \nabla_x V(t,x^\star(t))
+		+
+		\partial_x H(t,x^\star(t),u^\star(t),p(t))
+		+
+		V_{xx}(t,x^\star(t))\,\dot x^\star(t)
+		=0.
+	\]
+	Now use the chain rule
+	\[
+		\dot p(t)
+		=
+		\frac{d}{dt}\nabla_x V(t,x^\star(t))
+		=
+		\partial_t \nabla_x V(t,x^\star(t))
+		+
+		V_{xx}(t,x^\star(t))\,\dot x^\star(t),
+	\]
+	and substitute
+	\[
+		\dot x^\star(t)=f(t,x^\star(t),u^\star(t)).
+	\]
+	The terms combine to give
+	\[
+		\dot p(t)=-\partial_x H(t,x^\star(t),u^\star(t),p(t)).
+	\]
+	Finally, the minimizing control in the HJB Hamiltonian is exactly the minimizer in the PMP Hamiltonian once we identify
 	\[
 		p(t)=\nabla_x V(t,x^\star(t)).
 	\]
-	Substituting this relation into the HJB equation recovers the Hamiltonian minimization in PMP. Thus HJB and PMP are not unrelated theories; the costate is the gradient of the value function when enough smoothness is present.
+\end{proof}
+
+\begin{remark}[Discrete-time analogue]
+	In discrete time, the same argument leads to
+	\[
+		\lambda_k = \nabla_x V_k(x_k^\star),
+	\]
+	where $\lambda_k$ is the multiplier on the dynamics constraint at stage $k$. \autoref{sec:l6-finite-horizon-lqr-as-a-structured-quadratic-program} will make this identity explicit in the linear-quadratic setting, where the relation becomes
+	\[
+		\lambda_k=P_kx_k^\star.
+	\]
 \end{remark}
 
 \subsection{Calculus of Variations}

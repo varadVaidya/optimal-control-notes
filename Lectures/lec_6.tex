@@ -299,6 +299,163 @@
 	In finite-horizon LQR, the gain $K_k$ depends on time because the remaining horizon length changes with $k$. In infinite-horizon LQR, the problem is time invariant, the value function becomes stationary, and the gain converges to a constant matrix under the standard stabilizability and detectability assumptions.
 \end{remark}
 
+\subsection{Finite-Horizon LQR as a Structured Quadratic Program}
+\label{sec:l6-finite-horizon-lqr-as-a-structured-quadratic-program}
+
+\begin{remark}
+	The dynamic-programming derivation from \autoref{sec:l6-finite-horizon-lqr-via-dynamic-programming} is conceptually fundamental, but it is not the only exact derivation. One can also write the entire finite-horizon problem as a single equality-constrained quadratic program and then solve its KKT system. The Riccati recursion then appears as a sparse block elimination of that KKT system.
+\end{remark}
+
+\begin{definition}[Stacked QP form of finite-horizon LQR]\label{def:l6-stacked-qp-form-of-finite-horizon-lqr}
+	Let
+	\[
+		z=
+		\begin{bmatrix}
+			u_0 \\
+			x_1 \\
+			u_1 \\
+			x_2 \\
+			\vdots \\
+			u_{N-1} \\
+			x_N
+		\end{bmatrix}.
+	\]
+	With $x_0$ fixed, the finite-horizon LQR problem can be written as
+	\begin{align*}
+		\min_{z} \quad & \frac{1}{2}z^\top H z + \ell^\top z + \text{const} \\
+		\text{subject to}\quad & Cz=d,
+	\end{align*}
+	where $H$ is block diagonal with copies of $R$ and $Q$ (and $Q_f$ at the final state block), while $C$ is block bidiagonal and represents the dynamics
+	\[
+		x_{k+1}-Ax_k-Bu_k=0.
+	\]
+\end{definition}
+
+\begin{remark}[Structure of the matrices]
+	The important point is not the exact bookkeeping of $H$, $C$, and $d$, but their sparsity:
+	\begin{itemize}
+		\item $H$ is block diagonal because the stage cost couples only variables from the same time index,
+		\item $C$ is block banded because each dynamics constraint couples only $x_k$, $u_k$, and $x_{k+1}$.
+	\end{itemize}
+	This structure is precisely what later allows Riccati-style elimination and, more generally, sparse optimal-control solvers.
+\end{remark}
+
+\begin{proposition}[KKT system for stacked LQR]\label{prop:l6-kkt-system-for-stacked-lqr}
+	The first-order optimality conditions of the stacked QP from \autoref{def:l6-stacked-qp-form-of-finite-horizon-lqr} are the linear saddle-point system
+	\[
+		\begin{bmatrix}
+			H      & C^\top \\
+			C      & 0
+		\end{bmatrix}
+		\begin{bmatrix}
+			z^\star \\
+			\lambda^\star
+		\end{bmatrix}
+		=
+		\begin{bmatrix}
+			-\ell \\
+			d
+		\end{bmatrix}.
+	\]
+	The multiplier block $\lambda^\star$ consists of one vector per dynamics constraint and is the discrete-time costate sequence.
+\end{proposition}
+\begin{proof}
+	This is the equality-constrained QP KKT system from \autoref{prop:l3-equality-constrained-qp-kkt-system} applied to the stacked LQR matrices. Since the constraints are exactly the stagewise dynamics equations, each multiplier corresponds to one dynamics equation and therefore plays the role of a costate.
+\end{proof}
+
+\begin{theorem}[Riccati recursion from block elimination of the KKT system]\label{thm:l6-riccati-recursion-from-block-elimination-of-the-kkt-system}
+	Eliminating the variables of the KKT system in reverse time recovers the same feedback gains and Riccati matrices as in \autoref{thm:l6-quadratic-value-function-and-linear-optimal-control}. In particular, if the multiplier attached to the constraint
+	\[
+		x_{k+1}-Ax_k-Bu_k=0
+	\]
+	is denoted by $\lambda_{k+1}$, then
+	\[
+		\lambda_k=P_k x_k,
+	\]
+	and backward elimination yields
+	\[
+		K_k=\left(R+B^\top P_{k+1}B\right)^{-1}B^\top P_{k+1}A
+	\]
+	and
+	\[
+		P_k = Q + A^\top P_{k+1}A - A^\top P_{k+1}B\left(R+B^\top P_{k+1}B\right)^{-1}B^\top P_{k+1}A.
+	\]
+\end{theorem}
+\begin{proof}
+	Write the Lagrangian in stagewise form:
+	\[
+		\mathcal{L}
+		=
+		x_N^\top Q_f x_N
+		+
+		\sum_{k=0}^{N-1}
+		\Bigl(
+			x_k^\top Q x_k + u_k^\top R u_k + \lambda_{k+1}^\top(Ax_k+Bu_k-x_{k+1})
+		\Bigr).
+	\]
+	Stationarity with respect to the terminal state gives
+	\[
+		2Q_f x_N-\lambda_N=0.
+	\]
+	Up to the purely conventional factor of $2$ coming from whether one writes the cost with or without $\frac12$, this says that the final multiplier is linear in the final state:
+	\[
+		\lambda_N=P_N x_N,
+		\qquad
+		P_N=Q_f.
+	\]
+
+	Now fix a stage $k$. Stationarity with respect to $u_k$ yields
+	\[
+		2Ru_k + B^\top \lambda_{k+1}=0.
+	\]
+	If we already know
+	\[
+		\lambda_{k+1}=P_{k+1}x_{k+1},
+	\]
+	then substituting
+	\[
+		x_{k+1}=Ax_k+Bu_k
+	\]
+	into the stationarity condition gives
+	\[
+		\left(R+B^\top P_{k+1}B\right)u_k = -B^\top P_{k+1}A x_k,
+	\]
+	again up to the same harmless factor convention. Hence
+	\[
+		u_k=-K_k x_k
+	\]
+	with the usual Riccati gain
+	\[
+		K_k=\left(R+B^\top P_{k+1}B\right)^{-1}B^\top P_{k+1}A.
+	\]
+
+	Next, stationarity with respect to $x_k$ gives
+	\[
+		2Qx_k + A^\top \lambda_{k+1} - \lambda_k = 0.
+	\]
+	Substitute
+	\[
+		\lambda_{k+1}=P_{k+1}(Ax_k+Bu_k)
+	\]
+	and then replace $u_k$ by the feedback law just derived. The result is
+	\[
+		\lambda_k
+		=
+		\Bigl(
+			Q + A^\top P_{k+1}A - A^\top P_{k+1}B K_k
+		\Bigr)x_k,
+	\]
+	again with the same normalization convention. Identifying the coefficient of $x_k$ gives
+	\[
+		P_k = Q + A^\top P_{k+1}A - A^\top P_{k+1}B K_k,
+	\]
+	which is exactly the Riccati recursion.
+\end{proof}
+
+\begin{remark}[Why this derivation matters computationally]
+	The dynamic-programming derivation explains optimality through value functions; the KKT derivation explains why sparse linear algebra is so effective. Riccati recursion is not magic. It is the specialized sparse elimination one gets when the QP has the chain structure induced by time.
+\end{remark}
+
 \subsection{Infinite-Horizon LQR and the Algebraic Riccati Equation}
 \label{sec:l6-infinite-horizon-lqr-and-the-algebraic-riccati-equation}
 

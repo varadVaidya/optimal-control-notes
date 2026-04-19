@@ -1,0 +1,393 @@
+\section{Attitude Control and Quaternion Optimization}
+\label{sec:app-attitude-control-and-quaternion-optimization}
+
+\begin{remark}
+	Many robotic optimal-control problems live on nonlinear configuration spaces rather than Euclidean spaces. Attitude is the simplest and most important example: the physically meaningful state is a rotation, not an arbitrary vector in $\mathbb{R}^{3\times 3}$ or $\mathbb{R}^{4}$. This appendix summarizes the geometric constructions most often needed when trajectory optimization, estimation, and LQR are carried out with attitude states.
+\end{remark}
+
+\subsection{Rotation Matrices and Unit Quaternions}
+\label{sec:app-rotation-matrices-and-unit-quaternions}
+
+\begin{definition}[Special orthogonal group]\label{def:app-special-orthogonal-group}
+	The set of three-dimensional rotation matrices is
+	\[
+		SO(3)
+		=
+		\left\{
+			R \in \mathbb{R}^{3\times 3}
+			:
+			R^\top R = I,
+			\ \det R = 1
+		\right\}.
+	\]
+\end{definition}
+
+\begin{definition}[Hat map]\label{def:app-hat-map}
+	For $\omega=(\omega_1,\omega_2,\omega_3)^\top \in \mathbb{R}^{3}$, define
+	\[
+		\widehat{\omega}
+		=
+		\begin{bmatrix}
+			0          & -\omega_3 & \omega_2 \\
+			\omega_3   & 0         & -\omega_1 \\
+			-\omega_2  & \omega_1  & 0
+		\end{bmatrix}.
+	\]
+	Then
+	\[
+		\widehat{\omega}v=\omega \times v
+	\]
+	for every $v \in \mathbb{R}^{3}$.
+\end{definition}
+
+\begin{definition}[Unit quaternion]\label{def:app-unit-quaternion}
+	A unit quaternion is a vector
+	\[
+		q=
+		\begin{bmatrix}
+			q_0 \\
+			q_v
+		\end{bmatrix}
+		\in \mathbb{R}^{4},
+		\qquad
+		q_0 \in \mathbb{R},
+		\quad
+		q_v \in \mathbb{R}^{3},
+	\]
+	satisfying
+	\[
+		q^\top q = q_0^2+\|q_v\|^2 = 1.
+	\]
+	The set of unit quaternions is the three-sphere
+	\[
+		S^3=\{q \in \mathbb{R}^{4}:q^\top q=1\}.
+	\]
+\end{definition}
+
+\begin{remark}[Double cover]
+	Every rotation in $SO(3)$ is represented by two antipodal unit quaternions:
+	\[
+		q
+		\qquad \text{and} \qquad
+		-q.
+	\]
+	They encode the same physical attitude. This is not a singularity, but it does matter numerically because optimization and filtering routines should maintain a consistent sign convention along a trajectory.
+\end{remark}
+
+\begin{definition}[Quaternion-to-rotation map]\label{def:app-quaternion-to-rotation-map}
+	The rotation matrix corresponding to a unit quaternion
+	\[
+		q=
+		\begin{bmatrix}
+			q_0 \\
+			q_v
+		\end{bmatrix}
+	\]
+	is
+	\[
+		R(q)
+		=
+		(q_0^2-q_v^\top q_v)I
+		+
+		2q_v q_v^\top
+		+
+		2q_0 \widehat{q_v}.
+	\]
+\end{definition}
+
+\begin{definition}[Quaternion kinematics]\label{def:app-quaternion-kinematics}
+	If $\omega \in \mathbb{R}^{3}$ is the body angular velocity, then the quaternion kinematics are
+	\[
+		\dot q = \frac{1}{2}G(q)\omega,
+	\]
+	where
+	\[
+		G(q)
+		=
+		\begin{bmatrix}
+			-q_v^\top \\
+			q_0 I + \widehat{q_v}
+		\end{bmatrix}
+		\in \mathbb{R}^{4\times 3}.
+	\]
+\end{definition}
+
+\begin{proposition}[Tangent-space property of the quaternion kinematics matrix]\label{prop:app-tangent-space-property-of-the-quaternion-kinematics-matrix}
+	For every unit quaternion $q \in S^3$,
+	\[
+		q^\top G(q)=0
+	\]
+	and
+	\[
+		G(q)^\top G(q)=I_3.
+	\]
+	Therefore the columns of $G(q)$ form an orthonormal basis for the tangent space
+	\[
+		T_q S^3 = \{\delta q \in \mathbb{R}^{4}:q^\top \delta q=0\}.
+	\]
+\end{proposition}
+\begin{proof}
+	Direct multiplication gives
+	\[
+		q^\top G(q)
+		=
+		\begin{bmatrix}
+			q_0 & q_v^\top
+		\end{bmatrix}
+		\begin{bmatrix}
+			-q_v^\top \\
+			q_0 I + \widehat{q_v}
+		\end{bmatrix}
+		=
+		-q_0 q_v^\top + q_0 q_v^\top + q_v^\top \widehat{q_v}
+		=
+		0,
+	\]
+	because
+	\[
+		q_v^\top \widehat{q_v}=0.
+	\]
+	A second direct multiplication yields
+	\[
+		G(q)^\top G(q)
+		=
+		q_v q_v^\top + (q_0 I-\widehat{q_v})(q_0 I+\widehat{q_v})
+		=
+		(q_0^2+\|q_v\|^2)I
+		=
+		I_3,
+	\]
+	using
+	\[
+		\widehat{q_v}^{\,2}=q_v q_v^\top-\|q_v\|^2 I
+	\]
+	and the unit-norm condition on $q$.
+\end{proof}
+
+\subsection{Optimization Updates in the Quaternion Tangent Space}
+\label{sec:app-optimization-updates-in-the-quaternion-tangent-space}
+
+\begin{remark}
+	An unconstrained Newton or Gauss--Newton method wants to add a correction vector to the current iterate. For quaternions this is invalid: an arbitrary
+	\[
+		q+\delta q
+	\]
+	will not remain on $S^3$. The correction must instead be computed in a three-dimensional local coordinate chart and then mapped back to the manifold.
+\end{remark}
+
+\begin{definition}[Small-angle quaternion update]\label{def:app-small-angle-quaternion-update}
+	Let $\phi \in \mathbb{R}^{3}$ be a small attitude correction. A corresponding first-order unit-quaternion update is
+	\[
+		\delta q(\phi)
+		\approx
+		\begin{bmatrix}
+			1 \\
+			\frac{1}{2}\phi
+		\end{bmatrix},
+	\]
+	and the updated quaternion is obtained multiplicatively,
+	\[
+		q^{+} = \delta q(\phi)\otimes q,
+	\]
+	followed by normalization if needed.
+\end{definition}
+
+\begin{remark}[Why multiplicative updates are natural]
+	Additive updates live in the ambient space $\mathbb{R}^{4}$. Multiplicative updates live on the group structure of rotations. The local coordinate $\phi \in \mathbb{R}^{3}$ is unconstrained, while the updated quaternion remains on the unit sphere after renormalization.
+\end{remark}
+
+\begin{definition}[Full-state projection matrix for error coordinates]\label{def:app-full-state-projection-matrix-for-error-coordinates}
+	Suppose the state contains position, quaternion attitude, linear velocity, and angular velocity:
+	\[
+		x=
+		\begin{bmatrix}
+			r \\
+			q \\
+			v \\
+			\omega
+		\end{bmatrix}
+		\in \mathbb{R}^{13}.
+	\]
+	The tangent-space error coordinate
+	\[
+		\eta=
+		\begin{bmatrix}
+			\delta r \\
+			\delta \phi \\
+			\delta v \\
+			\delta \omega
+		\end{bmatrix}
+		\in \mathbb{R}^{12}
+	\]
+	is lifted to an ambient perturbation by
+	\[
+		\delta x = E(x)\eta,
+	\]
+	with
+	\[
+		E(x)
+		=
+		\operatorname{diag}\!\bigl(I_3,G(q),I_3,I_3\bigr)
+		\in \mathbb{R}^{13\times 12}.
+	\]
+\end{definition}
+
+\begin{proposition}[Projected linearization in quaternion error coordinates]\label{prop:app-projected-linearization-in-quaternion-error-coordinates}
+	Let
+	\[
+		x_{k+1}=f_k(x_k,u_k)
+	\]
+	and linearize in the ambient coordinates:
+	\[
+		\delta x_{k+1}=A_k \delta x_k + B_k \delta u_k.
+	\]
+	If $\eta_k$ and $\eta_{k+1}$ are the tangent-space errors defined by
+	\[
+		\delta x_k = E(\bar x_k)\eta_k,
+		\qquad
+		\eta_{k+1}=E(\bar x_{k+1})^\top \delta x_{k+1},
+	\]
+	then the projected error dynamics are
+	\[
+		\eta_{k+1}
+		=
+		\underbrace{E(\bar x_{k+1})^\top A_k E(\bar x_k)}_{A_k^\eta}\eta_k
+		+
+		\underbrace{E(\bar x_{k+1})^\top B_k}_{B_k^\eta}\delta u_k.
+	\]
+\end{proposition}
+\begin{proof}
+	Substitute
+	\[
+		\delta x_k=E(\bar x_k)\eta_k
+	\]
+	into the ambient linearization:
+	\[
+		\delta x_{k+1}=A_k E(\bar x_k)\eta_k+B_k \delta u_k.
+	\]
+	Project the result back onto the tangent space at the next nominal state by multiplying with
+	\[
+		E(\bar x_{k+1})^\top.
+	\]
+	This gives the stated reduced linear dynamics directly.
+\end{proof}
+
+\subsection{Wahba's Problem and Gauss--Newton on $S^3$}
+\label{sec:app-wahba-s-problem-and-gauss-newton-on-s3}
+
+\begin{definition}[Wahba's problem]\label{def:app-wahba-s-problem}
+	Given known inertial-frame vectors
+	\[
+		v_1^N,\dots,v_m^N \in \mathbb{R}^{3}
+	\]
+	and their corresponding body-frame measurements
+	\[
+		v_1^B,\dots,v_m^B \in \mathbb{R}^{3},
+	\]
+	find the attitude $q$ minimizing
+	\[
+		J(q)
+		=
+		\frac{1}{2}\sum_{i=1}^{m} w_i
+		\left\|
+			R(q)v_i^B-v_i^N
+		\right\|^2,
+	\]
+	where $w_i>0$ are weights.
+\end{definition}
+
+\begin{remark}
+	Wahba's problem is the canonical example of optimization on a rotation manifold. It is also a clean model for attitude estimation from vector observations, such as star trackers, accelerometers, or magnetometers.
+\end{remark}
+
+\begin{algorithm}[H]
+	\DontPrintSemicolon
+	\caption{Gauss--Newton for Wahba's Problem in Quaternion Coordinates}
+\label{alg:app-gauss-newton-for-wahba-s-problem-in-quaternion-coordinates}
+	\KwIn{Initial unit quaternion $q_0$, vector correspondences $(v_i^B,v_i^N)$, weights $w_i$}
+	\For{$r=0,1,2,\dots$ until convergence}{
+		Compute residuals
+		\[
+			r_i(q_r)=R(q_r)v_i^B-v_i^N
+		\]
+		and stack them into $r(q_r)$\;
+		Linearize the residual with respect to a tangent-space correction $\phi \in \mathbb{R}^{3}$:
+		\[
+			r(q_r \oplus \phi)\approx r(q_r)+J_\phi(q_r)\phi
+		\]\;
+		Solve the normal equations
+		\[
+			J_\phi(q_r)^\top J_\phi(q_r)\,\phi
+			=
+			- J_\phi(q_r)^\top r(q_r)
+		\]\;
+		Form the multiplicative update $q_{r+1}=\delta q(\phi)\otimes q_r$\;
+		Renormalize $q_{r+1}$ to unit length\;
+	}
+	\KwOut{Estimated attitude quaternion}
+\end{algorithm}
+
+\begin{remark}[Role of the attitude Jacobian]
+	The Jacobian
+	\[
+		J_\phi(q)
+	\]
+	is the chain-rule Jacobian of the residual with respect to the three-dimensional correction variable $\phi$, not with respect to the ambient four-dimensional quaternion coordinate. This is exactly the same philosophy as \autoref{prop:app-projected-linearization-in-quaternion-error-coordinates}: compute in the tangent space, then lift back to the manifold.
+\end{remark}
+
+\subsection{Quaternion Error-State LQR and Attitude Control}
+\label{sec:app-quaternion-error-state-lqr-and-attitude-control}
+
+\begin{definition}[Quaternion error state]\label{def:app-quaternion-error-state}
+	Given a nominal quaternion $\bar q$ and actual quaternion $q$, define the error quaternion by
+	\[
+		\delta q = \bar q^\ast \otimes q,
+	\]
+	where $\bar q^\ast$ is the quaternion conjugate. For small errors,
+	\[
+		\delta q
+		\approx
+		\begin{bmatrix}
+			1 \\
+			\frac{1}{2}\delta \phi
+		\end{bmatrix},
+	\]
+	so the three-vector $\delta \phi$ serves as the local attitude error coordinate.
+\end{definition}
+
+\begin{remark}[Why naive LQR on the ambient quaternion is wrong]
+	A state containing a quaternion lives on a manifold of codimension one. A naive linearization in the ambient coordinate $\delta q \in \mathbb{R}^{4}$ creates a fictitious radial direction that changes $\|q\|$, but that direction is not physically actuated by the true dynamics. An LQR design built on the ambient linearization therefore solves the wrong local problem.
+\end{remark}
+
+\begin{algorithm}[H]
+	\DontPrintSemicolon
+	\caption{Quaternion Error-State LQR Design}
+\label{alg:app-quaternion-error-state-lqr-design}
+	\KwIn{Nominal attitude trajectory $\{\bar x_k,\bar u_k\}$ or equilibrium, ambient linearization matrices $(A_k,B_k)$, quadratic weights on tangent errors}
+	Construct the projection matrices $E(\bar x_k)$ from \autoref{def:app-full-state-projection-matrix-for-error-coordinates}\;
+	Project the ambient linearization onto tangent coordinates using \autoref{prop:app-projected-linearization-in-quaternion-error-coordinates}\;
+	Choose a quadratic cost in the reduced error state
+	\[
+		\eta_k=
+		\begin{bmatrix}
+			\delta r_k \\
+			\delta \phi_k \\
+			\delta v_k \\
+			\delta \omega_k
+		\end{bmatrix}
+	\]\;
+	Solve the resulting reduced LQR problem using \autoref{alg:l6-finite-horizon-discrete-time-lqr} or the algebraic Riccati equation from \autoref{thm:l6-discrete-time-algebraic-riccati-equation-and-optimal-gain}\;
+	Implement the feedback in quaternion error coordinates and renormalize the propagated quaternion state\;
+	\KwOut{Locally optimal feedback law respecting the attitude manifold}
+\end{algorithm}
+
+\begin{remark}[Quadrotor attitude stabilization]
+	For a rigid body or quadrotor, the practical pattern is standard:
+	\begin{itemize}
+		\item propagate the full nonlinear quaternion dynamics,
+		\item compute the attitude error through the quaternion product,
+		\item feed the reduced error vector into an LQR or MPC law designed in tangent coordinates,
+		\item renormalize the quaternion after numerical integration.
+	\end{itemize}
+	This is the manifold-aware version of linear quadratic feedback. The control law is linear in the local error coordinates, not in the raw quaternion itself.
+\end{remark}

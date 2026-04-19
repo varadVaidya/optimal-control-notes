@@ -447,6 +447,107 @@
 	Differential dynamic programming (DDP) is the full second-order version of local dynamic-programming trajectory optimization. It expands both the cost and the dynamics to second order. iLQR is the simplified variant that retains only first-order dynamics and therefore ignores the second-order dynamics tensors.
 \end{definition}
 
+\begin{proposition}[Full second-order $Q$-function derivatives in DDP]\label{prop:l8-full-second-order-q-function-derivatives-in-ddp}
+	Let
+	\[
+		x_{k+1}=f_k(x_k,u_k)
+	\]
+	and suppose the stage cost is $\ell_k(x_k,u_k)$, with local quadratic value model at stage $k+1$
+	\[
+		V_{k+1}(\bar x_{k+1}+\delta x)
+		\approx
+		V_{k+1}
+		+
+		V_{x,k+1}^\top \delta x
+		+
+		\frac{1}{2}\delta x^\top V_{xx,k+1}\delta x.
+	\]
+	Write
+	\[
+		A_k=\partial_x f_k(\bar x_k,\bar u_k),
+		\qquad
+		B_k=\partial_u f_k(\bar x_k,\bar u_k),
+	\]
+	and let
+	\[
+		f_{xx,k}^{(i)},
+		\qquad
+		f_{ux,k}^{(i)},
+		\qquad
+		f_{uu,k}^{(i)}
+	\]
+	denote the Hessians of the $i$th component of $f_k$. Then the DDP local action-value derivatives are
+	\[
+		Q_{x,k} = \ell_{x,k} + A_k^\top V_{x,k+1},
+		\qquad
+		Q_{u,k} = \ell_{u,k} + B_k^\top V_{x,k+1},
+	\]
+	\[
+		Q_{xx,k}
+		=
+		\ell_{xx,k}+A_k^\top V_{xx,k+1}A_k
+		+
+		\sum_{i=1}^{n}(V_{x,k+1})_i\,f_{xx,k}^{(i)},
+	\]
+	\[
+		Q_{ux,k}
+		=
+		\ell_{ux,k}+B_k^\top V_{xx,k+1}A_k
+		+
+		\sum_{i=1}^{n}(V_{x,k+1})_i\,f_{ux,k}^{(i)},
+	\]
+	\[
+		Q_{uu,k}
+		=
+		\ell_{uu,k}+B_k^\top V_{xx,k+1}B_k
+		+
+		\sum_{i=1}^{n}(V_{x,k+1})_i\,f_{uu,k}^{(i)}.
+	\]
+\end{proposition}
+\begin{proof}[Proof sketch]
+	The Bellman one-step function is
+	\[
+		Q_k(x_k,u_k)=\ell_k(x_k,u_k)+V_{k+1}(f_k(x_k,u_k)).
+	\]
+	The first derivatives follow from the chain rule exactly as in iLQR. The second derivatives follow by differentiating the composite term
+	\[
+		V_{k+1}(f_k(x_k,u_k))
+	\]
+	one more time. This produces two kinds of curvature terms:
+	\begin{itemize}
+		\item propagated curvature from the Hessian $V_{xx,k+1}$ acting through the Jacobians $A_k$ and $B_k$,
+		\item direct second-order curvature from the dynamics themselves, weighted by the gradient $V_{x,k+1}$.
+	\end{itemize}
+	The latter are exactly the tensor-contraction terms absent from iLQR.
+\end{proof}
+
+\begin{proposition}[DDP backward-pass update]\label{prop:l8-ddp-backward-pass-update}
+	If
+	\[
+		Q_{uu,k}\succ 0,
+	\]
+	then the minimizing local quadratic control law in DDP is
+	\[
+		\delta u_k^\star = k_k + K_k \delta x_k,
+	\]
+	with
+	\[
+		k_k = -Q_{uu,k}^{-1}Q_{u,k},
+		\qquad
+		K_k = -Q_{uu,k}^{-1}Q_{ux,k}.
+	\]
+	The corresponding value-function derivatives update according to
+	\[
+		V_{x,k}=Q_{x,k}-Q_{xu,k}Q_{uu,k}^{-1}Q_{u,k},
+	\]
+	\[
+		V_{xx,k}=Q_{xx,k}-Q_{xu,k}Q_{uu,k}^{-1}Q_{ux,k}.
+	\]
+\end{proposition}
+\begin{proof}
+	Once the full DDP derivatives are available, the local model is still quadratic in $(\delta x_k,\delta u_k)$. Therefore minimizing with respect to $\delta u_k$ is the same algebraic step as in \autoref{prop:l8-backward-pass-gains}: differentiate the quadratic model, solve the linear system in $\delta u_k$, and substitute the minimizer back into the local model. The only difference from iLQR lies upstream, in the presence of the second-order dynamics terms inside $Q_{xx,k}$, $Q_{ux,k}$, and $Q_{uu,k}$.
+\end{proof}
+
 \begin{remark}
 	In DDP, the quadratic terms include tensor contractions such as
 	\[
@@ -462,6 +563,41 @@
 \begin{remark}
 	iLQR can therefore be viewed as the Gauss--Newton approximation to DDP's full Newton step. The gain is simplicity and numerical robustness; the cost is that the local model can be less accurate on strongly nonlinear problems.
 \end{remark}
+
+\begin{algorithm}[H]
+	\DontPrintSemicolon
+	\caption{Differential Dynamic Programming}
+\label{alg:l8-ddp}
+	\KwIn{Nominal controls $\{\bar u_k\}_{k=0}^{N-1}$, initial state $x_0$, dynamics derivatives up to second order, tolerance $\varepsilon$}
+	Roll out the nominal trajectory $\{\bar x_k\}$ and compute the nominal cost\;
+	\For{$r=0,1,2,\dots$ until convergence}{
+		Form first- and second-order derivatives of the stage costs and dynamics along the current trajectory\;
+		Run a backward pass using \autoref{prop:l8-full-second-order-q-function-derivatives-in-ddp} and \autoref{prop:l8-ddp-backward-pass-update} to compute $k_k$, $K_k$, $V_{x,k}$, and $V_{xx,k}$\;
+		Regularize $Q_{uu,k}$ when necessary to maintain a well-posed local minimization\;
+		Perform a forward rollout with line search using
+		\[
+			u_k^{\text{new}}=\bar u_k+\alpha k_k + K_k(x_k^{\text{new}}-\bar x_k)
+		\]
+		and accept the step when the true nonlinear cost decreases sufficiently\;
+	}
+	\KwOut{Locally optimal state-control trajectory and local feedback gains}
+\end{algorithm}
+
+\begin{remark}[When DDP earns its extra cost]
+	If the dynamics are only mildly nonlinear over the region explored by the current trajectory, then iLQR is often preferable because it avoids second-order dynamics tensors and is easier to regularize. DDP becomes attractive when the local curvature of the dynamics genuinely matters, for example in aggressive underactuated maneuvers, contact-rich transitions, or problems where the first-order dynamics model is too poor to predict useful descent steps.
+\end{remark}
+
+\begin{eg}[Acrobot swing-up as a motivating example]\label{eg:l8-acrobot-swing-up-as-a-motivating-example}
+	The Acrobot is a two-link underactuated pendulum with actuation only at the elbow joint. A typical swing-up objective is to move from the hanging configuration to the upright unstable equilibrium while minimizing control effort and terminal error.
+
+	This problem is a natural test case for iLQR and DDP because:
+	\begin{itemize}
+		\item the dynamics are strongly nonlinear away from the upright equilibrium,
+		\item the maneuver requires energy pumping rather than local stabilization,
+		\item the system is underactuated, so naive local feedback around the start state is useless.
+	\end{itemize}
+	In practice, both iLQR and DDP can solve the swing-up from a crude initial guess by repeatedly improving a nominal trajectory. DDP can produce a more faithful local model when the second-order dynamics terms materially affect the energy-transfer mechanism, but iLQR is often preferred in implementation because it avoids third-order derivative bookkeeping while retaining the same Riccati-style computational structure.
+\end{eg}
 
 \subsection{Handling Constraints in Trajectory Optimization}
 \label{sec:l8-handling-constraints-in-trajectory-optimization}
@@ -688,3 +824,28 @@
 	\]
 	So one iLQR iteration produces a substantial cost decrease.
 \end{eg}
+
+\subsection{Choosing Between Direct Collocation, iLQR, and DDP}
+\label{sec:l8-choosing-between-direct-collocation-ilqr-and-ddp}
+
+\begin{center}
+	\small
+	\begin{adjustbox}{max width=\textwidth}
+	\begin{tabular}{p{0.2\textwidth}p{0.22\textwidth}p{0.22\textwidth}p{0.24\textwidth}}
+		\toprule
+		Property & Direct collocation & iLQR & DDP \\
+		\midrule
+		Decision variables & Full discretized state-control trajectory in an NLP & Nominal control trajectory plus local feedback corrections & Same rollout structure as iLQR, but with full second-order dynamics terms \\
+		Constraint handling & Natural for boundary, path, and state constraints & Indirect; usually via penalties, projection, or augmented Lagrangians & Same limitation as iLQR; local constrained variants are more delicate \\
+		Local model & Sparse NLP with generic nonlinear constraints & Quadratic cost with linearized dynamics & Quadratic cost with second-order-expanded dynamics \\
+		Derivative burden & First derivatives and often sparse second derivatives of the NLP & First derivatives of dynamics and second derivatives of cost & First and second derivatives of both cost and dynamics \\
+		Convergence behavior & Robust with mature SQP/interior-point globalization & Fast local improvement when initialized reasonably & Potentially better local Newton step, but more sensitive numerically \\
+		Best use case & Hard constraints, stiff dynamics, or general-purpose transcription & Fast local trajectory improvement for moderate nonlinearities & Strongly nonlinear problems where dynamics curvature matters materially \\
+		\bottomrule
+	\end{tabular}
+	\end{adjustbox}
+\end{center}
+
+\begin{remark}
+	This table extends the broader trajectory-optimization comparison in \autoref{sec:l5-comparison-of-major-trajectory-optimization-methods}. The main tradeoff is now clear: direct methods win on generality and constraint handling, while Riccati-style methods win on horizon scalability and fast local policy improvement.
+\end{remark}

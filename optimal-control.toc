@@ -21,51 +21,64 @@
 \contentsline {subsection}{\numberline {3.4}Second-Order Conditions for Constrained Problems}{41}{subsection.3.4}%
 \contentsline {subsection}{\numberline {3.5}Lagrangian Duality}{42}{subsection.3.5}%
 \contentsline {subsection}{\numberline {3.6}Quadratic Programming}{45}{subsection.3.6}%
-\contentsline {part}{II\hspace {1em}Dynamic Optimal Control}{47}{part.2}%
-\contentsline {section}{Lecture 4: Dynamic Programming and the Calculus of Optimal Control}{47}{section*.5}%
-\contentsline {subsection}{\numberline {4.1}Optimal Control Problem Formulation}{47}{subsection.4.1}%
-\contentsline {subsection}{\numberline {4.2}Dynamic Programming in Discrete Time}{48}{subsection.4.2}%
-\contentsline {subsection}{\numberline {4.3}The Hamilton--Jacobi--Bellman Equation}{49}{subsection.4.3}%
-\contentsline {subsection}{\numberline {4.4}Pontryagin's Minimum Principle}{51}{subsection.4.4}%
-\contentsline {subsection}{\numberline {4.5}Calculus of Variations}{53}{subsection.4.5}%
-\contentsline {section}{Lecture 5: Numerical Methods for Trajectory Optimization}{54}{section*.6}%
-\contentsline {subsection}{\numberline {5.1}The Two-Point Boundary Value Problem from PMP}{54}{subsection.5.1}%
-\contentsline {subsection}{\numberline {5.2}Indirect Shooting Methods}{54}{subsection.5.2}%
-\contentsline {subsection}{\numberline {5.3}Direct Single Shooting}{56}{subsection.5.3}%
-\contentsline {subsection}{\numberline {5.4}Direct Multiple Shooting}{57}{subsection.5.4}%
-\contentsline {subsection}{\numberline {5.5}Direct Collocation}{58}{subsection.5.5}%
-\contentsline {subsection}{\numberline {5.6}Transcription to Nonlinear Programming}{59}{subsection.5.6}%
-\contentsline {subsection}{\numberline {5.7}Comparison of Major Trajectory-Optimization Methods}{59}{subsection.5.7}%
-\contentsline {section}{Lecture 6: Linear Quadratic Regulator}{60}{section*.7}%
-\contentsline {subsection}{\numberline {6.1}Problem Statement and Structure}{60}{subsection.6.1}%
-\contentsline {subsection}{\numberline {6.2}Finite-Horizon LQR via Dynamic Programming}{61}{subsection.6.2}%
-\contentsline {subsection}{\numberline {6.3}Infinite-Horizon LQR and the Algebraic Riccati Equation}{64}{subsection.6.3}%
-\contentsline {subsection}{\numberline {6.4}The Riccati Equation -- Properties and Structure}{65}{subsection.6.4}%
-\contentsline {subsection}{\numberline {6.5}Continuous-Time LQR}{68}{subsection.6.5}%
-\contentsline {subsection}{\numberline {6.6}LQR and Pontryagin's Minimum Principle}{70}{subsection.6.6}%
-\contentsline {section}{Lecture 7: Estimation -- The Kalman Filter}{71}{section*.8}%
-\contentsline {subsection}{\numberline {7.1}Problem Setup}{72}{subsection.7.1}%
-\contentsline {subsection}{\numberline {7.2}The Kalman Filter Algorithm}{73}{subsection.7.2}%
-\contentsline {subsection}{\numberline {7.3}Derivation of the Kalman Gain}{74}{subsection.7.3}%
-\contentsline {subsection}{\numberline {7.4}Error Covariance and Riccati Recursion}{75}{subsection.7.4}%
-\contentsline {subsection}{\numberline {7.5}Steady-State Kalman Filter}{76}{subsection.7.5}%
-\contentsline {subsection}{\numberline {7.6}Duality Between LQR and Kalman Filter}{77}{subsection.7.6}%
-\contentsline {subsection}{\numberline {7.7}Innovation Sequence}{78}{subsection.7.7}%
-\contentsline {subsection}{\numberline {7.8}Extended Kalman Filter}{78}{subsection.7.8}%
-\contentsline {subsection}{\numberline {7.9}Scalar Kalman Filter Example}{79}{subsection.7.9}%
-\contentsline {section}{Lecture 8: LQG Control, Trajectory Optimization, and iLQR}{80}{section*.9}%
-\contentsline {subsection}{\numberline {8.1}Linear Quadratic Gaussian Control}{80}{subsection.8.1}%
-\contentsline {subsection}{\numberline {8.2}Robustness of LQG}{82}{subsection.8.2}%
-\contentsline {subsection}{\numberline {8.3}Nonlinear Trajectory Optimization}{83}{subsection.8.3}%
-\contentsline {subsection}{\numberline {8.4}Iterative LQR}{84}{subsection.8.4}%
-\contentsline {subsection}{\numberline {8.5}iLQR: Practical Considerations}{86}{subsection.8.5}%
-\contentsline {subsection}{\numberline {8.6}Differential Dynamic Programming}{86}{subsection.8.6}%
-\contentsline {subsection}{\numberline {8.7}Handling Constraints in Trajectory Optimization}{87}{subsection.8.7}%
-\contentsline {subsection}{\numberline {8.8}Worked iLQR Example}{87}{subsection.8.8}%
-\contentsline {section}{Lecture 9: Model Predictive Control}{89}{section*.10}%
-\contentsline {subsection}{\numberline {9.1}The MPC Concept}{89}{subsection.9.1}%
-\contentsline {subsection}{\numberline {9.2}Linear MPC and QP Formulation}{90}{subsection.9.2}%
-\contentsline {subsection}{\numberline {9.3}Stability of MPC}{92}{subsection.9.3}%
-\contentsline {subsection}{\numberline {9.4}Feasibility and Recursive Feasibility}{94}{subsection.9.4}%
-\contentsline {subsection}{\numberline {9.5}Nonlinear MPC}{94}{subsection.9.5}%
-\contentsline {subsection}{\numberline {9.6}MPC in Practice}{95}{subsection.9.6}%
+\contentsline {subsection}{\numberline {3.7}Interior-Point Methods}{46}{subsection.3.7}%
+\contentsline {subsection}{\numberline {3.8}Regularization of KKT Systems}{48}{subsection.3.8}%
+\contentsline {subsection}{\numberline {3.9}Merit Functions and Line Search for Constrained Problems}{49}{subsection.3.9}%
+\contentsline {part}{II\hspace {1em}Dynamic Optimal Control}{51}{part.2}%
+\contentsline {section}{Lecture 4: Dynamic Programming and the Calculus of Optimal Control}{51}{section*.5}%
+\contentsline {subsection}{\numberline {4.1}Optimal Control Problem Formulation}{51}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}Dynamic Programming in Discrete Time}{52}{subsection.4.2}%
+\contentsline {subsection}{\numberline {4.3}The Hamilton--Jacobi--Bellman Equation}{53}{subsection.4.3}%
+\contentsline {subsection}{\numberline {4.4}Pontryagin's Minimum Principle}{55}{subsection.4.4}%
+\contentsline {subsection}{\numberline {4.5}The Fundamental Connection Between Dynamic Programming and PMP}{57}{subsection.4.5}%
+\contentsline {subsection}{\numberline {4.6}Calculus of Variations}{58}{subsection.4.6}%
+\contentsline {section}{Lecture 5: Numerical Methods for Trajectory Optimization}{59}{section*.6}%
+\contentsline {subsection}{\numberline {5.1}The Two-Point Boundary Value Problem from PMP}{59}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}Indirect Shooting Methods}{59}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}Direct Single Shooting}{61}{subsection.5.3}%
+\contentsline {subsection}{\numberline {5.4}Direct Multiple Shooting}{62}{subsection.5.4}%
+\contentsline {subsection}{\numberline {5.5}Direct Collocation}{63}{subsection.5.5}%
+\contentsline {subsection}{\numberline {5.6}Transcription to Nonlinear Programming}{64}{subsection.5.6}%
+\contentsline {subsection}{\numberline {5.7}Sequential Quadratic Programming for Transcribed Optimal Control}{65}{subsection.5.7}%
+\contentsline {subsection}{\numberline {5.8}Free-Time and Minimum-Time Transcriptions}{66}{subsection.5.8}%
+\contentsline {subsection}{\numberline {5.9}Comparison of Major Trajectory-Optimization Methods}{67}{subsection.5.9}%
+\contentsline {section}{Lecture 6: Linear Quadratic Regulator}{68}{section*.7}%
+\contentsline {subsection}{\numberline {6.1}Problem Statement and Structure}{68}{subsection.6.1}%
+\contentsline {subsection}{\numberline {6.2}Finite-Horizon LQR via Dynamic Programming}{69}{subsection.6.2}%
+\contentsline {subsection}{\numberline {6.3}Finite-Horizon LQR as a Structured Quadratic Program}{72}{subsection.6.3}%
+\contentsline {subsection}{\numberline {6.4}Infinite-Horizon LQR and the Algebraic Riccati Equation}{74}{subsection.6.4}%
+\contentsline {subsection}{\numberline {6.5}The Riccati Equation -- Properties and Structure}{76}{subsection.6.5}%
+\contentsline {subsection}{\numberline {6.6}Continuous-Time LQR}{79}{subsection.6.6}%
+\contentsline {subsection}{\numberline {6.7}LQR and Pontryagin's Minimum Principle}{80}{subsection.6.7}%
+\contentsline {section}{Lecture 7: Estimation -- The Kalman Filter}{82}{section*.8}%
+\contentsline {subsection}{\numberline {7.1}Problem Setup}{82}{subsection.7.1}%
+\contentsline {subsection}{\numberline {7.2}The Kalman Filter Algorithm}{83}{subsection.7.2}%
+\contentsline {subsection}{\numberline {7.3}Derivation of the Kalman Gain}{84}{subsection.7.3}%
+\contentsline {subsection}{\numberline {7.4}Error Covariance and Riccati Recursion}{85}{subsection.7.4}%
+\contentsline {subsection}{\numberline {7.5}Steady-State Kalman Filter}{87}{subsection.7.5}%
+\contentsline {subsection}{\numberline {7.6}Duality Between LQR and Kalman Filter}{87}{subsection.7.6}%
+\contentsline {subsection}{\numberline {7.7}Innovation Sequence}{88}{subsection.7.7}%
+\contentsline {subsection}{\numberline {7.8}Extended Kalman Filter}{89}{subsection.7.8}%
+\contentsline {subsection}{\numberline {7.9}Scalar Kalman Filter Example}{89}{subsection.7.9}%
+\contentsline {section}{Lecture 8: LQG Control, Trajectory Optimization, and iLQR}{90}{section*.9}%
+\contentsline {subsection}{\numberline {8.1}Linear Quadratic Gaussian Control}{90}{subsection.8.1}%
+\contentsline {subsection}{\numberline {8.2}Robustness of LQG}{93}{subsection.8.2}%
+\contentsline {subsection}{\numberline {8.3}Nonlinear Trajectory Optimization}{93}{subsection.8.3}%
+\contentsline {subsection}{\numberline {8.4}Iterative LQR}{94}{subsection.8.4}%
+\contentsline {subsection}{\numberline {8.5}iLQR: Practical Considerations}{96}{subsection.8.5}%
+\contentsline {subsection}{\numberline {8.6}Differential Dynamic Programming}{97}{subsection.8.6}%
+\contentsline {subsection}{\numberline {8.7}Handling Constraints in Trajectory Optimization}{99}{subsection.8.7}%
+\contentsline {subsection}{\numberline {8.8}Worked iLQR Example}{99}{subsection.8.8}%
+\contentsline {subsection}{\numberline {8.9}Choosing Between Direct Collocation, iLQR, and DDP}{101}{subsection.8.9}%
+\contentsline {section}{Lecture 9: Model Predictive Control}{101}{section*.10}%
+\contentsline {subsection}{\numberline {9.1}The MPC Concept}{102}{subsection.9.1}%
+\contentsline {subsection}{\numberline {9.2}Linear MPC and QP Formulation}{103}{subsection.9.2}%
+\contentsline {subsection}{\numberline {9.3}Stability of MPC}{105}{subsection.9.3}%
+\contentsline {subsection}{\numberline {9.4}Feasibility and Recursive Feasibility}{106}{subsection.9.4}%
+\contentsline {subsection}{\numberline {9.5}Nonlinear MPC}{107}{subsection.9.5}%
+\contentsline {subsection}{\numberline {9.6}MPC in Practice}{107}{subsection.9.6}%
+\contentsline {section}{\numberline {A}Attitude Control and Quaternion Optimization}{109}{appendix.A}%
+\contentsline {subsection}{\numberline {A.1}Rotation Matrices and Unit Quaternions}{109}{appendix.A.1}%
+\contentsline {subsection}{\numberline {A.2}Optimization Updates in the Quaternion Tangent Space}{110}{appendix.A.2}%
+\contentsline {subsection}{\numberline {A.3}Wahba's Problem and Gauss--Newton on $S^3$}{111}{appendix.A.3}%
+\contentsline {subsection}{\numberline {A.4}Quaternion Error-State LQR and Attitude Control}{112}{appendix.A.4}%

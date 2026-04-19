@@ -316,6 +316,63 @@
 	\]
 \end{definition}
 
+\begin{remark}[Why Hermite--Simpson is more than a formula]
+	The Hermite--Simpson rule is not merely a higher-order defect equation inserted into the NLP. It encodes a local cubic model of the state trajectory and a Simpson-type quadrature of the integral dynamics. That viewpoint explains both its accuracy and its algebraic sparsity.
+\end{remark}
+
+\begin{proposition}[Hermite--Simpson midpoint construction]\label{prop:l5-hermite-simpson-midpoint-construction}
+	On the interval $[t_k,t_{k+1}]$, Hermite--Simpson uses a cubic Hermite interpolant for the state determined by
+	\[
+		x_k,\quad x_{k+1},\quad f(x_k,u_k),\quad f(x_{k+1},u_{k+1}).
+	\]
+	The midpoint state formula
+	\[
+		x_{k+\frac{1}{2}}
+		=
+		\frac{x_k+x_{k+1}}{2}
+		+
+		\frac{h_k}{8}\bigl(f(x_k,u_k)-f(x_{k+1},u_{k+1})\bigr)
+	\]
+	is exactly the value of this cubic interpolant at the midpoint.
+\end{proposition}
+\begin{proof}
+	A cubic Hermite interpolant on $[t_k,t_{k+1}]$ is uniquely specified by endpoint values and endpoint derivatives. Writing the interpolant in normalized time
+	\[
+		\tau=\frac{t-t_k}{h_k} \in [0,1],
+	\]
+	and evaluating the standard Hermite basis functions at
+	\[
+		\tau=\frac{1}{2},
+	\]
+	one obtains
+	\[
+		x\!\left(t_k+\frac{h_k}{2}\right)
+		=
+		\frac{x_k+x_{k+1}}{2}
+		+
+		\frac{h_k}{8}\bigl(\dot x_k-\dot x_{k+1}\bigr).
+	\]
+	Approximating the endpoint derivatives by the dynamics,
+	\[
+		\dot x_k=f(x_k,u_k),
+		\qquad
+		\dot x_{k+1}=f(x_{k+1},u_{k+1}),
+	\]
+	yields the stated midpoint formula.
+\end{proof}
+
+\begin{remark}[Implementation detail]
+	In many software implementations one does not store a separate midpoint state variable for Hermite--Simpson. Instead, one reconstructs
+	\[
+		x_{k+\frac{1}{2}}
+	\]
+	algebraically from the node values and endpoint dynamics. This keeps the NLP smaller while preserving the same local approximation order. Other implementations do introduce midpoint variables, especially when midpoint path constraints or contact conditions must be imposed explicitly.
+\end{remark}
+
+\begin{remark}[Accuracy versus Euler or trapezoidal transcription]
+	Hermite--Simpson is substantially more accurate per interval than a forward-Euler shooting constraint and typically more accurate than the trapezoidal rule on the same mesh. The practical consequence is not merely better asymptotic order: for a fixed accuracy target, one often needs many fewer mesh intervals, which can more than offset the extra algebra per interval.
+\end{remark}
+
 \begin{algorithm}[H]
 	\DontPrintSemicolon
 	\caption{Direct Collocation Transcription}
@@ -370,6 +427,156 @@
 
 \begin{remark}[Warm starts and real-time use]
 	Optimal control is often solved repeatedly with slowly changing initial conditions or references. Warm-starting from the previous solution can dramatically reduce solve time. This is one of the key reasons direct methods become viable in real-time MPC and nonlinear receding-horizon control.
+\end{remark}
+
+\subsection{Sequential Quadratic Programming for Transcribed Optimal Control}
+\label{sec:l5-sequential-quadratic-programming-for-transcribed-optimal-control}
+
+\begin{remark}
+	Once the trajectory problem has been discretized as in \autoref{def:l5-general-nlp-form-from-direct-transcription}, one of the most important solver classes is sequential quadratic programming (SQP). SQP should be viewed as Newton's method applied to the KKT system of the transcribed NLP.
+\end{remark}
+
+\begin{definition}[SQP subproblem for trajectory optimization]\label{def:l5-sqp-subproblem-for-trajectory-optimization}
+	Let
+	\[
+		\mathcal{L}(z,\lambda,\mu)=F(z)+\lambda^\top c(z)+\mu^\top d(z)
+	\]
+	be the Lagrangian of the transcribed NLP, where $\mu \ge 0$ corresponds to the inequality constraints. At iterate $(z_k,\lambda_k,\mu_k)$, an SQP step $p_k$ is obtained by solving the quadratic program
+	\begin{align*}
+		\min_{p} \quad & \nabla F(z_k)^\top p + \frac{1}{2}p^\top W_k p \\
+		\text{subject to}\quad & c(z_k)+\nabla c(z_k)p=0, \\
+		                       & d(z_k)+\nabla d(z_k)p\le 0,
+	\end{align*}
+	where $W_k$ approximates
+	\[
+		\nabla_{zz}^2 \mathcal{L}(z_k,\lambda_k,\mu_k).
+	\]
+\end{definition}
+
+\begin{remark}[Where the sparsity enters]
+	The vector $z$ is ordered by time. Therefore the Jacobians
+	\[
+		\nabla c(z_k),
+		\qquad
+		\nabla d(z_k)
+	\]
+	and the Hessian model $W_k$ inherit the block-banded locality of the transcription. The resulting QP is large but highly structured. Sparse SQP codes exploit that structure rather than treating the problem as a generic dense nonlinear program.
+\end{remark}
+
+\begin{proposition}[Why SQP is a natural solver for direct transcription]\label{prop:l5-why-sqp-is-a-natural-solver-for-direct-transcription}
+	If the transcription mesh is fixed, then every SQP iteration replaces the nonlinear trajectory-optimization problem by a structured QP whose variables are corrections to the state, control, and possibly time variables. The linearized defect constraints preserve exactly the same nearest-neighbor coupling pattern as the original transcription.
+\end{proposition}
+\begin{proof}
+	Each defect constraint in single shooting, multiple shooting, or collocation involves only local time-neighbor variables; see \autoref{prop:l5-sparsity-structure-of-multiple-shooting} and \autoref{prop:l5-sparsity-of-direct-collocation-nlps}. Linearizing such a constraint does not enlarge its support: the Jacobian row remains nonzero only in the same local variable blocks. Therefore the SQP QP has the same banded coupling graph as the original NLP. The QP interpretation is thus faithful to the time-structured geometry of the control problem.
+\end{proof}
+
+\begin{algorithm}[H]
+	\DontPrintSemicolon
+	\caption{SQP for a Transcribed Trajectory-Optimization NLP}
+\label{alg:l5-sqp-for-a-transcribed-trajectory-optimization-nlp}
+	\KwIn{Initial guess $z_0$, multiplier estimate $(\lambda_0,\mu_0)$, Hessian model $W_0$}
+	\For{$k=0,1,2,\dots$ until convergence}{
+		Linearize the dynamics defects, boundary constraints, and path constraints at $z_k$\;
+		Build the structured QP subproblem from \autoref{def:l5-sqp-subproblem-for-trajectory-optimization}\;
+		Solve the QP using sparse linear algebra that respects the time ordering\;
+		Globalize with a merit function or filter line search as in \autoref{alg:l3-sqp-with-merit-function-line-search}\;
+		Update the primal variables, multipliers, and Hessian model\;
+	}
+	\KwOut{Approximate KKT point of the transcribed NLP}
+\end{algorithm}
+
+\begin{remark}[SQP versus interior-point methods]
+	Both SQP and interior-point methods are standard for trajectory NLPs. Interior-point methods solve a sequence of perturbed KKT systems along a central path, while SQP solves a sequence of explicit QP approximations. The two families often use similar sparse factorizations internally, but their globalization, multiplier updates, and treatment of inequalities differ.
+\end{remark}
+
+\subsection{Free-Time and Minimum-Time Transcriptions}
+\label{sec:l5-free-time-and-minimum-time-transcriptions}
+
+\begin{definition}[Free-final-time optimal control problem]\label{def:l5-free-final-time-optimal-control-problem}
+	A free-final-time problem augments the usual state and control variables with the terminal time $T$. In continuous time,
+	\begin{align*}
+		\min_{u(\cdot),T} \quad & \phi(x(T),T)+\int_{0}^{T}L(x(t),u(t),t)\,dt \\
+		\text{subject to}\quad & \dot x(t)=f(x(t),u(t),t), \\
+		                       & x(0)=x_0,
+	\end{align*}
+	with $T$ itself unknown.
+\end{definition}
+
+\begin{remark}[Minimum-time as a special case]
+	Minimum-time control is obtained by choosing
+	\[
+		L \equiv 1,
+		\qquad
+		\phi \equiv 0,
+	\]
+	so that the objective is exactly
+	\[
+		J=T.
+	\]
+	The minimum-time example in \autoref{sec:l4-pontryagin-s-minimum-principle} was analyzed indirectly through PMP. Direct transcription treats the same problem by making $T$ or the time steps themselves decision variables.
+\end{remark}
+
+\begin{definition}[Time normalization for free-time transcription]\label{def:l5-time-normalization-for-free-time-transcription}
+	Introduce normalized time
+	\[
+		\tau=\frac{t}{T}\in[0,1].
+	\]
+	Then
+	\[
+		\frac{dx}{d\tau}=T f(x(\tau),u(\tau),T\tau),
+	\]
+	and the cost becomes
+	\[
+		J
+		=
+		\phi(x(1),T)
+		+
+		T\int_{0}^{1}L(x(\tau),u(\tau),T\tau)\,d\tau.
+	\]
+	After normalization, the mesh in $\tau$ is fixed while the scalar $T$ becomes an optimization variable.
+\end{definition}
+
+\begin{remark}[Variable step sizes]
+	An equivalent discrete formulation introduces interval lengths
+	\[
+		h_k=t_{k+1}-t_k
+	\]
+	as decision variables. Then the discrete dynamics become
+	\[
+		x_{k+1}=\Phi(x_k,u_k,h_k)
+	\]
+	and the total horizon is
+	\[
+		T=\sum_{k=0}^{N-1} h_k.
+	\]
+	This formulation is especially natural in collocation methods when mesh adaptation is also desired.
+\end{remark}
+
+\begin{algorithm}[H]
+	\DontPrintSemicolon
+	\caption{Direct Transcription for a Free-Time Problem}
+\label{alg:l5-direct-transcription-for-a-free-time-problem}
+	\KwIn{State/control boundary data, fixed normalized mesh, initial guesses for $(x_k,u_k,T)$}
+	Introduce either the terminal time $T$ or interval lengths $\{h_k\}$ as optimization variables\;
+	Rewrite the dynamics on a fixed normalized grid using
+	\[
+		\frac{dx}{d\tau}=T f(x,u,T\tau)
+	\]
+	(or the equivalent discrete step map depending on $h_k$)\;
+	Scale every integral stage cost by the local time interval\;
+	Add positivity constraints
+	\[
+		T>0
+		\qquad \text{or} \qquad
+		h_k>0
+	\]
+	so that time does not reverse\;
+	Transcribe the resulting free-time OCP as an NLP and solve with SQP or an interior-point method\;
+	\KwOut{State, control, and time variables describing the optimized trajectory}
+\end{algorithm}
+
+\begin{remark}[A subtle but important scaling issue]
+	When the horizon length is variable, the stage cost must scale with the corresponding interval length. Otherwise the discretized objective is not a consistent approximation of the continuous-time integral, and the optimizer may exploit the mismatch by stretching or shrinking time in unphysical ways.
 \end{remark}
 
 \subsection{Comparison of Major Trajectory-Optimization Methods}

@@ -836,6 +836,288 @@
 	Since $H\succ 0$, the problem is strictly convex, so this feasible KKT point is the unique global minimizer.
 \end{eg}
 
+\subsection{Interior-Point Methods}
+\label{sec:l3-interior-point-methods}
+
+\begin{remark}
+	KKT conditions describe optimal points, but they do not yet constitute a numerically robust algorithm for inequality-constrained problems. One must still cope with complementarity,
+	\[
+		\mu_i g_i(x)=0,
+	\]
+	which is nonsmooth as an equation in the pair $(g_i,\mu_i)$. Interior-point methods replace this singular condition by a smooth perturbed relation and then drive the perturbation to zero.
+\end{remark}
+
+\begin{definition}[Logarithmic barrier formulation]\label{def:l3-logarithmic-barrier-formulation}
+	Consider the problem
+	\begin{align*}
+		\min_x \quad & f(x) \\
+		\text{subject to}\quad & c(x)=0, \\
+		                       & g(x)\le 0,
+	\end{align*}
+	with $g=(g_1,\dots,g_m)^\top$. For a barrier parameter $\mu>0$, the logarithmic barrier subproblem is
+	\begin{align*}
+		\min_x \quad & f(x)-\mu\sum_{i=1}^{m}\log\bigl(-g_i(x)\bigr) \\
+		\text{subject to}\quad & c(x)=0,
+	\end{align*}
+	defined only on the strict interior
+	\[
+		g_i(x)<0,
+		\qquad i=1,\dots,m.
+	\]
+\end{definition}
+
+\begin{remark}[Slack-variable form]
+	It is often cleaner to introduce slack variables
+	\[
+		s \in \mathbb{R}^{m},
+		\qquad
+		s>0,
+	\]
+	and rewrite the inequalities as equalities
+	\[
+		g(x)+s=0.
+	\]
+	The barrier problem then becomes
+	\begin{align*}
+		\min_{x,s} \quad & f(x)-\mu\sum_{i=1}^{m}\log(s_i) \\
+		\text{subject to}\quad & c(x)=0, \\
+		                       & g(x)+s=0.
+	\end{align*}
+	This formulation is the standard entry point for primal-dual interior-point methods because positivity is handled entirely through the barrier term.
+\end{remark}
+
+\begin{definition}[Central path]\label{def:l3-central-path}
+	A family of primal-dual points
+	\[
+		(x(\mu),s(\mu),\lambda(\mu),\nu(\mu)),
+		\qquad
+		\mu>0,
+	\]
+	is called the \emph{central path} if it satisfies
+	\begin{align*}
+		\nabla f(x)+\nabla c(x)^\top \lambda+\nabla g(x)^\top \nu & = 0, \\
+		c(x) & = 0, \\
+		g(x)+s & = 0, \\
+		S\nu & = \mu \mathbf{1}, \\
+		s & > 0, \\
+		\nu & > 0,
+	\end{align*}
+	where $S=\operatorname{diag}(s_1,\dots,s_m)$.
+\end{definition}
+
+\begin{proposition}[Perturbed KKT system for the barrier problem]\label{prop:l3-perturbed-kkt-system-for-the-barrier-problem}
+	The KKT conditions of the slack-variable barrier problem are exactly the central-path equations from \autoref{def:l3-central-path}.
+\end{proposition}
+\begin{proof}
+	Form the Lagrangian
+	\[
+		\mathcal{L}_{\mu}(x,s,\lambda,\nu)
+		=
+		f(x)-\mu\sum_{i=1}^{m}\log(s_i)
+		+\lambda^\top c(x)
+		+\nu^\top(g(x)+s).
+	\]
+	Stationarity with respect to $x$ gives
+	\[
+		\nabla f(x)+\nabla c(x)^\top \lambda+\nabla g(x)^\top \nu=0.
+	\]
+	Stationarity with respect to $s$ gives, componentwise,
+	\[
+		-\frac{\mu}{s_i}+\nu_i=0,
+	\]
+	or equivalently
+	\[
+		s_i\nu_i=\mu.
+	\]
+	The equality constraints of the barrier problem are
+	\[
+		c(x)=0,
+		\qquad
+		g(x)+s=0.
+	\]
+	Finally, the logarithm forces $s_i>0$, and the relation $\nu_i=\mu/s_i$ then implies $\nu_i>0$. These are exactly the central-path equations.
+\end{proof}
+
+\begin{theorem}[Barrier path converges to KKT as $\mu \downarrow 0$]\label{thm:l3-barrier-path-converges-to-kkt}
+	Suppose $(x(\mu),s(\mu),\lambda(\mu),\nu(\mu))$ is a bounded family of central-path points for $\mu \downarrow 0$. Then every accumulation point $(x^\star,s^\star,\lambda^\star,\nu^\star)$ satisfies the KKT conditions of the original nonlinear program:
+	\begin{align*}
+		\nabla f(x^\star)+\nabla c(x^\star)^\top \lambda^\star+\nabla g(x^\star)^\top \nu^\star & = 0, \\
+		c(x^\star) & = 0, \\
+		g(x^\star)+s^\star & = 0, \\
+		s^\star & \ge 0, \\
+		\nu^\star & \ge 0, \\
+		S^\star \nu^\star & = 0.
+	\end{align*}
+\end{theorem}
+\begin{proof}
+	Stationarity and primal feasibility hold for every $\mu$, so they pass to the limit by continuity. Since each $s_i(\mu)>0$ and $\nu_i(\mu)>0$, the limit satisfies
+	\[
+		s_i^\star \ge 0,
+		\qquad
+		\nu_i^\star \ge 0.
+	\]
+	Finally,
+	\[
+		s_i(\mu)\nu_i(\mu)=\mu
+	\]
+	for every component, and therefore
+	\[
+		s_i^\star \nu_i^\star = \lim_{\mu \downarrow 0} \mu = 0.
+	\]
+	This is complementary slackness. Hence any accumulation point is a KKT point of the original problem.
+\end{proof}
+
+\begin{algorithm}[H]
+	\DontPrintSemicolon
+	\caption{Primal-Dual Interior-Point Method}
+\label{alg:l3-primal-dual-interior-point-method}
+	\KwIn{Initial strictly feasible or nearly feasible guess $(x,s,\lambda,\nu)$ with $s>0$, $\nu>0$; barrier reduction rule; tolerances}
+	\While{KKT residuals and complementarity are not sufficiently small}{
+		Choose a target complementarity level $\mu>0$\;
+		Linearize the perturbed KKT equations around the current iterate\;
+		Solve the resulting primal-dual Newton system for $(\Delta x,\Delta s,\Delta \lambda,\Delta \nu)$\;
+		Choose primal and dual step lengths so that
+		\[
+			s+\alpha_p \Delta s > 0,
+			\qquad
+			\nu+\alpha_d \Delta \nu > 0
+		\]
+		remain strictly positive\;
+		Update the iterate and reduce $\mu$ according to the centering strategy\;
+	}
+	\KwOut{Approximate primal-dual KKT point}
+\end{algorithm}
+
+\begin{remark}[Why interior-point methods matter for optimal control]
+	When direct collocation or multiple shooting transcribes an optimal-control problem into a large sparse NLP, interior-point methods are often the default choice. Their Newton systems respect the banded time structure, and the central-path viewpoint handles large numbers of inequality constraints without explicit active-set combinatorics.
+\end{remark}
+
+\subsection{Regularization of KKT Systems}
+\label{sec:l3-regularization-of-kkt-systems}
+
+\begin{remark}
+	Newton steps for equality-constrained QPs and SQP subproblems require solving saddle-point systems. Even when the original optimization problem is well posed, these linear systems can become singular or can have the wrong inertia if the Hessian model is indefinite on the constraint tangent space.
+\end{remark}
+
+\begin{definition}[Regularized KKT matrix]\label{def:l3-regularized-kkt-matrix}
+	For an equality-constrained quadratic model
+	\begin{align*}
+		\min_p \quad & \frac{1}{2}p^\top Wp + g^\top p \\
+		\text{subject to}\quad & Ap + c = 0,
+	\end{align*}
+	a standard regularized KKT system is
+	\[
+		\begin{bmatrix}
+			W+\delta I & A^\top \\
+			A          & -\gamma I
+		\end{bmatrix}
+		\begin{bmatrix}
+			p \\
+			y
+		\end{bmatrix}
+		=
+		-
+		\begin{bmatrix}
+			g \\
+			c
+		\end{bmatrix},
+	\]
+	where $\delta \ge 0$ and $\gamma \ge 0$ are regularization parameters.
+\end{definition}
+
+\begin{proposition}[Quasi-definiteness under regularization]\label{prop:l3-quasi-definiteness-under-regularization}
+	If
+	\[
+		W+\delta I \succ 0
+	\]
+	and $\gamma>0$, then the regularized KKT matrix in \autoref{def:l3-regularized-kkt-matrix} is nonsingular. More precisely, it has positive definite $(1,1)$ block and negative definite Schur complement in the dual variables.
+\end{proposition}
+\begin{proof}
+	Since $W+\delta I \succ 0$, the primal block is invertible. Taking its Schur complement gives
+	\[
+		-\gamma I - A(W+\delta I)^{-1}A^\top.
+	\]
+	The matrix
+	\[
+		A(W+\delta I)^{-1}A^\top
+	\]
+	is positive semidefinite, so the Schur complement is strictly negative definite because $\gamma>0$. Therefore both the primal block and its Schur complement are nonsingular, which implies nonsingularity of the full block matrix.
+\end{proof}
+
+\begin{remark}[Inertia correction]
+	Modern NLP solvers do not merely want an invertible KKT matrix; they want one whose inertia matches that of a local constrained minimization problem. In practice, one increases $\delta$ and, when necessary, $\gamma$ until the factorization has the desired pivot structure. This is called \emph{inertia correction}. It is the constrained analogue of adding Levenberg--Marquardt damping in unconstrained Newton methods.
+\end{remark}
+
+\subsection{Merit Functions and Line Search for Constrained Problems}
+\label{sec:l3-merit-functions-and-line-search-for-constrained-problems}
+
+\begin{definition}[$\ell_1$ exact-penalty merit function]\label{def:l3-l1-exact-penalty-merit-function}
+	For the nonlinear program
+	\begin{align*}
+		\min_x \quad & f(x) \\
+		\text{subject to}\quad & c(x)=0, \\
+		                       & g(x)\le 0,
+	\end{align*}
+	a standard globalization device is the merit function
+	\[
+		\Phi_\rho(x)
+		=
+		f(x)
+		+
+		\rho\|c(x)\|_1
+		+
+		\rho\|\max\{0,g(x)\}\|_1,
+	\]
+	where $\rho>0$ is a penalty parameter.
+\end{definition}
+
+\begin{remark}[Why a merit function is needed]
+	A Newton or SQP step may improve stationarity while worsening feasibility, or vice versa. A merit function converts this vector-valued notion of progress into a scalar quantity suitable for line search. The price is that one must choose $\rho$ large enough that feasibility is not underweighted.
+\end{remark}
+
+\begin{proposition}[Merit decrease for linearized feasible SQP steps]\label{prop:l3-merit-decrease-for-linearized-feasible-sqp-steps}
+	Consider an SQP step $p_k$ obtained from a QP subproblem whose linearized constraints are satisfied:
+	\[
+		c(x_k)+\nabla c(x_k)p_k=0,
+	\]
+	and whose active linearized inequalities are enforced analogously. If the Hessian model is positive definite on the linearized tangent space and $\rho$ is chosen sufficiently large relative to the multiplier estimates, then $p_k$ is a descent direction for the merit function $\Phi_\rho$ from \autoref{def:l3-l1-exact-penalty-merit-function}.
+\end{proposition}
+\begin{proof}[Proof sketch]
+	The directional derivative of $\Phi_\rho$ splits into an objective part and a feasibility part. The QP step is constructed to reduce the quadratic model of the Lagrangian, so on the tangent space it gives negative first-order change in the stationarity part. The exact-penalty term contributes
+	\[
+		\rho \, D\!\left(\|c(x)\|_1 + \|\max\{0,g(x)\}\|_1\right)[p_k].
+	\]
+	Because the QP step also reduces the linearized constraint residuals, the feasibility contribution is nonpositive. Choosing $\rho$ larger than the current multiplier magnitudes ensures that any possible objective increase caused by imperfect multiplier estimates is dominated by the penalty on infeasibility. Hence the total directional derivative is negative.
+\end{proof}
+
+\begin{algorithm}[H]
+	\DontPrintSemicolon
+	\caption{SQP with Merit-Function Line Search}
+\label{alg:l3-sqp-with-merit-function-line-search}
+	\KwIn{Initial guess $x_0$, multiplier estimate $(\lambda_0,\mu_0)$, Hessian model $W_0$, penalty parameter $\rho>0$}
+	\For{$k=0,1,2,\dots$ until convergence}{
+		Build the QP subproblem by quadratic approximation of the Lagrangian and linearization of the constraints\;
+		Regularize the QP KKT system if needed and solve for the step $p_k$ and multiplier update\;
+		Choose a step size $\alpha_k \in (0,1]$ by backtracking until
+		\[
+			\Phi_\rho(x_k+\alpha_k p_k)
+			\le
+			\Phi_\rho(x_k)+\sigma \alpha_k D\Phi_\rho(x_k)[p_k]
+		\]
+		holds for some $\sigma \in (0,1)$\;
+		Update
+		\[
+			x_{k+1}=x_k+\alpha_k p_k
+		\]
+		and refresh the Hessian model and multiplier estimates\;
+	}
+	\KwOut{Approximate KKT point}
+\end{algorithm}
+
+\begin{remark}[Augmented Lagrangian versus pure penalty globalization]
+	The $\ell_1$ merit function is simple and effective, but many implementations instead use augmented-Lagrangian merit functions. The reason is conditioning: pure penalties require large $\rho$ values, while multiplier terms let the solver enforce feasibility without forcing the quadratic model to become extremely stiff.
+\end{remark}
+
 \begin{remark}
 	Lecture 3 gives the static constrained-optimization language used repeatedly later:
 	\begin{itemize}
